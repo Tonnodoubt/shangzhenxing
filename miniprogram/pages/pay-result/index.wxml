@@ -1,0 +1,40 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">支付结果</text>
+    <text class="state-title">支付结果加载中</text>
+    <text class="state-copy">正在同步刚刚创建的订单信息。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">支付结果页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是订单信息还没同步成功。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="viewOrders">查看订单列表</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'notFound'}}">
+    <text class="state-tag">订单不存在</text>
+    <text class="state-title">这笔订单暂时找不到</text>
+    <text class="state-copy">{{errorMessage || '你可以回订单列表确认，或者返回首页重新下单。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="viewOrders">订单列表</button>
+      <button class="primary-button state-button" bindtap="backHome">返回首页</button>
+    </view>
+  </view>
+
+  <view wx:elif="{{pageState === 'success' && order}}">
+    <view class="panel result-card">
+      <text class="result-badge">支付成功</text>
+      <text class="result-title">订单已经创建完成</text>
+      <text class="result-copy">这一版先按 mock 支付成功流转，后面再接真实微信支付回调。</text>
+      <text class="result-amount">实付 ¥{{order.displayAmount}}</text>
+      <text class="result-order">订单号 {{order.id}}</text>
+    </view>
+
+    <button class="primary-button result-button" bindtap="openOrderDetail">查看订单详情</button>
+    <button class="ghost-button result-button" bindtap="backHome">返回首页</button>
+  </view>
+</view>

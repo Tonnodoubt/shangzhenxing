@@ -1,0 +1,55 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/category/index",
+    "pages/search/index",
+    "pages/product/index",
+    "pages/cart/index",
+    "pages/checkout/index",
+    "pages/pay-result/index",
+    "pages/orders/index",
+    "pages/order-detail/index",
+    "pages/aftersale/index",
+    "pages/profile/index",
+    "pages/address-list/index",
+    "pages/address-edit/index",
+    "pages/coupons/index",
+    "pages/distribution/index",
+    "pages/team/index",
+    "pages/commissions/index",
+    "pages/poster/index",
+    "pages/auth/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "微信商城",
+    "navigationBarBackgroundColor": "#F7F4ED",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F7F4ED",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#706B62",
+    "selectedColor": "#C96B48",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/category/index",
+        "text": "分类"
+      },
+      {
+        "pagePath": "pages/cart/index",
+        "text": "购物车"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

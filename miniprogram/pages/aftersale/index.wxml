@@ -1,0 +1,138 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">售后申请</text>
+    <text class="state-title">正在加载订单信息</text>
+    <text class="state-copy">先确认订单是否可售后，再进入提交表单。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">售后页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是订单信息还没同步成功。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backOrderDetail">返回订单详情</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'notFound'}}">
+    <text class="state-tag">订单不存在</text>
+    <text class="state-title">这笔订单可能已经失效</text>
+    <text class="state-copy">{{errorMessage || '你可以回订单列表重新进入，或者返回首页继续下单。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backOrderDetail">订单详情</button>
+      <button class="primary-button state-button" bindtap="backHome">返回首页</button>
+    </view>
+  </view>
+
+  <view wx:elif="{{(pageState === 'submitted' || pageState === 'success' || pageState === 'notEligible') && order}}">
+    <view class="panel aftersale-card">
+      <text class="block-title">关联订单</text>
+      <text class="aftersale-order">{{order.id}}</text>
+      <text class="aftersale-copy">订单状态：{{order.statusText}} · {{order.itemCountText}}</text>
+      <text class="aftersale-time">下单时间 {{order.createTime}}</text>
+    </view>
+
+    <view class="panel aftersale-card">
+      <text class="block-title">商品与金额</text>
+      <block wx:for="{{order.itemList}}" wx:key="index">
+        <view class="order-item-row">
+          <view class="order-item-main">
+            <text class="order-item-title">{{item.title}}</text>
+            <text class="order-item-meta">{{item.specText}} x {{item.quantity}}</text>
+          </view>
+          <text class="order-item-price">{{item.priceText}}</text>
+        </view>
+      </block>
+      <view class="amount-row" wx:for="{{order.amountRows}}" wx:key="id">
+        <text class="amount-label {{item.isTotal ? 'amount-label-strong' : ''}}">{{item.label}}</text>
+        <text class="amount-value {{item.isTotal ? 'amount-value-strong' : ''}}">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="panel aftersale-card">
+      <text class="block-title">收货信息</text>
+      <text class="aftersale-order-info">{{order.addressLine}}</text>
+      <text class="aftersale-copy">{{order.address.detail}}</text>
+    </view>
+
+    <view class="panel aftersale-card">
+      <text class="block-title">处理流程</text>
+      <block wx:for="{{processSteps}}" wx:key="id">
+        <view class="process-row">
+          <text class="process-dot {{item.active ? 'process-dot-active' : ''}}"></text>
+          <view class="process-main">
+            <text class="process-title {{item.active ? 'process-title-active' : ''}}">{{item.title}}</text>
+            <text class="process-copy">{{item.copy}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel state-card" wx:if="{{pageState === 'notEligible'}}">
+      <text class="state-tag">暂不可申请</text>
+      <text class="state-title">当前订单状态还不能走售后</text>
+      <text class="state-copy">现在只有待收货和已完成订单支持发起售后，等订单状态变更后再试。</text>
+      <view class="state-actions">
+        <button class="primary-button state-button" bindtap="backOrderDetail">返回订单详情</button>
+      </view>
+    </view>
+
+    <view wx:elif="{{pageState === 'submitted'}}">
+      <view class="panel aftersale-card">
+        <text class="block-title">售后记录</text>
+        <text class="aftersale-status" wx:if="{{afterSale}}">
+          {{afterSale.statusText}} · {{afterSale.reason}}
+        </text>
+        <text class="aftersale-time" wx:if="{{afterSale}}">{{afterSale.createdAt}}</text>
+        <text class="aftersale-copy" wx:if="{{afterSale && afterSale.description}}">{{afterSale.description}}</text>
+        <text class="aftersale-copy" wx:else>这笔订单已经提交过售后了，不需要重复申请。</text>
+      </view>
+
+      <button class="primary-button aftersale-button" bindtap="backOrderDetail">返回订单详情</button>
+    </view>
+
+    <view wx:else>
+      <view class="panel aftersale-card">
+        <text class="block-title">售后原因</text>
+        <view class="reason-list">
+          <block wx:for="{{reasons}}" wx:key="*this">
+            <view class="reason-chip {{selectedReason === item ? 'reason-chip-active' : ''}}" data-reason="{{item}}" bindtap="chooseReason">
+              {{item}}
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view class="panel aftersale-card">
+        <text class="block-title">补充说明</text>
+        <textarea
+          class="aftersale-textarea"
+          maxlength="200"
+          value="{{description}}"
+          placeholder="可补充说明，本版先做文本售后"
+          bindinput="handleInput"
+        />
+      </view>
+
+      <view class="panel aftersale-card">
+        <text class="block-title">售后说明</text>
+        <block wx:for="{{supportTips}}" wx:key="id">
+          <view class="tip-row">
+            <text class="tip-title">{{item.title}}</text>
+            <text class="tip-copy">{{item.copy}}</text>
+          </view>
+        </block>
+      </view>
+
+      <button
+        class="primary-button aftersale-button"
+        bindtap="submitAfterSale"
+        loading="{{submitting}}"
+        disabled="{{submitting || !canSubmit}}"
+      >
+        {{submitting ? '提交中...' : submitButtonText}}
+      </button>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,75 @@
+<view class="page-shell">
+  <view class="panel search-bar">
+    <input
+      class="search-input"
+      placeholder="输入商品关键词试试"
+      value="{{keyword}}"
+      bindinput="handleInput"
+      bindconfirm="submitSearch"
+      confirm-type="search"
+    />
+    <button
+      class="primary-button search-button"
+      bindtap="submitSearch"
+      loading="{{searching}}"
+      disabled="{{searching || !canSearch}}"
+    >
+      {{searching ? '搜索中...' : '搜索'}}
+    </button>
+  </view>
+
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">商品搜索</text>
+    <text class="state-title">正在搜索相关商品</text>
+    <text class="state-copy">关键词“{{lastKeyword}}”正在匹配商品标题和分类。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">搜索失败</text>
+    <text class="state-title">搜索页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="openCategory">先看分类</button>
+      <button class="primary-button state-button" bindtap="retrySearch" disabled="{{!canSearch}}">重新搜索</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="section-head">
+      <text class="section-title">搜索结果</text>
+      <text class="section-subtitle">先做基础关键词搜索，后面再补搜索历史和推荐词。</text>
+    </view>
+
+    <view class="product-list" wx:if="{{pageState === 'success'}}">
+      <block wx:for="{{results}}" wx:key="id">
+        <view class="product-card panel" data-id="{{item.id}}" bindtap="openProduct">
+          <view class="product-cover" style="background: {{item.accent}};">
+            <text class="product-cover-text">{{item.coverLabel}}</text>
+          </view>
+          <view class="product-content">
+            <view class="product-top">
+              <text class="tag-chip">{{item.tag}}</text>
+              <text class="product-sales">{{item.salesText}}</text>
+            </view>
+            <text class="product-title">{{item.title}}</text>
+            <text class="product-desc">{{item.shortDesc}}</text>
+            <view class="price-row">
+              <text class="price-now">¥{{item.displayPrice}}</text>
+              <text class="price-origin">¥{{item.displayMarketPrice}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel empty-box" wx:elif="{{pageState === 'empty'}}">
+      <text class="empty-title">暂时没搜到“{{lastKeyword}}”</text>
+      <text class="empty-copy">你可以试试“礼盒”、“饮品”或者“数码”这些关键词。</text>
+    </view>
+
+    <view class="panel empty-box" wx:else>
+      <text class="empty-title">先输入关键词开始搜索</text>
+      <text class="empty-copy">当前会从本地商品数据里筛结果，后续可以继续补搜索历史和推荐词。</text>
+    </view>
+  </view>
+</view>

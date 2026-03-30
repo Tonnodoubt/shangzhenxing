@@ -1,0 +1,261 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.profile-shell {
+  padding-bottom: 36rpx;
+}
+
+.profile-hero {
+  padding: 34rpx;
+  background: linear-gradient(145deg, #fff1e6, #f5e7d8 50%, #d7efe3);
+}
+
+.profile-hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.profile-kicker {
+  color: #8d5e43;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+
+.profile-name {
+  margin-top: 14rpx;
+  display: block;
+  font-size: 46rpx;
+  font-weight: 700;
+  color: #2d241d;
+  line-height: 1.2;
+}
+
+.profile-phone {
+  display: block;
+  margin-top: 16rpx;
+  color: #6f655a;
+  font-size: 24rpx;
+}
+
+.profile-auth-chip {
+  flex-shrink: 0;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.78);
+  color: #2b6b53;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.profile-promo {
+  margin-top: 28rpx;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #202320, #40493d);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.profile-promo-main {
+  flex: 1;
+}
+
+.profile-promo-kicker {
+  display: inline-block;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 229, 180, 0.14);
+  color: #f0d39d;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.profile-promo-title {
+  margin-top: 16rpx;
+  display: block;
+  color: #fff9ef;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.profile-promo-copy {
+  margin-top: 12rpx;
+  display: block;
+  color: rgba(255, 248, 238, 0.76);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.profile-promo-link {
+  flex-shrink: 0;
+  color: #ffe0a1;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.metric-grid {
+  margin-top: 22rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.metric-card {
+  width: 48%;
+  min-height: 180rpx;
+  margin-bottom: 18rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.metric-value {
+  display: block;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.metric-label {
+  margin-top: 12rpx;
+  color: #7a7166;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.profile-section {
+  margin-top: 22rpx;
+  padding: 28rpx;
+}
+
+.profile-section-head {
+  margin-bottom: 18rpx;
+}
+
+.service-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.service-card {
+  width: 48%;
+  min-height: 188rpx;
+  margin-bottom: 18rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  border-radius: 24rpx;
+  background: #f7f4ec;
+}
+
+.service-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #e2efe9;
+  color: #2b6b53;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.service-card-title {
+  display: block;
+  margin-top: 18rpx;
+  color: #2e261f;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.service-card-copy {
+  display: block;
+  margin-top: 12rpx;
+  color: #7a7167;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0ebe1;
+}
+
+.service-row:last-child {
+  border-bottom: 0;
+}
+
+.service-row-main {
+  flex: 1;
+}
+
+.service-row-title {
+  display: block;
+  color: #2e261f;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.service-row-copy {
+  display: block;
+  margin-top: 10rpx;
+  color: #83796d;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.service-row-value {
+  flex-shrink: 0;
+  color: #2b6b53;
+  font-size: 24rpx;
+  font-weight: 700;
+}

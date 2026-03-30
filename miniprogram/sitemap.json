@@ -1,0 +1,9 @@
+{
+  "desc": "微信商城小程序基础骨架 sitemap",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

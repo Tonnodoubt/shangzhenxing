@@ -1,0 +1,32 @@
+{
+  "name": "wechat-mini-shop-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node src/index.js",
+    "start": "node src/index.js",
+    "start:cloud": "prisma migrate deploy && node src/index.js",
+    "db:local:up": "docker compose -f compose.local-mysql.yml up -d",
+    "db:local:down": "docker compose -f compose.local-mysql.yml down",
+    "db:local:ps": "docker compose -f compose.local-mysql.yml ps",
+    "db:local:logs": "docker compose -f compose.local-mysql.yml logs -f mysql",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:format": "prisma format",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:seed:storefront": "node scripts/bootstrap-prisma-storefront.js",
+    "storefront:regression:prisma": "node scripts/run-prisma-regression.js"
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^7.6.0",
+    "@prisma/client": "^7.6.0",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "mariadb": "^3.5.2",
+    "prisma": "^7.6.0"
+  }
+}

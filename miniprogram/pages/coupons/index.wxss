@@ -1,0 +1,144 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.coupon-hero {
+  padding: 28rpx;
+}
+
+.clear-link {
+  margin-top: 16rpx;
+  display: block;
+  color: #c96b48;
+  font-size: 24rpx;
+}
+
+.section-head {
+  margin-top: 28rpx;
+}
+
+.coupon-list {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.coupon-card {
+  padding: 26rpx;
+}
+
+.coupon-card-active {
+  border: 2rpx solid #efc7b7;
+  background: #fff7f3;
+}
+
+.coupon-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.coupon-amount {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #b4512d;
+  margin-right: 12rpx;
+}
+
+.claim-button {
+  width: 200rpx;
+}
+
+.coupon-title {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.coupon-desc,
+.coupon-expiry,
+.coupon-action {
+  display: block;
+  margin-top: 10rpx;
+  color: #786f64;
+  font-size: 24rpx;
+}
+
+.content-empty {
+  margin-top: 20rpx;
+  padding: 48rpx 28rpx;
+  text-align: center;
+}
+
+.content-empty-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.content-empty-copy {
+  display: block;
+  margin-top: 16rpx;
+  color: #7f7569;
+  line-height: 1.7;
+}
+
+.empty-box {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.empty-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.empty-copy {
+  display: block;
+  margin-top: 16rpx;
+  color: #7f7569;
+  line-height: 1.7;
+}

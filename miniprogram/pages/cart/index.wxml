@@ -1,0 +1,95 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">购物车</text>
+    <text class="state-title">购物车加载中</text>
+    <text class="state-copy">正在同步商品数量、金额和结算信息。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">购物车暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="goShopping">去首页逛逛</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="cart-header panel">
+      <text class="section-title">购物车骨架</text>
+      <text class="section-subtitle">这里已经连上了数量增减、删除和结算入口，方便我们后面继续接支付。</text>
+    </view>
+
+    <view wx:if="{{!isEmpty}}">
+      <view class="cart-list">
+        <block wx:for="{{cartItems}}" wx:key="cartKey">
+          <view class="cart-card panel">
+            <view class="cart-cover" style="background: {{item.accent}};">
+              <text class="cart-cover-text">{{item.coverLabel}}</text>
+            </view>
+            <view class="cart-content">
+              <view class="cart-top">
+                <text class="cart-title">{{item.title}}</text>
+                <text
+                  class="cart-remove {{loadingCartKey === item.cartKey ? 'cart-remove-disabled' : ''}}"
+                  data-id="{{item.id}}"
+                  data-key="{{item.cartKey}}"
+                  data-spec="{{item.specText}}"
+                  bindtap="removeItem"
+                >
+                  {{loadingCartKey === item.cartKey && loadingAction === 'remove' ? '处理中' : '删除'}}
+                </text>
+              </view>
+              <text class="cart-spec">{{item.specText}}</text>
+              <view class="cart-bottom">
+                <view class="quantity-row">
+                  <view
+                    class="quantity-button {{loadingCartKey === item.cartKey ? 'quantity-button-disabled' : ''}}"
+                    data-id="{{item.id}}"
+                    data-key="{{item.cartKey}}"
+                    data-spec="{{item.specText}}"
+                    bindtap="decreaseQuantity"
+                  >
+                    -
+                  </view>
+                  <text class="quantity-value">{{item.quantity}}</text>
+                  <view
+                    class="quantity-button quantity-button-active {{loadingCartKey === item.cartKey ? 'quantity-button-disabled' : ''}}"
+                    data-id="{{item.id}}"
+                    data-key="{{item.cartKey}}"
+                    data-spec="{{item.specText}}"
+                    bindtap="increaseQuantity"
+                  >
+                    +
+                  </view>
+                </view>
+                <text class="cart-subtotal">¥{{item.displaySubtotal}}</text>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <view class="cart-summary panel">
+        <view>
+          <text class="summary-label">共 {{totalCount}} 件商品</text>
+          <text class="summary-price">¥{{totalPrice}}</text>
+        </view>
+        <button
+          class="primary-button cart-submit"
+          bindtap="goCheckout"
+          disabled="{{refreshing || loadingCartKey ? true : false}}"
+        >
+          去结算
+        </button>
+      </view>
+    </view>
+
+    <view class="empty-box panel" wx:else>
+      <text class="empty-title">购物车目前还是空的</text>
+      <text class="empty-copy">你可以先去首页或分类页点几件商品进来，整条下单链路就能跑起来了。</text>
+      <button class="primary-button empty-action" bindtap="goShopping">去逛逛</button>
+    </view>
+  </view>
+</view>

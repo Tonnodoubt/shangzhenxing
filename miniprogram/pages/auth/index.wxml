@@ -1,0 +1,42 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">账号授权</text>
+    <text class="state-title">授权信息加载中</text>
+    <text class="state-copy">正在同步当前账号的授权状态和手机号信息。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">授权页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="panel auth-hero">
+      <text class="auth-kicker">{{sessionLoginModeTag}}</text>
+      <text class="auth-mode-title">{{sessionLoginModeTitle}}</text>
+      <text class="auth-mode-copy">{{sessionLoginModeCopy}}</text>
+      <text class="auth-title">{{user.isAuthorized ? '当前账号已完成授权' : '补上登录授权，让用户链路更完整'}}</text>
+      <text class="auth-copy">这里先把小程序内的授权流程接上，后面再替换成更完整的微信昵称、手机号和用户资料同步。</text>
+    </view>
+
+    <view class="panel auth-card">
+      <text class="auth-label">当前账号</text>
+      <text class="auth-value">{{user.nickname}}</text>
+      <text class="auth-phone">{{user.phone}}</text>
+
+      <view class="agreement-row" bindtap="toggleAgreement">
+        <text class="agreement-check">{{agreed ? '已勾选' : '未勾选'}}</text>
+        <text class="agreement-copy">我已阅读并同意《用户协议》和《隐私政策》</text>
+      </view>
+    </view>
+
+    <button class="primary-button auth-button" bindtap="authorize" loading="{{authorizing}}" disabled="{{authorizing}}">
+      {{authorizing ? '授权中...' : (user.isAuthorized ? '重新同步授权状态' : '一键同步授权状态')}}
+    </button>
+  </view>
+</view>

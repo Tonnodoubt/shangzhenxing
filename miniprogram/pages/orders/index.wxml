@@ -1,0 +1,75 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">我的订单</text>
+    <text class="state-title">订单列表加载中</text>
+    <text class="state-copy">正在同步全部订单和各状态筛选结果。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">订单页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="goHome">返回首页</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="order-tabs panel">
+      <block wx:for="{{tabs}}" wx:key="status">
+        <view
+          class="order-tab {{activeStatus === item.status ? 'order-tab-active' : ''}}"
+          data-status="{{item.status}}"
+          bindtap="switchStatus"
+        >
+          {{item.label}}
+        </view>
+      </block>
+    </view>
+
+    <view wx:if="{{!isEmpty}}">
+      <block wx:for="{{filteredOrders}}" wx:key="id">
+        <view class="order-card panel">
+          <view class="order-top">
+            <text class="order-number">{{item.id}}</text>
+            <text class="order-status">{{item.statusText}}</text>
+          </view>
+          <text class="order-time">{{item.createTime}}</text>
+          <block wx:for="{{item.items}}" wx:key="index">
+            <view class="order-item">
+              <text class="order-item-title">{{item.title}}</text>
+              <text class="order-item-meta">{{item.specText}} x {{item.quantity}}</text>
+            </view>
+          </block>
+          <view class="order-tags">
+            <text class="order-tag">{{item.itemCountText}}</text>
+            <text class="order-tag order-tag-warm" wx:if="{{item.aftersaleStatusText}}">
+              {{item.aftersaleStatusText}}
+            </text>
+          </view>
+          <view class="order-bottom">
+            <text class="order-total">合计 ¥{{item.displayAmount}}</text>
+            <view class="order-links">
+              <text
+                class="order-link order-link-muted"
+                wx:if="{{item.canOpenAftersale}}"
+                data-id="{{item.id}}"
+                catchtap="openAfterSale"
+              >
+                {{item.aftersaleEntryText}}
+              </text>
+              <text class="order-link" data-id="{{item.id}}" bindtap="openOrderDetail">查看详情</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="order-empty panel" wx:else>
+      <text class="order-empty-title">{{emptyTitle}}</text>
+      <text class="order-empty-copy">{{emptyCopy}}</text>
+      <button class="primary-button order-empty-button" bindtap="goHome">去首页逛逛</button>
+    </view>
+  </view>
+</view>

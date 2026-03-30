@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>履约控制台</title>
+    <style>
+      :root {
+        --bg: #f4efe7;
+        --panel: rgba(255, 252, 247, 0.92);
+        --line: rgba(91, 67, 43, 0.12);
+        --text: #2d241b;
+        --muted: #73614d;
+        --brand: #7b4b28;
+        --brand-soft: #ead8c2;
+        --warn: #a24b37;
+        --success: #2c6a4d;
+        --shadow: 0 18px 40px rgba(61, 41, 23, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(234, 216, 194, 0.9), transparent 35%),
+          radial-gradient(circle at top right, rgba(206, 224, 214, 0.7), transparent 32%),
+          linear-gradient(180deg, #fbf7f0 0%, #f3ece2 100%);
+      }
+
+      .shell {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 28px 18px 48px;
+      }
+
+      .hero,
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      .hero {
+        padding: 28px;
+        margin-bottom: 20px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .hero h1 {
+        margin-top: 12px;
+        font-size: 34px;
+        line-height: 1.1;
+      }
+
+      .hero p {
+        margin-top: 10px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .credentials {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .credential-chip {
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(123, 75, 40, 0.08);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .panel {
+        padding: 20px;
+      }
+
+      .panel h2 {
+        font-size: 18px;
+        margin-bottom: 14px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid rgba(91, 67, 43, 0.14);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--text);
+      }
+
+      textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: transform 160ms ease, opacity 160ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        transform: none;
+      }
+
+      .primary {
+        background: linear-gradient(135deg, #7b4b28 0%, #98633b 100%);
+        color: #fff;
+      }
+
+      .secondary {
+        background: rgba(123, 75, 40, 0.08);
+        color: var(--brand);
+      }
+
+      .danger {
+        background: rgba(162, 75, 55, 0.12);
+        color: var(--warn);
+      }
+
+      .success {
+        background: rgba(44, 106, 77, 0.12);
+        color: var(--success);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .status-line {
+        min-height: 20px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .status-line.error {
+        color: var(--warn);
+      }
+
+      .status-line.success {
+        color: var(--success);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .summary-card {
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(91, 67, 43, 0.08);
+      }
+
+      .summary-card strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 14px;
+      }
+
+      .toolbar label {
+        min-width: 160px;
+        flex: 1 1 160px;
+      }
+
+      .section {
+        margin-top: 20px;
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .list {
+        display: grid;
+        gap: 14px;
+      }
+
+      .card {
+        border: 1px solid rgba(91, 67, 43, 0.1);
+        border-radius: 20px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.88);
+      }
+
+      .card-top,
+      .card-bottom,
+      .detail-grid,
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+      }
+
+      .card-top {
+        align-items: center;
+      }
+
+      .meta {
+        display: grid;
+        gap: 6px;
+      }
+
+      .meta strong {
+        font-size: 16px;
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(123, 75, 40, 0.08);
+        color: var(--brand);
+        font-size: 12px;
+      }
+
+      .detail-grid {
+        margin-top: 14px;
+        align-items: flex-start;
+      }
+
+      .detail-box {
+        flex: 1 1 220px;
+        padding: 14px;
+        border-radius: 16px;
+        background: rgba(123, 75, 40, 0.05);
+      }
+
+      .detail-box p + p {
+        margin-top: 8px;
+      }
+
+      .order-items {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .order-item {
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(91, 67, 43, 0.08);
+      }
+
+      .ship-form,
+      .review-form {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .empty {
+        padding: 24px 12px;
+        text-align: center;
+        color: var(--muted);
+        border: 1px dashed rgba(91, 67, 43, 0.14);
+        border-radius: 18px;
+      }
+
+      @media (max-width: 980px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .hero h1 {
+          font-size: 28px;
+        }
+
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <span class="eyebrow">MINIMAL FULFILLMENT</span>
+        <h1>微信小程序商城履约控制台</h1>
+        <p>这是一套不依赖额外前端工程的轻量入口，当前只解决三件事：看订单、录物流、处理售后。适合先把正式上线前的最小履约链路跑起来。</p>
+        <div class="credentials">
+          <div class="credential-chip">管理员账号：<strong>admin / Admin@123456</strong></div>
+          <div class="credential-chip">履约账号：<strong>order / Order@123456</strong></div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <aside class="stack">
+          <section class="panel">
+            <h2>登录</h2>
+            <form id="login-form" class="stack">
+              <label>
+                用户名
+                <input id="login-username" name="username" autocomplete="username" value="order" />
+              </label>
+              <label>
+                密码
+                <input id="login-password" name="password" type="password" autocomplete="current-password" value="Order@123456" />
+              </label>
+              <button class="primary" id="login-submit" type="submit">登录控制台</button>
+            </form>
+            <div id="login-status" class="status-line"></div>
+          </section>
+
+          <section class="panel hidden" id="session-panel">
+            <h2>当前会话</h2>
+            <div class="stack">
+              <div>
+                <div class="muted">账号</div>
+                <strong id="session-name">未登录</strong>
+              </div>
+              <div>
+                <div class="muted">角色</div>
+                <strong id="session-roles">-</strong>
+              </div>
+              <div>
+                <div class="muted">仓库模式</div>
+                <strong id="repository-mode">-</strong>
+              </div>
+              <button class="secondary" id="refresh-all" type="button">刷新全部数据</button>
+              <button class="danger" id="logout-button" type="button">退出登录</button>
+            </div>
+            <div id="session-status" class="status-line"></div>
+          </section>
+        </aside>
+
+        <main class="stack hidden" id="workspace">
+          <section class="panel">
+            <div class="section-header">
+              <div>
+                <h2>履约概览</h2>
+                <p class="muted">优先盯待发货和待审核售后。</p>
+              </div>
+            </div>
+            <div id="summary-grid" class="summary-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-header">
+              <div>
+                <h2>订单处理</h2>
+                <p class="muted">新订单会先停留在待发货，录入物流后进入待收货。</p>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                订单号
+                <input id="orders-filter-order-no" placeholder="支持模糊搜索订单号" />
+              </label>
+              <label>
+                状态
+                <select id="orders-filter-status">
+                  <option value="">全部</option>
+                  <option value="pending_shipment">待发货</option>
+                  <option value="shipping">待收货</option>
+                  <option value="done">已完成</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+              </label>
+              <button class="secondary" id="orders-filter-submit" type="button">刷新订单</button>
+            </div>
+            <div id="orders-list" class="list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-header">
+              <div>
+                <h2>售后处理</h2>
+                <p class="muted">当前支持通过 / 驳回两种最小动作，处理结果会回写到订单售后状态。</p>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                订单号 / 买家
+                <input id="aftersales-filter-keyword" placeholder="支持订单号、昵称、收货人" />
+              </label>
+              <label>
+                状态
+                <select id="aftersales-filter-status">
+                  <option value="">全部</option>
+                  <option value="pending_review">待审核</option>
+                  <option value="approved">已通过</option>
+                  <option value="rejected">已驳回</option>
+                  <option value="done">已完成</option>
+                </select>
+              </label>
+              <button class="secondary" id="aftersales-filter-submit" type="button">刷新售后</button>
+            </div>
+            <div id="aftersales-list" class="list"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        adminToken: window.localStorage.getItem("mall_admin_token") || "",
+        session: null,
+        repositoryMode: "-",
+        summary: null,
+        orders: [],
+        afterSales: [],
+        orderDetails: new Map()
+      };
+
+      const summaryLabels = [
+        { key: "pendingShipmentCount", label: "待发货", suffix: "单" },
+        { key: "pendingAftersaleCount", label: "待审核售后", suffix: "笔" },
+        { key: "shippingOrderCount", label: "待收货", suffix: "单" },
+        { key: "todayPaidAmountText", label: "今日成交", suffix: "元" }
+      ];
+
+      const nodes = {
+        loginForm: document.getElementById("login-form"),
+        loginStatus: document.getElementById("login-status"),
+        loginSubmit: document.getElementById("login-submit"),
+        sessionPanel: document.getElementById("session-panel"),
+        sessionName: document.getElementById("session-name"),
+        sessionRoles: document.getElementById("session-roles"),
+        repositoryMode: document.getElementById("repository-mode"),
+        sessionStatus: document.getElementById("session-status"),
+        workspace: document.getElementById("workspace"),
+        summaryGrid: document.getElementById("summary-grid"),
+        ordersList: document.getElementById("orders-list"),
+        aftersalesList: document.getElementById("aftersales-list")
+      };
+
+      function setStatus(node, message, type) {
+        node.textContent = message || "";
+        node.className = "status-line" + (type ? " " + type : "");
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      async function request(url, options = {}) {
+        const headers = Object.assign(
+          {
+            "Content-Type": "application/json"
+          },
+          options.headers || {}
+        );
+
+        if (options.auth !== false && state.adminToken) {
+          headers.Authorization = "Bearer " + state.adminToken;
+        }
+
+        const response = await fetch(url, {
+          method: options.method || "GET",
+          headers,
+          body: typeof options.body === "undefined" ? undefined : JSON.stringify(options.body)
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || payload.code) {
+          const error = new Error(payload.message || "请求失败");
+          error.statusCode = response.status;
+          throw error;
+        }
+
+        return payload.data;
+      }
+
+      async function ensureRepositoryMode() {
+        const payload = await fetch("/health").then((response) => response.json());
+        state.repositoryMode = (((payload || {}).data || {}).storefrontRepositoryMode) || "-";
+        nodes.repositoryMode.textContent = state.repositoryMode;
+      }
+
+      function renderSession() {
+        const loggedIn = !!(state.session && state.adminToken);
+
+        nodes.sessionPanel.classList.toggle("hidden", !loggedIn);
+        nodes.workspace.classList.toggle("hidden", !loggedIn);
+        nodes.sessionName.textContent = loggedIn ? state.session.adminUser.realName + " / " + state.session.adminUser.username : "未登录";
+        nodes.sessionRoles.textContent = loggedIn ? (state.session.roleCodes || []).join(" / ") : "-";
+        nodes.repositoryMode.textContent = state.repositoryMode;
+      }
+
+      function renderSummary() {
+        const data = state.summary || {};
+
+        nodes.summaryGrid.innerHTML = summaryLabels.map((item) => {
+          const rawValue = data[item.key];
+          const displayValue = typeof rawValue === "number" ? String(rawValue) : (rawValue || "0.00");
+
+          return [
+            '<div class="summary-card">',
+            "<div class=\"muted\">" + escapeHtml(item.label) + "</div>",
+            "<strong>" + escapeHtml(displayValue) + "</strong>",
+            "<div class=\"muted\">" + escapeHtml(item.suffix) + "</div>",
+            "</div>"
+          ].join("");
+        }).join("");
+      }
+
+      function renderOrders() {
+        if (!state.orders.length) {
+          nodes.ordersList.innerHTML = '<div class="empty">当前没有符合条件的订单。</div>';
+          return;
+        }
+
+        nodes.ordersList.innerHTML = state.orders.map((order) => {
+          const detail = state.orderDetails.get(order.orderId) || null;
+          const detailHtml = detail ? renderOrderDetail(detail) : "";
+          const shipForm = order.orderStatus === "pending_shipment"
+            ? [
+                '<div class="ship-form">',
+                '<label>物流公司<input data-ship-company-name="' + escapeHtml(order.orderId) + '" placeholder="例如：顺丰速运" /></label>',
+                '<label>物流单号<input data-ship-tracking-no="' + escapeHtml(order.orderId) + '" placeholder="录入真实物流单号" /></label>',
+                '<label>物流编码<input data-ship-company-code="' + escapeHtml(order.orderId) + '" placeholder="可选，例如 SF" /></label>',
+                '<div class="action-row">',
+                '<button class="primary" data-action="ship" data-order-id="' + escapeHtml(order.orderId) + '">确认发货</button>',
+                '<button class="danger" data-action="cancel-order" data-order-id="' + escapeHtml(order.orderId) + '">取消订单</button>',
+                "</div>",
+                "</div>"
+              ].join("")
+            : "";
+
+          return [
+            '<article class="card">',
+            '<div class="card-top">',
+            '<div class="meta">',
+            '<strong>' + escapeHtml(order.orderNo) + "</strong>",
+            '<span class="muted">买家 ' + escapeHtml(order.buyerName) + " · " + escapeHtml(order.createdAt) + "</span>",
+            "</div>",
+            '<div class="tag-row">',
+            '<span class="tag">' + escapeHtml(order.orderStatusText) + "</span>",
+            '<span class="tag">' + escapeHtml(order.payableAmountText) + " 元</span>",
+            '<span class="tag">' + escapeHtml(String(order.itemCount || 0)) + " 件商品</span>",
+            "</div>",
+            "</div>",
+            '<div class="card-bottom">',
+            '<span class="muted">状态码：' + escapeHtml(order.orderStatus) + "</span>",
+            '<div class="action-row">',
+            '<button class="secondary" data-action="toggle-order-detail" data-order-id="' + escapeHtml(order.orderId) + '">' + (detail ? "收起详情" : "查看详情") + "</button>",
+            "</div>",
+            "</div>",
+            detailHtml,
+            shipForm,
+            "</article>"
+          ].join("");
+        }).join("");
+      }
+
+      function renderOrderDetail(detail) {
+        const shipment = detail.shipment;
+        const afterSale = detail.afterSale;
+
+        return [
+          '<div class="detail-grid">',
+          '<div class="detail-box">',
+          "<p><strong>收货信息</strong></p>",
+          "<p>" + escapeHtml(detail.receiverName || "-") + " / " + escapeHtml(detail.receiverMobile || "-") + "</p>",
+          "<p class=\"muted\">" + escapeHtml(detail.receiverAddress || "-") + "</p>",
+          "</div>",
+          '<div class="detail-box">',
+          "<p><strong>金额信息</strong></p>",
+          "<p>商品金额 " + escapeHtml(detail.goodsAmountText) + " 元</p>",
+          "<p>优惠抵扣 " + escapeHtml(detail.discountAmountText) + " 元</p>",
+          "<p>实付 " + escapeHtml(detail.payableAmountText) + " 元</p>",
+          "</div>",
+          '<div class="detail-box">',
+          "<p><strong>履约信息</strong></p>",
+          (shipment
+            ? "<p>" + escapeHtml(shipment.companyName) + " · " + escapeHtml(shipment.trackingNo) + "</p><p class=\"muted\">发货时间 " + escapeHtml(shipment.shippedAt) + "</p>"
+            : '<p class="muted">还没有录入物流信息</p>'),
+          (afterSale
+            ? "<p>售后状态 " + escapeHtml(afterSale.statusText) + "</p>"
+            : '<p class="muted">当前没有售后记录</p>'),
+          "</div>",
+          "</div>",
+          '<div class="order-items">',
+          (detail.items || []).map((item) => {
+            return [
+              '<div class="order-item">',
+              "<strong>" + escapeHtml(item.productTitle) + "</strong>",
+              "<p class=\"muted\">" + escapeHtml(item.specText || "默认规格") + " · x" + escapeHtml(String(item.quantity || 1)) + "</p>",
+              "<p class=\"muted\">成交单价 " + escapeHtml(item.salePriceText) + " 元</p>",
+              "</div>"
+            ].join("");
+          }).join(""),
+          "</div>"
+        ].join("");
+      }
+
+      function renderAfterSales() {
+        if (!state.afterSales.length) {
+          nodes.aftersalesList.innerHTML = '<div class="empty">当前没有符合条件的售后记录。</div>';
+          return;
+        }
+
+        nodes.aftersalesList.innerHTML = state.afterSales.map((record) => {
+          const canReview = record.status === "pending_review";
+
+          return [
+            '<article class="card">',
+            '<div class="card-top">',
+            '<div class="meta">',
+            '<strong>' + escapeHtml(record.orderNo) + "</strong>",
+            '<span class="muted">买家 ' + escapeHtml(record.buyerName) + " · " + escapeHtml(record.createdAt) + "</span>",
+            "</div>",
+            '<div class="tag-row">',
+            '<span class="tag">' + escapeHtml(record.statusText) + "</span>",
+            '<span class="tag">' + escapeHtml(record.reason) + "</span>",
+            "</div>",
+            "</div>",
+            '<div class="detail-grid">',
+            '<div class="detail-box">',
+            "<p><strong>申请说明</strong></p>",
+            "<p>" + escapeHtml(record.description || "未填写说明") + "</p>",
+            "</div>",
+            '<div class="detail-box">',
+            "<p><strong>订单状态</strong></p>",
+            "<p>" + escapeHtml(record.orderStatusText || "-") + "</p>",
+            "</div>",
+            '<div class="detail-box">',
+            "<p><strong>处理结果</strong></p>",
+            (record.reviewedAt
+              ? "<p>" + escapeHtml(record.reviewedBy || "系统管理员") + " · " + escapeHtml(record.reviewedAt) + "</p><p class=\"muted\">" + escapeHtml(record.reviewRemark || "未填写备注") + "</p>"
+              : '<p class="muted">尚未处理</p>'),
+            "</div>",
+            "</div>",
+            (canReview
+              ? [
+                  '<div class="review-form">',
+                  '<label>处理备注<textarea data-review-remark="' + escapeHtml(record.afterSaleId) + '" placeholder="例如：已核实问题，同意退款或换货"></textarea></label>',
+                  '<div class="action-row">',
+                  '<button class="success" data-action="approve-aftersale" data-aftersale-id="' + escapeHtml(record.afterSaleId) + '">通过</button>',
+                  '<button class="danger" data-action="reject-aftersale" data-aftersale-id="' + escapeHtml(record.afterSaleId) + '">驳回</button>',
+                  "</div>",
+                  "</div>"
+                ].join("")
+              : ""),
+            "</article>"
+          ].join("");
+        }).join("");
+      }
+
+      async function login(username, password) {
+        const payload = await request("/admin/v1/auth/login", {
+          method: "POST",
+          auth: false,
+          body: {
+            username,
+            password
+          }
+        });
+
+        state.adminToken = payload.adminToken;
+        state.session = payload;
+        window.localStorage.setItem("mall_admin_token", state.adminToken);
+        await ensureRepositoryMode();
+        renderSession();
+        await refreshAll();
+      }
+
+      async function validateSession() {
+        if (!state.adminToken) {
+          return;
+        }
+
+        try {
+          state.session = await request("/admin/v1/auth/me");
+          await ensureRepositoryMode();
+          renderSession();
+          await refreshAll();
+        } catch (error) {
+          clearSession();
+        }
+      }
+
+      function clearSession() {
+        state.adminToken = "";
+        state.session = null;
+        state.summary = null;
+        state.orders = [];
+        state.afterSales = [];
+        state.orderDetails = new Map();
+        window.localStorage.removeItem("mall_admin_token");
+        renderSession();
+        renderSummary();
+        renderOrders();
+        renderAfterSales();
+      }
+
+      async function refreshSummary() {
+        state.summary = await request("/admin/v1/dashboard/summary");
+        renderSummary();
+      }
+
+      async function refreshOrders() {
+        const orderNo = document.getElementById("orders-filter-order-no").value.trim();
+        const status = document.getElementById("orders-filter-status").value;
+        const query = new URLSearchParams({
+          page: "1",
+          pageSize: "50"
+        });
+
+        if (orderNo) {
+          query.set("orderNo", orderNo);
+        }
+
+        if (status) {
+          query.set("status", status);
+        }
+
+        const payload = await request("/admin/v1/orders?" + query.toString());
+        state.orders = payload.list || [];
+        renderOrders();
+      }
+
+      async function refreshAfterSales() {
+        const keyword = document.getElementById("aftersales-filter-keyword").value.trim();
+        const status = document.getElementById("aftersales-filter-status").value;
+        const query = new URLSearchParams({
+          page: "1",
+          pageSize: "50"
+        });
+
+        if (keyword) {
+          query.set("keyword", keyword);
+        }
+
+        if (status) {
+          query.set("status", status);
+        }
+
+        const payload = await request("/admin/v1/aftersales?" + query.toString());
+        state.afterSales = payload.list || [];
+        renderAfterSales();
+      }
+
+      async function refreshAll() {
+        setStatus(nodes.sessionStatus, "正在刷新履约数据...");
+
+        try {
+          await Promise.all([
+            refreshSummary(),
+            refreshOrders(),
+            refreshAfterSales()
+          ]);
+          setStatus(nodes.sessionStatus, "数据已更新。", "success");
+        } catch (error) {
+          setStatus(nodes.sessionStatus, error.message || "刷新失败", "error");
+        }
+      }
+
+      async function toggleOrderDetail(orderId) {
+        if (state.orderDetails.has(orderId)) {
+          state.orderDetails.delete(orderId);
+          renderOrders();
+          return;
+        }
+
+        const detail = await request("/admin/v1/orders/" + encodeURIComponent(orderId));
+        state.orderDetails.set(orderId, detail);
+        renderOrders();
+      }
+
+      function getInputValue(selector, value) {
+        const node = document.querySelector(selector + '="' + value.replace(/"/g, '\\"') + '"]');
+        return node ? node.value.trim() : "";
+      }
+
+      async function shipOrder(orderId) {
+        const companyName = document.querySelector('[data-ship-company-name="' + orderId + '"]').value.trim();
+        const trackingNo = document.querySelector('[data-ship-tracking-no="' + orderId + '"]').value.trim();
+        const companyCode = document.querySelector('[data-ship-company-code="' + orderId + '"]').value.trim();
+
+        await request("/admin/v1/orders/" + encodeURIComponent(orderId) + "/ship", {
+          method: "POST",
+          body: {
+            companyName,
+            trackingNo,
+            companyCode
+          }
+        });
+
+        await refreshAll();
+      }
+
+      async function cancelOrder(orderId) {
+        await request("/admin/v1/orders/" + encodeURIComponent(orderId) + "/cancel", {
+          method: "POST"
+        });
+
+        await refreshAll();
+      }
+
+      async function reviewAfterSale(afterSaleId, action) {
+        const remarkNode = document.querySelector('[data-review-remark="' + afterSaleId + '"]');
+
+        await request("/admin/v1/aftersales/" + encodeURIComponent(afterSaleId) + "/review", {
+          method: "POST",
+          body: {
+            action,
+            remark: remarkNode ? remarkNode.value.trim() : ""
+          }
+        });
+
+        await refreshAll();
+      }
+
+      nodes.loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus(nodes.loginStatus, "正在登录...");
+        nodes.loginSubmit.disabled = true;
+
+        try {
+          const username = document.getElementById("login-username").value.trim();
+          const password = document.getElementById("login-password").value;
+          await login(username, password);
+          setStatus(nodes.loginStatus, "登录成功。", "success");
+        } catch (error) {
+          setStatus(nodes.loginStatus, error.message || "登录失败", "error");
+        } finally {
+          nodes.loginSubmit.disabled = false;
+        }
+      });
+
+      document.getElementById("refresh-all").addEventListener("click", refreshAll);
+      document.getElementById("orders-filter-submit").addEventListener("click", refreshOrders);
+      document.getElementById("aftersales-filter-submit").addEventListener("click", refreshAfterSales);
+
+      document.getElementById("logout-button").addEventListener("click", async () => {
+        try {
+          await request("/admin/v1/auth/logout", {
+            method: "POST"
+          });
+        } catch (error) {
+          console.warn(error);
+        }
+
+        clearSession();
+        setStatus(nodes.loginStatus, "已退出登录。");
+      });
+
+      document.body.addEventListener("click", async (event) => {
+        const target = event.target.closest("[data-action]");
+
+        if (!target) {
+          return;
+        }
+
+        const action = target.dataset.action;
+        const orderId = target.dataset.orderId;
+        const afterSaleId = target.dataset.aftersaleId;
+
+        target.disabled = true;
+
+        try {
+          if (action === "toggle-order-detail") {
+            await toggleOrderDetail(orderId);
+          } else if (action === "ship") {
+            await shipOrder(orderId);
+          } else if (action === "cancel-order") {
+            await cancelOrder(orderId);
+          } else if (action === "approve-aftersale") {
+            await reviewAfterSale(afterSaleId, "approve");
+          } else if (action === "reject-aftersale") {
+            await reviewAfterSale(afterSaleId, "reject");
+          }
+
+          setStatus(nodes.sessionStatus, "操作已完成。", "success");
+        } catch (error) {
+          setStatus(nodes.sessionStatus, error.message || "操作失败", "error");
+        } finally {
+          target.disabled = false;
+        }
+      });
+
+      renderSummary();
+      renderOrders();
+      renderAfterSales();
+      validateSession();
+    </script>
+  </body>
+</html>

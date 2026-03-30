@@ -1,0 +1,75 @@
+page {
+  background: #f7f4ed;
+  color: #2f2b26;
+  font-family: "PingFang SC", "Helvetica Neue", sans-serif;
+  font-size: 28rpx;
+}
+
+.page-shell {
+  padding: 28rpx;
+}
+
+.panel {
+  background: #ffffff;
+  border-radius: 28rpx;
+  box-sizing: border-box;
+}
+
+.section-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #241f1a;
+}
+
+.section-subtitle {
+  margin-top: 10rpx;
+  color: #7b7367;
+  font-size: 24rpx;
+}
+
+.primary-button {
+  background: #c96b48;
+  color: #ffffff;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  line-height: 88rpx;
+}
+
+.ghost-button {
+  background: #fff6f2;
+  color: #c96b48;
+  border-radius: 999rpx;
+  border: 1rpx solid #f1cfbf;
+  font-size: 28rpx;
+  line-height: 88rpx;
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.price-now {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #b4512d;
+}
+
+.price-origin {
+  font-size: 24rpx;
+  color: #a69c90;
+  text-decoration: line-through;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: #fff0ea;
+  color: #c96b48;
+  font-size: 22rpx;
+  font-weight: 600;
+}

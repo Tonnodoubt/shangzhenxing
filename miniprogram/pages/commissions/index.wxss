@@ -1,0 +1,129 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.content-empty {
+  margin-top: 22rpx;
+  padding: 48rpx 28rpx;
+  text-align: center;
+}
+
+.content-empty-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.content-empty-copy {
+  margin-top: 16rpx;
+  color: #786f64;
+  line-height: 1.7;
+}
+
+.commission-head {
+  padding: 26rpx;
+  display: flex;
+  justify-content: space-between;
+}
+
+.commission-summary {
+  width: 48%;
+}
+
+.commission-value {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.commission-label {
+  display: block;
+  margin-top: 10rpx;
+  color: #7b7268;
+  font-size: 24rpx;
+}
+
+.commission-list {
+  margin-top: 22rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.commission-card {
+  padding: 24rpx;
+}
+
+.commission-top,
+.commission-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.commission-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.commission-amount {
+  color: #b4512d;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.commission-meta {
+  display: block;
+  margin-top: 12rpx;
+  color: #786f64;
+  font-size: 24rpx;
+}
+
+.commission-status {
+  color: #c96b48;
+  font-size: 24rpx;
+}
+
+.commission-time {
+  color: #92897f;
+  font-size: 22rpx;
+}

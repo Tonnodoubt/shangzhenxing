@@ -1,0 +1,127 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.auth-hero {
+  padding: 34rpx;
+  background: linear-gradient(160deg, #efe1d6, #f8f3ea);
+}
+
+.auth-kicker {
+  color: #9f5e42;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.auth-mode-title {
+  margin-top: 12rpx;
+  display: block;
+  color: #5c4738;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.auth-mode-copy {
+  margin-top: 12rpx;
+  display: block;
+  color: #7b6b5e;
+  line-height: 1.7;
+}
+
+.auth-title {
+  margin-top: 14rpx;
+  display: block;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.auth-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #73695e;
+  line-height: 1.7;
+}
+
+.auth-card {
+  margin-top: 24rpx;
+  padding: 28rpx;
+}
+
+.auth-label {
+  display: block;
+  color: #84796d;
+  font-size: 24rpx;
+}
+
+.auth-value {
+  display: block;
+  margin-top: 14rpx;
+  color: #2d241d;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.auth-phone {
+  display: block;
+  margin-top: 12rpx;
+  color: #73695e;
+  font-size: 24rpx;
+}
+
+.agreement-row {
+  margin-top: 28rpx;
+}
+
+.agreement-check {
+  display: block;
+  color: #c96b48;
+  font-size: 24rpx;
+}
+
+.agreement-copy {
+  display: block;
+  margin-top: 10rpx;
+  color: #73695e;
+  line-height: 1.7;
+}
+
+.auth-button {
+  margin-top: 28rpx;
+}

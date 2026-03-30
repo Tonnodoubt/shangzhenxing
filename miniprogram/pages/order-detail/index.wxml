@@ -1,0 +1,138 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">订单详情</text>
+    <text class="state-title">订单信息加载中</text>
+    <text class="state-copy">正在同步订单状态、金额和售后记录。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">订单详情暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backOrders">返回订单列表</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'notFound'}}">
+    <text class="state-tag">订单不存在</text>
+    <text class="state-title">这笔订单可能已经失效</text>
+    <text class="state-copy">{{errorMessage || '请回订单列表重新进入，或者回首页继续下单。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backOrders">订单列表</button>
+      <button class="primary-button state-button" bindtap="backHome">返回首页</button>
+    </view>
+  </view>
+
+  <view wx:elif="{{pageState === 'success' && order}}">
+    <view class="panel detail-card">
+      <view class="detail-top">
+        <text class="detail-status">{{order.statusText}}</text>
+        <text class="detail-order">{{order.id}}</text>
+      </view>
+      <text class="detail-summary">{{order.statusSummary}}</text>
+      <view class="detail-tags">
+        <text class="detail-tag">{{order.itemCountText}}</text>
+        <text class="detail-tag detail-tag-warm" wx:if="{{order.aftersaleStatusText}}">
+          {{order.aftersaleStatusText}}
+        </text>
+        <text class="detail-tag detail-tag-plain" wx:if="{{order.couponTitle}}">
+          {{order.couponTitle}}
+        </text>
+      </view>
+      <text class="detail-time">下单时间 {{order.createTime}}</text>
+    </view>
+
+    <view class="panel detail-card">
+      <text class="block-title">订单进度</text>
+      <block wx:for="{{order.processSteps}}" wx:key="id">
+        <view class="process-row">
+          <text class="process-dot {{item.active ? 'process-dot-active' : ''}}"></text>
+          <view class="process-main">
+            <text class="process-title {{item.active ? 'process-title-active' : ''}}">{{item.title}}</text>
+            <text class="process-copy">{{item.copy}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel detail-card">
+      <text class="block-title">收货信息</text>
+      <text class="detail-name">{{order.addressLine}}</text>
+      <text class="detail-address">{{order.address.detail}}</text>
+    </view>
+
+    <view class="panel detail-card">
+      <text class="block-title">商品清单</text>
+      <block wx:for="{{order.itemList}}" wx:key="index">
+        <view class="detail-item">
+          <view>
+            <text class="detail-item-title">{{item.title}}</text>
+            <text class="detail-item-meta">{{item.specText}} x {{item.quantity}}</text>
+          </view>
+          <text class="detail-item-price">{{item.priceText}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel detail-card">
+      <text class="block-title">金额信息</text>
+      <view class="summary-row" wx:for="{{order.amountRows}}" wx:key="id">
+        <text class="{{item.isTotal ? 'total-row' : ''}}">{{item.label}}</text>
+        <text class="{{item.isTotal ? 'total-row' : ''}}">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="panel detail-card" wx:if="{{order.remark}}">
+      <text class="block-title">订单备注</text>
+      <text class="detail-remark">{{order.remark}}</text>
+    </view>
+
+    <view class="panel detail-card" wx:if="{{afterSale}}">
+      <text class="block-title">售后记录</text>
+      <text class="detail-remark detail-remark-strong">{{afterSale.statusText}} · {{afterSale.reason}}</text>
+      <text class="detail-remark" wx:if="{{afterSale.description}}">{{afterSale.description}}</text>
+      <text class="detail-time">{{afterSale.createdAt}}</text>
+    </view>
+
+    <view class="panel detail-card">
+      <text class="block-title">订单服务说明</text>
+      <block wx:for="{{order.serviceTips}}" wx:key="id">
+        <view class="service-row">
+          <text class="service-title">{{item.title}}</text>
+          <text class="service-copy">{{item.copy}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="detail-actions">
+      <button
+        class="ghost-button action-button"
+        wx:if="{{order.canOpenAftersale}}"
+        bindtap="openAfterSale"
+        disabled="{{actionLoading ? true : false}}"
+      >
+        {{order.aftersaleButtonText}}
+      </button>
+      <button
+        class="ghost-button action-button"
+        wx:if="{{order.canCancel}}"
+        bindtap="cancelOrder"
+        loading="{{actionLoading === 'cancel'}}"
+        disabled="{{actionLoading ? true : false}}"
+      >
+        取消订单
+      </button>
+      <button
+        class="primary-button action-button"
+        wx:if="{{order.canConfirm}}"
+        bindtap="confirmReceipt"
+        loading="{{actionLoading === 'confirm'}}"
+        disabled="{{actionLoading ? true : false}}"
+      >
+        确认收货
+      </button>
+    </view>
+  </view>
+</view>

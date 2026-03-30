@@ -1,0 +1,111 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">结算页</text>
+    <text class="state-title">结算信息加载中</text>
+    <text class="state-copy">正在同步购物车、地址和优惠券信息。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">结算页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backCart">返回购物车</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'empty'}}">
+    <text class="state-tag">购物车为空</text>
+    <text class="state-title">还没有可结算的商品</text>
+    <text class="state-copy">先回首页或分类页加几件商品，结算页再继续补优惠券和地址选择。</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backCart">返回购物车</button>
+      <button class="primary-button state-button" bindtap="goShopping">去首页逛逛</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="panel checkout-block" bindtap="chooseAddress">
+      <text class="block-title">收货信息</text>
+      <block wx:if="{{address}}">
+        <text class="checkout-name">{{address.receiver}} {{address.phone}}</text>
+        <text class="checkout-address">{{address.detail}}</text>
+      </block>
+      <block wx:else>
+        <text class="checkout-empty-title">还没有可用收货地址</text>
+        <text class="checkout-empty-copy">先补一个常用地址，提交订单按钮才会解锁。</text>
+      </block>
+      <text class="checkout-action">{{address ? '点击切换地址' : '点击添加地址'}}</text>
+      <text class="checkout-warning" wx:if="{{missingAddress}}">当前未选择地址，暂时不能提交订单。</text>
+    </view>
+
+    <view class="panel checkout-block">
+      <text class="block-title">商品清单</text>
+      <block wx:for="{{cartItems}}" wx:key="cartKey">
+        <view class="checkout-item">
+          <view class="checkout-item-main">
+            <text class="checkout-item-title">{{item.title}}</text>
+            <text class="checkout-item-spec">{{item.specText}} x {{item.quantity}}</text>
+          </view>
+          <text class="checkout-item-price">¥{{item.displaySubtotal}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel checkout-block">
+      <view class="checkout-inline-head">
+        <text class="block-title">优惠券</text>
+        <text class="checkout-link" bindtap="chooseCoupon">
+          {{couponActionText}}
+        </text>
+      </view>
+      <text class="coupon-hint">
+        {{couponHintText}}
+      </text>
+    </view>
+
+    <view class="panel checkout-block">
+      <text class="block-title">订单备注</text>
+      <textarea
+        class="remark-box"
+        maxlength="120"
+        value="{{remark}}"
+        placeholder="可填写订单备注，后续可扩展发票、配送时间等"
+        bindinput="handleRemarkInput"
+      />
+    </view>
+
+    <view class="panel checkout-summary">
+      <view class="checkout-summary-row">
+        <text>商品件数</text>
+        <text>{{totalCount}} 件</text>
+      </view>
+      <view class="checkout-summary-row">
+        <text>商品金额</text>
+        <text>¥{{goodsAmount}}</text>
+      </view>
+      <view class="checkout-summary-row">
+        <text>优惠金额</text>
+        <text>-¥{{discountAmount}}</text>
+      </view>
+      <view class="checkout-summary-row">
+        <text>配送费</text>
+        <text>¥0.00</text>
+      </view>
+      <view class="checkout-summary-row checkout-summary-total">
+        <text>应付金额</text>
+        <text>¥{{payableAmount}}</text>
+      </view>
+    </view>
+
+    <button
+      class="primary-button checkout-submit"
+      bindtap="submitOrder"
+      loading="{{submitting}}"
+      disabled="{{submitting || pageState !== 'success' || missingAddress}}"
+    >
+      {{submitting ? '提交中...' : submitButtonText}}
+    </button>
+  </view>
+</view>

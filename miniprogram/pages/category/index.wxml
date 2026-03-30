@@ -1,0 +1,77 @@
+<view class="page-shell category-page">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">分类页</text>
+    <text class="state-title">分类与商品加载中</text>
+    <text class="state-copy">正在同步分类列表和当前分类下的商品。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">分类页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="goHome">返回首页</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="category-header panel">
+      <text class="section-title">分类页骨架</text>
+      <text class="section-subtitle">先把分类筛选和商品列表跑通，后面再接真实分类树。</text>
+    </view>
+
+    <view class="category-layout">
+      <view class="category-sidebar panel">
+        <block wx:for="{{categories}}" wx:key="id">
+          <view
+            class="category-tab {{activeCategoryId === item.id ? 'category-tab-active' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="switchCategory"
+          >
+            {{item.name}}
+          </view>
+        </block>
+      </view>
+
+      <scroll-view class="category-content" scroll-y>
+        <view class="panel state-card content-state-card" wx:if="{{productLoading}}">
+          <text class="state-title content-state-title">当前分类商品加载中</text>
+          <text class="state-copy">切换分类后正在同步新的商品列表。</text>
+        </view>
+
+        <view class="panel state-card content-state-card" wx:elif="{{productErrorMessage}}">
+          <text class="state-title content-state-title">当前分类暂时没打开</text>
+          <text class="state-copy">{{productErrorMessage}}</text>
+          <view class="state-actions">
+            <button class="primary-button state-button" bindtap="retryProducts">重试当前分类</button>
+          </view>
+        </view>
+
+        <view class="panel content-empty" wx:elif="{{isProductEmpty}}">
+          <text class="content-empty-title">这个分类下暂时没有商品</text>
+          <text class="content-empty-copy">后面可以在这里补“新品上架”“敬请期待”或者活动预告。</text>
+        </view>
+
+        <block wx:else>
+          <block wx:for="{{currentProducts}}" wx:key="id">
+            <view class="category-product panel" data-id="{{item.id}}" bindtap="openProduct">
+              <view class="category-cover" style="background: {{item.accent}};">
+                <text class="category-cover-text">{{item.coverLabel}}</text>
+              </view>
+              <view class="category-info">
+                <text class="tag-chip">{{item.tag}}</text>
+                <text class="category-title">{{item.title}}</text>
+                <text class="category-desc">{{item.shortDesc}}</text>
+                <view class="price-row">
+                  <text class="price-now">¥{{item.displayPrice}}</text>
+                  <text class="price-origin">¥{{item.displayMarketPrice}}</text>
+                </view>
+              </view>
+            </view>
+          </block>
+        </block>
+      </scroll-view>
+    </view>
+  </view>
+</view>

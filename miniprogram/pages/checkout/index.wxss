@@ -1,0 +1,177 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.checkout-block,
+.checkout-summary {
+  margin-top: 22rpx;
+  padding: 28rpx;
+}
+
+.block-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #281f19;
+}
+
+.checkout-name {
+  margin-top: 18rpx;
+  display: block;
+  font-size: 30rpx;
+  color: #2d241d;
+  font-weight: 700;
+}
+
+.checkout-address {
+  margin-top: 12rpx;
+  display: block;
+  color: #776d63;
+  line-height: 1.7;
+}
+
+.checkout-action {
+  margin-top: 16rpx;
+  display: block;
+  color: #c96b48;
+  font-size: 24rpx;
+}
+
+.checkout-empty-title {
+  margin-top: 18rpx;
+  display: block;
+  font-size: 30rpx;
+  color: #2d241d;
+  font-weight: 700;
+}
+
+.checkout-empty-copy {
+  margin-top: 12rpx;
+  display: block;
+  color: #776d63;
+  line-height: 1.7;
+}
+
+.checkout-warning {
+  margin-top: 18rpx;
+  display: block;
+  color: #b4512d;
+  font-size: 24rpx;
+}
+
+.checkout-inline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checkout-link {
+  color: #c96b48;
+  font-size: 24rpx;
+}
+
+.coupon-hint {
+  margin-top: 16rpx;
+  display: block;
+  color: #7f766b;
+  font-size: 24rpx;
+}
+
+.checkout-item {
+  margin-top: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.checkout-item-main {
+  flex: 1;
+}
+
+.checkout-item-title {
+  display: block;
+  font-size: 28rpx;
+  color: #2f271f;
+}
+
+.checkout-item-spec {
+  margin-top: 10rpx;
+  display: block;
+  color: #807669;
+  font-size: 24rpx;
+}
+
+.checkout-item-price {
+  color: #b4512d;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.remark-box {
+  margin-top: 18rpx;
+  width: 100%;
+  height: 160rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+  background: #f7f4ed;
+  border-radius: 20rpx;
+}
+
+.checkout-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #6f675d;
+  margin-top: 16rpx;
+}
+
+.checkout-summary-row:first-child {
+  margin-top: 0;
+}
+
+.checkout-summary-total {
+  color: #b4512d;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.checkout-submit {
+  margin-top: 28rpx;
+}

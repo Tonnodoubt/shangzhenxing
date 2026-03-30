@@ -1,0 +1,141 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  padding: 18rpx;
+}
+
+.search-input {
+  flex: 1;
+  height: 84rpx;
+  background: #f7f4ed;
+  border-radius: 999rpx;
+  padding: 0 28rpx;
+  box-sizing: border-box;
+}
+
+.search-button {
+  width: 180rpx;
+  margin-left: 16rpx;
+}
+
+.section-head {
+  margin-top: 28rpx;
+}
+
+.product-list {
+  margin-top: 20rpx;
+}
+
+.product-card {
+  padding: 22rpx;
+  display: flex;
+  margin-bottom: 20rpx;
+}
+
+.product-cover {
+  width: 188rpx;
+  height: 188rpx;
+  border-radius: 24rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-cover-text {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #4a3c33;
+}
+
+.product-content {
+  flex: 1;
+  margin-left: 22rpx;
+}
+
+.product-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.product-sales {
+  color: #8a8074;
+  font-size: 22rpx;
+}
+
+.product-title {
+  margin-top: 16rpx;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.product-desc {
+  margin-top: 12rpx;
+  display: block;
+  color: #7e7468;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.empty-box {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.empty-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.empty-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7e7468;
+  line-height: 1.7;
+}

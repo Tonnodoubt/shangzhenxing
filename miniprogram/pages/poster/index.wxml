@@ -1,0 +1,40 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">推广海报</text>
+    <text class="state-title">海报内容加载中</text>
+    <text class="state-copy">正在同步分销昵称、等级和券面信息。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">海报页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backDistribution">返回分销中心</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="poster-card">
+      <text class="poster-kicker">分销推广海报</text>
+      <text class="poster-title">分享你的商城名片</text>
+      <text class="poster-copy">{{user.nickname}} 正在推广商品和新人福利，当前分销等级：{{distributor.level}}</text>
+
+      <view class="poster-coupon" wx:if="{{coupon}}">
+        <text class="poster-coupon-amount">¥{{coupon.amount}}</text>
+        <text class="poster-coupon-copy">{{coupon.title}}</text>
+      </view>
+      <view class="poster-coupon poster-coupon-empty" wx:else>
+        <text class="poster-coupon-copy">当前还没有可展示的优惠券，后面可以补新人券或活动券。</text>
+      </view>
+
+      <view class="poster-code">
+        <text class="poster-code-text">小程序码示意区</text>
+      </view>
+    </view>
+
+    <button class="primary-button poster-button" bindtap="savePoster">保存海报</button>
+    <button class="ghost-button poster-button" bindtap="sharePoster">分享给好友</button>
+  </view>
+</view>

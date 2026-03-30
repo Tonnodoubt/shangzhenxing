@@ -1,0 +1,145 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.content-state-card,
+.content-empty {
+  margin-top: 0;
+}
+
+.content-state-title,
+.content-empty-title {
+  font-size: 32rpx;
+}
+
+.content-empty {
+  padding: 48rpx 28rpx;
+  text-align: center;
+}
+
+.content-empty-copy {
+  margin-top: 16rpx;
+  color: #7e7469;
+  line-height: 1.7;
+}
+
+.category-page {
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.category-header {
+  padding: 28rpx;
+}
+
+.category-layout {
+  margin-top: 24rpx;
+  display: flex;
+  gap: 20rpx;
+  height: calc(100vh - 280rpx);
+}
+
+.category-sidebar {
+  width: 180rpx;
+  padding: 16rpx;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.category-tab {
+  padding: 24rpx 12rpx;
+  border-radius: 20rpx;
+  color: #736c62;
+  text-align: center;
+  font-size: 26rpx;
+}
+
+.category-tab-active {
+  background: #fff2eb;
+  color: #c96b48;
+  font-weight: 700;
+}
+
+.category-content {
+  flex: 1;
+  min-height: 0;
+}
+
+.category-product {
+  margin-bottom: 20rpx;
+  padding: 20rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.category-cover {
+  width: 156rpx;
+  height: 156rpx;
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.category-cover-text {
+  font-size: 30rpx;
+  color: #4e4036;
+  font-weight: 700;
+}
+
+.category-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.category-title {
+  margin-top: 14rpx;
+  font-size: 30rpx;
+  color: #2c241d;
+  font-weight: 700;
+}
+
+.category-desc {
+  margin-top: 10rpx;
+  color: #7e7469;
+  font-size: 24rpx;
+  line-height: 1.6;
+}

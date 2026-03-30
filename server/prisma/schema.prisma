@@ -1,0 +1,364 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum SessionStatus {
+  active
+  expired
+  revoked
+}
+
+enum ProductStatus {
+  on_sale
+  off_sale
+}
+
+enum OrderStatus {
+  pending
+  shipping
+  done
+  cancelled
+}
+
+enum CouponTemplateStatus {
+  enabled
+  disabled
+}
+
+enum CouponIssueType {
+  center_claim
+  manual_issue
+}
+
+enum UserCouponStatus {
+  available
+  used
+  expired
+}
+
+enum UserCouponSourceType {
+  center_claim
+  manual_issue
+  system_grant
+}
+
+enum AfterSaleStatus {
+  processing
+  approved
+  rejected
+  done
+}
+
+enum DistributorStatus {
+  active
+  inactive
+}
+
+enum CommissionStatus {
+  pending
+  settled
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  openId             String?             @unique
+  unionId            String?             @unique
+  nickname           String
+  mobile             String?
+  isAuthorized       Boolean             @default(false)
+  status             UserStatus          @default(active)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  sessions           UserSession[]
+  addresses          Address[]
+  cart               Cart?
+  orders             Order[]
+  coupons            UserCoupon[]
+  afterSales         AfterSale[]
+  distributorProfile DistributorProfile?
+}
+
+model UserSession {
+  id           String        @id @default(cuid())
+  userId       String
+  sessionToken String        @unique
+  expiresAt    DateTime
+  status       SessionStatus @default(active)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  receiver  String
+  phone     String
+  province  String?
+  city      String?
+  district  String?
+  detail    String
+  tag       String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders    Order[]
+
+  @@index([userId, isDefault])
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  parentId  String?
+  name      String
+  sortOrder Int        @default(0)
+  status    String     @default("enabled")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CategoryChildren")
+  products  Product[]
+
+  @@index([parentId, sortOrder])
+}
+
+model Product {
+  id                  String        @id @default(cuid())
+  categoryId          String?
+  title               String
+  shortDesc           String?
+  subTitle            String?
+  coverImage          String?
+  detailContent       String?       @db.LongText
+  price               Decimal       @db.Decimal(10, 2)
+  marketPrice         Decimal       @db.Decimal(10, 2)
+  salesCount          Int           @default(0)
+  favoriteCount       Int           @default(0)
+  distributionEnabled Boolean       @default(true)
+  status              ProductStatus @default(on_sale)
+  sortOrder           Int           @default(0)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  category            Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  skus                ProductSku[]
+  cartItems           CartItem[]
+  orderItems          OrderItem[]
+
+  @@index([categoryId, status, sortOrder])
+}
+
+model ProductSku {
+  id          String      @id @default(cuid())
+  productId   String
+  skuCode     String      @unique
+  specText    String
+  price       Decimal     @db.Decimal(10, 2)
+  originPrice Decimal     @db.Decimal(10, 2)
+  stock       Int         @default(0)
+  lockStock   Int         @default(0)
+  status      String      @default("enabled")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+
+  @@index([productId, status])
+}
+
+model Cart {
+  id               String      @id @default(cuid())
+  userId           String      @unique
+  selectedCouponId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            CartItem[]
+  selectedCoupon   UserCoupon? @relation("SelectedCartCoupon", fields: [selectedCouponId], references: [id], onDelete: SetNull)
+}
+
+model CartItem {
+  id        String      @id @default(cuid())
+  cartId    String
+  productId String
+  skuId     String?
+  title     String
+  specText  String?
+  price     Decimal     @db.Decimal(10, 2)
+  quantity  Int         @default(1)
+  selected  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  cart      Cart        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku       ProductSku? @relation(fields: [skuId], references: [id], onDelete: SetNull)
+
+  @@index([cartId, selected])
+  @@index([productId])
+}
+
+model Order {
+  id                  String      @id @default(cuid())
+  orderNo             String      @unique
+  userId              String
+  addressId           String?
+  status              OrderStatus @default(pending)
+  goodsAmount         Decimal     @db.Decimal(10, 2)
+  discountAmount      Decimal     @default(0.00) @db.Decimal(10, 2)
+  payableAmount       Decimal     @db.Decimal(10, 2)
+  couponTitle         String?
+  remark              String?
+  shipmentCompanyCode String?
+  shipmentCompanyName String?
+  shipmentTrackingNo  String?
+  shippedAt           DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address             Address?    @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  items               OrderItem[]
+  usedCoupon          UserCoupon? @relation("OrderUsedCoupon")
+  afterSale           AfterSale?
+
+  @@index([userId, status, createdAt])
+}
+
+model OrderItem {
+  id             String      @id @default(cuid())
+  orderId        String
+  productId      String?
+  skuId          String?
+  title          String
+  specText       String?
+  price          Decimal     @db.Decimal(10, 2)
+  quantity       Int         @default(1)
+  subtotalAmount Decimal     @db.Decimal(10, 2)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  order          Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sku            ProductSku? @relation(fields: [skuId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+model CouponTemplate {
+  id          String               @id @default(cuid())
+  code        String               @unique
+  title       String
+  amount      Decimal              @db.Decimal(10, 2)
+  threshold   Decimal              @db.Decimal(10, 2)
+  badge       String?
+  description String?
+  issueType   CouponIssueType      @default(center_claim)
+  validDays   Int                  @default(7)
+  status      CouponTemplateStatus @default(enabled)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  coupons     UserCoupon[]
+
+  @@index([status, issueType, createdAt])
+}
+
+model UserCoupon {
+  id             String               @id @default(cuid())
+  userId         String
+  templateId     String
+  status         UserCouponStatus     @default(available)
+  sourceType     UserCouponSourceType @default(center_claim)
+  sourceText     String?
+  claimedAt      DateTime             @default(now())
+  expiresAt      DateTime
+  usedAt         DateTime?
+  usedOrderId    String?              @unique
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template       CouponTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  usedOrder      Order?               @relation("OrderUsedCoupon", fields: [usedOrderId], references: [id], onDelete: SetNull)
+  selectedByCart Cart[]               @relation("SelectedCartCoupon")
+
+  @@index([userId, status, expiresAt])
+  @@index([userId, templateId, sourceType])
+  @@index([templateId, status])
+}
+
+model AfterSale {
+  id           String          @id @default(cuid())
+  orderId      String          @unique
+  userId       String
+  reason       String
+  description  String?         @db.LongText
+  status       AfterSaleStatus @default(processing)
+  reviewRemark String?         @db.LongText
+  reviewedAt   DateTime?
+  reviewedBy   String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model DistributorProfile {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  level             String             @default("普通分销员")
+  status            DistributorStatus  @default(active)
+  totalCommission   Decimal            @default(0.00) @db.Decimal(10, 2)
+  pendingCommission Decimal            @default(0.00) @db.Decimal(10, 2)
+  settledCommission Decimal            @default(0.00) @db.Decimal(10, 2)
+  teamCount         Int                @default(0)
+  todayInviteCount  Int                @default(0)
+  joinedAt          DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamMembers       TeamMember[]
+  commissionRecords CommissionRecord[]
+
+  @@index([status, createdAt])
+}
+
+model TeamMember {
+  id                String             @id @default(cuid())
+  distributorId     String
+  nickname          String
+  avatarLabel       String
+  joinedAt          DateTime
+  contributedAmount Decimal            @default(0.00) @db.Decimal(10, 2)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  distributor       DistributorProfile @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@index([distributorId, joinedAt])
+}
+
+model CommissionRecord {
+  id            String             @id @default(cuid())
+  distributorId String
+  title         String
+  fromUser      String
+  orderNo       String
+  amount        Decimal            @db.Decimal(10, 2)
+  levelText     String
+  status        CommissionStatus   @default(pending)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  distributor   DistributorProfile @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@index([distributorId, status, createdAt])
+}

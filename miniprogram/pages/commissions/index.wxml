@@ -1,0 +1,52 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">佣金明细</text>
+    <text class="state-title">佣金记录加载中</text>
+    <text class="state-copy">正在同步累计佣金、待结算金额和每笔分佣来源。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">佣金页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="commission-head panel">
+      <view class="commission-summary">
+        <text class="commission-value">¥{{distributor.totalCommission}}</text>
+        <text class="commission-label">累计佣金</text>
+      </view>
+      <view class="commission-summary">
+        <text class="commission-value">¥{{distributor.pendingCommission}}</text>
+        <text class="commission-label">待结算</text>
+      </view>
+    </view>
+
+    <view class="commission-list" wx:if="{{records.length}}">
+      <block wx:for="{{records}}" wx:key="id">
+        <view class="panel commission-card">
+          <view class="commission-top">
+            <text class="commission-title">{{item.title}}</text>
+            <text class="commission-amount">+¥{{item.amount}}</text>
+          </view>
+          <text class="commission-meta">{{item.levelText}} · 来自 {{item.fromUser}}</text>
+          <text class="commission-meta">订单号 {{item.orderNo}}</text>
+          <view class="commission-bottom">
+            <text class="commission-status">{{item.statusText}}</text>
+            <text class="commission-time">{{item.createdAt}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel content-empty" wx:else>
+      <text class="content-empty-title">还没有佣金记录</text>
+      <text class="content-empty-copy">后面接真实分销成交后，这里会展示每笔订单带来的佣金和结算状态。</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,157 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">商品详情</text>
+    <text class="state-title">商品信息加载中</text>
+    <text class="state-copy">正在拉取当前商品的规格、价格和卖点信息。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">商品详情暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是接口暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backHome">返回首页</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'notFound'}}">
+    <text class="state-tag">商品不存在</text>
+    <text class="state-title">这件商品可能已下架或不存在</text>
+    <text class="state-copy">{{errorMessage || '请换一件商品试试，或者回首页重新进入。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backHome">返回首页</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:elif="{{pageState === 'success' && product}}">
+    <view class="detail-cover" style="background: {{product.accent}};">
+      <text class="detail-cover-text">{{product.coverLabel}}</text>
+    </view>
+
+    <view class="detail-main panel">
+      <view class="detail-head">
+        <text class="tag-chip">{{product.tag}}</text>
+        <text class="detail-sales">{{product.salesText}}</text>
+      </view>
+      <text class="detail-title">{{product.title}}</text>
+      <text class="detail-desc">{{product.shortDesc}}</text>
+      <view class="detail-tags" wx:if="{{product.highlightTags.length}}">
+        <block wx:for="{{product.highlightTags}}" wx:key="*this">
+          <text class="detail-tag">{{item}}</text>
+        </block>
+      </view>
+      <view class="price-row detail-price">
+        <text class="price-now">¥{{product.displayPrice}}</text>
+        <text class="price-origin">¥{{product.displayMarketPrice}}</text>
+      </view>
+      <view class="detail-status-row">
+        <text class="detail-status-chip">{{product.statusHint}}</text>
+        <text class="detail-status-copy">{{product.selectedSpecHint}}</text>
+      </view>
+    </view>
+
+    <view class="detail-metrics">
+      <block wx:for="{{product.metricList}}" wx:key="id">
+        <view class="panel detail-metric">
+          <text class="detail-metric-value">{{item.value}}</text>
+          <text class="detail-metric-label">{{item.label}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel detail-block">
+      <text class="block-title">选择规格</text>
+      <view class="spec-list" wx:if="{{product.specs && product.specs.length}}">
+        <block wx:for="{{product.specs}}" wx:key="*this">
+          <view
+            class="spec-chip {{selectedSpec === item ? 'spec-chip-active' : ''}}"
+            data-spec="{{item}}"
+            bindtap="chooseSpec"
+          >
+            {{item}}
+          </view>
+        </block>
+      </view>
+      <text class="detail-block-copy" wx:else>当前商品暂时只有默认规格。</text>
+    </view>
+
+    <view class="panel detail-block">
+      <text class="block-title">购买数量</text>
+      <view class="quantity-row">
+        <view class="quantity-button {{quantity <= 1 ? 'quantity-button-disabled' : ''}}" bindtap="decreaseQuantity">-</view>
+        <text class="quantity-value">{{quantity}}</text>
+        <view class="quantity-button quantity-button-active {{quantity >= 99 ? 'quantity-button-disabled' : ''}}" bindtap="increaseQuantity">+</view>
+      </view>
+      <text class="detail-block-copy">当前单次最多先买 99 件，避免误操作。</text>
+    </view>
+
+    <view class="panel detail-block">
+      <text class="block-title">商品亮点</text>
+      <block wx:if="{{product.highlights && product.highlights.length}}">
+        <block wx:for="{{product.highlights}}" wx:key="*this">
+          <view class="highlight-row">
+            <text class="highlight-dot"></text>
+            <text class="highlight-text">{{item}}</text>
+          </view>
+        </block>
+      </block>
+      <text class="detail-block-copy" wx:else>商品卖点正在整理中，后面会补成更完整的详情说明。</text>
+    </view>
+
+    <view class="panel detail-block">
+      <text class="block-title">购买权益说明</text>
+      <block wx:for="{{product.servicePromises}}" wx:key="id">
+        <view class="promise-row">
+          <view class="promise-main">
+            <text class="promise-title">{{item.title}}</text>
+            <text class="promise-copy">{{item.copy}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel detail-block">
+      <text class="block-title">图文详情说明</text>
+      <block wx:for="{{product.detailParagraphs}}" wx:key="index">
+        <text class="detail-paragraph">{{item}}</text>
+      </block>
+    </view>
+
+    <view class="panel detail-block">
+      <text class="block-title">当前选择</text>
+      <view class="selection-row">
+        <text class="selection-label">规格</text>
+        <text class="selection-value">{{selectedSpec || '默认规格'}}</text>
+      </view>
+      <view class="selection-row">
+        <text class="selection-label">数量</text>
+        <text class="selection-value">{{quantity}} 件</text>
+      </view>
+      <view class="selection-row">
+        <text class="selection-label">加入购物车后</text>
+        <text class="selection-value">可去购物车或直接结算</text>
+      </view>
+    </view>
+
+    <view class="bottom-actions">
+      <button
+        class="ghost-button action-button"
+        bindtap="addToCart"
+        loading="{{addingAction === 'cart'}}"
+        disabled="{{addingAction ? true : false}}"
+      >
+        加入购物车
+      </button>
+      <button
+        class="primary-button action-button"
+        bindtap="buyNow"
+        loading="{{addingAction === 'buy'}}"
+        disabled="{{addingAction ? true : false}}"
+      >
+        立即购买
+      </button>
+    </view>
+  </view>
+</view>

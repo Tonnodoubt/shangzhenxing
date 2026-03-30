@@ -1,0 +1,178 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.order-tabs {
+  padding: 12rpx;
+  display: flex;
+  gap: 12rpx;
+}
+
+.order-tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 12rpx;
+  border-radius: 18rpx;
+  color: #6f685d;
+  font-size: 26rpx;
+}
+
+.order-tab-active {
+  background: #fff2eb;
+  color: #c96b48;
+  font-weight: 700;
+}
+
+.order-card {
+  margin-top: 22rpx;
+  padding: 26rpx;
+}
+
+.order-top,
+.order-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.order-number {
+  font-size: 28rpx;
+  color: #2d251d;
+  font-weight: 700;
+}
+
+.order-status {
+  color: #c96b48;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.order-time {
+  margin-top: 12rpx;
+  display: block;
+  color: #867d72;
+  font-size: 24rpx;
+}
+
+.order-item {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  border-radius: 20rpx;
+  background: #f7f4ed;
+}
+
+.order-item-title {
+  display: block;
+  color: #2c241d;
+  font-size: 28rpx;
+}
+
+.order-item-meta {
+  margin-top: 10rpx;
+  display: block;
+  color: #7c7267;
+  font-size: 24rpx;
+}
+
+.order-total {
+  margin-top: 20rpx;
+  color: #b4512d;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.order-tags {
+  margin-top: 18rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.order-tag {
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f5efe8;
+  color: #7c7267;
+  font-size: 22rpx;
+}
+
+.order-tag-warm {
+  background: #fff2eb;
+  color: #c96b48;
+}
+
+.order-links {
+  margin-top: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+
+.order-link {
+  color: #c96b48;
+  font-size: 24rpx;
+}
+
+.order-link-muted {
+  color: #8a7e71;
+}
+
+.order-empty {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.order-empty-title {
+  display: block;
+  color: #2d241d;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.order-empty-copy {
+  margin-top: 16rpx;
+  display: block;
+  color: #7f7569;
+  line-height: 1.7;
+}
+
+.order-empty-button {
+  margin-top: 28rpx;
+}

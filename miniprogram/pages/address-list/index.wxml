@@ -1,0 +1,50 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">收货地址</text>
+    <text class="state-title">地址列表加载中</text>
+    <text class="state-copy">正在同步当前账号的收货地址和默认地址。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">地址页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="address-list" wx:if="{{addresses.length}}">
+      <block wx:for="{{addresses}}" wx:key="id">
+        <view class="panel address-card" data-id="{{item.id}}" bindtap="selectAddress">
+          <view class="address-top">
+            <view class="address-meta">
+              <text class="address-name">{{item.receiver}}</text>
+              <text class="address-phone">{{item.phone}}</text>
+              <text class="tag-chip" wx:if="{{item.tag}}">{{item.tag}}</text>
+            </view>
+            <text class="address-selected" wx:if="{{selectedAddressId === item.id}}">
+              {{actionLoadingId === item.id && actionType === 'select' ? '切换中' : '当前使用'}}
+            </text>
+          </view>
+          <text class="address-detail">{{item.detail}}</text>
+          <view class="address-actions">
+            <text class="address-action {{actionLoadingId === item.id ? 'address-action-disabled' : ''}}" data-id="{{item.id}}" catchtap="openEdit">编辑</text>
+            <text class="address-action danger {{actionLoadingId === item.id ? 'address-action-disabled' : ''}}" data-id="{{item.id}}" catchtap="deleteAddress">
+              {{actionLoadingId === item.id && actionType === 'delete' ? '删除中' : '删除'}}
+            </text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel empty-box" wx:else>
+      <text class="empty-title">你还没有添加地址</text>
+      <text class="empty-copy">先把地址补上，结算页就可以直接选择了。</text>
+    </view>
+
+    <button class="primary-button add-button" bindtap="openCreate" disabled="{{actionLoadingId ? true : false}}">新增地址</button>
+  </view>
+</view>

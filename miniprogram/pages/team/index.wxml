@@ -1,0 +1,53 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">我的团队</text>
+    <text class="state-title">团队数据加载中</text>
+    <text class="state-copy">正在同步团队人数、今日新增和成员列表。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">团队页暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="panel team-hero">
+      <text class="section-title">团队概览</text>
+      <text class="section-subtitle">当前基础版已经能把团队数据展示出来，后面再接真实分销关系。</text>
+    </view>
+
+    <view class="team-stats">
+      <view class="panel team-stat">
+        <text class="team-stat-value">{{distributor.teamCount}}</text>
+        <text class="team-stat-label">总团队人数</text>
+      </view>
+      <view class="panel team-stat">
+        <text class="team-stat-value">{{distributor.todayInviteCount}}</text>
+        <text class="team-stat-label">今日新增</text>
+      </view>
+    </view>
+
+    <view class="team-list" wx:if="{{teamMembers.length}}">
+      <block wx:for="{{teamMembers}}" wx:key="id">
+        <view class="panel team-card">
+          <view class="team-avatar">{{item.avatarLabel}}</view>
+          <view class="team-main">
+            <text class="team-name">{{item.nickname}}</text>
+            <text class="team-meta">加入时间 {{item.joinedAt}}</text>
+            <text class="team-meta">累计贡献 ¥{{item.contributedAmount}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel content-empty" wx:else>
+      <text class="content-empty-title">团队里还没有成员</text>
+      <text class="content-empty-copy">后面接真实分销关系后，这里会展示邀请进来的下级成员和贡献情况。</text>
+    </view>
+  </view>
+  </view>

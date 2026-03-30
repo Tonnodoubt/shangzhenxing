@@ -1,0 +1,297 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  margin-top: 24rpx;
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  margin-top: 18rpx;
+  display: block;
+  color: #7d7368;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.dist-hero {
+  padding: 34rpx;
+  background: linear-gradient(160deg, #f0dccd, #f8f3ea);
+}
+
+.dist-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.dist-kicker {
+  color: #9f5e42;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.dist-title {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 46rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.dist-copy {
+  display: block;
+  margin-top: 18rpx;
+  color: #73695e;
+  line-height: 1.7;
+}
+
+.dist-status {
+  flex-shrink: 0;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(159, 94, 66, 0.12);
+  color: #9f5e42;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.dist-status-active {
+  background: rgba(43, 107, 83, 0.12);
+  color: #2b6b53;
+}
+
+.dist-tip {
+  display: block;
+  margin-top: 18rpx;
+  color: #8b5a41;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.level-card {
+  margin-top: 22rpx;
+  padding: 28rpx;
+}
+
+.level-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.level-tag {
+  display: inline-block;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f6f0e8;
+  color: #8d6e5a;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.level-title {
+  display: block;
+  margin-top: 14rpx;
+  color: #2d241d;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.level-percent {
+  color: #b06441;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.level-bar {
+  margin-top: 22rpx;
+  height: 18rpx;
+  border-radius: 999rpx;
+  background: #f3ece4;
+  overflow: hidden;
+}
+
+.level-bar-fill {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #e1ad86, #c96b48);
+}
+
+.level-copy {
+  display: block;
+  margin-top: 18rpx;
+  color: #73695e;
+  line-height: 1.7;
+}
+
+.dist-grid {
+  margin-top: 22rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.dist-metric {
+  width: 48%;
+  min-height: 180rpx;
+  margin-bottom: 18rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.dist-value {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.dist-label {
+  display: block;
+  margin-top: 12rpx;
+  color: #7b7268;
+  font-size: 24rpx;
+}
+
+.dist-hint {
+  display: block;
+  margin-top: 10rpx;
+  color: #9a8f82;
+  font-size: 22rpx;
+}
+
+.action-grid {
+  margin-top: 4rpx;
+}
+
+.action-card {
+  margin-bottom: 18rpx;
+  padding: 28rpx;
+}
+
+.action-title {
+  display: block;
+  color: #2d241d;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.action-subtitle {
+  display: block;
+  margin-top: 12rpx;
+  color: #73695e;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.action-footer {
+  margin-top: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.action-value {
+  color: #60574d;
+  font-size: 22rpx;
+}
+
+.action-link {
+  color: #255847;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.dist-section {
+  padding: 24rpx 28rpx;
+}
+
+.dist-section-head {
+  margin-bottom: 6rpx;
+}
+
+.dist-section-title {
+  display: block;
+  color: #2d241d;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.dist-section-copy {
+  display: block;
+  margin-top: 10rpx;
+  color: #7b7268;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.guide-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0ebe1;
+}
+
+.guide-row:last-child {
+  border-bottom: 0;
+}
+
+.guide-index {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: #fff3eb;
+  color: #c96b48;
+  font-size: 24rpx;
+  font-weight: 700;
+  text-align: center;
+  line-height: 44rpx;
+}
+
+.guide-main {
+  flex: 1;
+}
+
+.guide-title {
+  display: block;
+  color: #2e261f;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.guide-copy {
+  display: block;
+  margin-top: 10rpx;
+  color: #82786c;
+  font-size: 24rpx;
+  line-height: 1.6;
+}

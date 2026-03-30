@@ -1,0 +1,88 @@
+.state-card {
+  margin-top: 24rpx;
+  padding: 56rpx 32rpx;
+  text-align: center;
+}
+
+.state-tag {
+  display: inline-block;
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: #f5eee6;
+  color: #8d6e5a;
+  font-size: 22rpx;
+}
+
+.state-title {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.state-copy {
+  display: block;
+  margin-top: 18rpx;
+  color: #756b60;
+  line-height: 1.7;
+}
+
+.state-actions {
+  margin-top: 28rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.state-button {
+  flex: 1;
+}
+
+.result-card {
+  padding: 48rpx 32rpx;
+  text-align: center;
+}
+
+.result-badge {
+  display: inline-block;
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: #fff2eb;
+  color: #c96b48;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.result-title {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #2d241d;
+}
+
+.result-copy {
+  display: block;
+  margin-top: 18rpx;
+  color: #756b60;
+  line-height: 1.7;
+}
+
+.result-amount {
+  display: block;
+  margin-top: 24rpx;
+  color: #b4512d;
+  font-size: 48rpx;
+  font-weight: 700;
+}
+
+.result-order {
+  display: block;
+  margin-top: 14rpx;
+  color: #8d8479;
+  font-size: 24rpx;
+}
+
+.result-button {
+  margin-top: 24rpx;
+}

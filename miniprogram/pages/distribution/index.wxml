@@ -1,0 +1,95 @@
+<view class="page-shell">
+  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
+    <text class="state-tag">分销中心</text>
+    <text class="state-title">分销数据加载中</text>
+    <text class="state-copy">正在同步当前账号的分销等级、收益和团队概览。</text>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
+    <text class="state-tag">加载失败</text>
+    <text class="state-title">分销中心暂时没打开</text>
+    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <view class="state-actions">
+      <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
+      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="panel state-card" wx:elif="{{pageState === 'empty'}}">
+    <text class="state-tag">暂无数据</text>
+    <text class="state-title">当前账号还没有分销资料</text>
+    <text class="state-copy">后面可以在这里补申请成为分销员、审核中和升级记录等状态。</text>
+    <view class="state-actions">
+      <button class="primary-button state-button" bindtap="backProfile">返回我的</button>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view class="panel dist-hero">
+      <view class="dist-head">
+        <view>
+          <text class="dist-kicker">分享有收益</text>
+          <text class="dist-title">{{distributor.level}}</text>
+        </view>
+        <text class="dist-status {{user.isAuthorized ? 'dist-status-active' : ''}}">
+          {{user.isAuthorized ? '已授权' : '待授权'}}
+        </text>
+      </view>
+      <text class="dist-copy">当前账号 {{user.nickname || '微信用户'}} 可查看等级、团队和佣金进度，分享商品后收益会继续累计。</text>
+      <text class="dist-tip">{{levelPlan.todayTip}}</text>
+    </view>
+
+    <view class="panel level-card">
+      <view class="level-head">
+        <view>
+          <text class="level-tag">等级进度</text>
+          <text class="level-title">{{levelPlan.progressTitle}}</text>
+        </view>
+        <text class="level-percent">{{levelPlan.progressPercent}}%</text>
+      </view>
+      <view class="level-bar">
+        <view class="level-bar-fill" style="width: {{levelPlan.progressPercent}}%;"></view>
+      </view>
+      <text class="level-copy">{{levelPlan.progressCopy}}</text>
+    </view>
+
+    <view class="dist-grid">
+      <block wx:for="{{metrics}}" wx:key="id">
+        <view class="panel dist-metric">
+          <text class="dist-value">{{item.value}}</text>
+          <text class="dist-label">{{item.label}}</text>
+          <text class="dist-hint">{{item.hint}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="action-grid">
+      <block wx:for="{{actionCards}}" wx:key="id">
+        <view class="panel action-card" data-action="{{item.action}}" bindtap="handleActionTap">
+          <text class="action-title">{{item.title}}</text>
+          <text class="action-subtitle">{{item.subtitle}}</text>
+          <view class="action-footer">
+            <text class="action-value">{{item.value}}</text>
+            <text class="action-link">立即进入</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="panel dist-section">
+      <view class="dist-section-head">
+        <text class="dist-section-title">新手分销三步走</text>
+        <text class="dist-section-copy">先分享，再沉淀团队，最后回看佣金进度，节奏会更清楚。</text>
+      </view>
+      <block wx:for="{{guideSteps}}" wx:key="id">
+        <view class="guide-row">
+          <text class="guide-index">{{index + 1}}</text>
+          <view class="guide-main">
+            <text class="guide-title">{{item.title}}</text>
+            <text class="guide-copy">{{item.copy}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>
