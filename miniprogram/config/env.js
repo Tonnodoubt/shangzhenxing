@@ -11,6 +11,7 @@ module.exports = {
   enableRequestDebug: true,
   cloud: {
     env: "",
+    // 预留字段，当前请求层还没有读取 service。
     service: "",
     path: "/api"
   }

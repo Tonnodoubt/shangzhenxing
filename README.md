@@ -197,6 +197,9 @@ http://127.0.0.1:3000/admin-console/
 - `docs/cloud-hosting-deployment.md`
   适合看云托管部署边界和上线方式
 
+- `docs/environment-variables.md`
+  适合看服务端环境变量和小程序运行配置怎么收口
+
 - `docs/frontend-regression-checklist.md`
   适合做前台回归时对照执行
 

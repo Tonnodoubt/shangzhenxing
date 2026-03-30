@@ -75,13 +75,19 @@
 4. 让小程序前台改走云托管调用
    文件：[env.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/config/env.js)
 
+   更完整的配置收口可参考：
+   [environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/environment-variables.md)
+
    需要把：
    `requestTransport` 改成 `cloud`
 
    并填写：
    `cloud.env`
-   `cloud.service`
    `cloud.path`
+
+   说明：
+   当前请求层实际读取的是 `cloud.env` 和 `cloud.path`；
+   `cloud.service` 仍是预留字段，当前代码还没有用到。
 
 5. 小程序里继续通过 `wx.cloud.callContainer` 请求后端
    当前这条能力已经在请求层预留好了：
