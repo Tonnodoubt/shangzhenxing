@@ -9,12 +9,23 @@ const { createStorefrontRouter } = require("./modules/storefront/router");
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT || 3000);
+const runtimeState = {
+  ready: true,
+  startupPhase: "ready",
+  startupMessage: ""
+};
 
 function sendError(res, message, statusCode = 500) {
   res.status(statusCode).json({
     success: false,
     message
   });
+}
+
+function setRuntimeState(nextState = {}) {
+  runtimeState.ready = typeof nextState.ready === "boolean" ? nextState.ready : runtimeState.ready;
+  runtimeState.startupPhase = String(nextState.startupPhase || runtimeState.startupPhase || "ready");
+  runtimeState.startupMessage = String(nextState.startupMessage || "");
 }
 
 const storefrontService = createStorefrontService();
@@ -49,11 +60,22 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
     data: {
-      ok: true,
+      ok: runtimeState.ready,
       service: "wechat-mini-shop-server",
-      storefrontRepositoryMode: storefrontService.getRepositoryMode()
+      storefrontRepositoryMode: storefrontService.getRepositoryMode(),
+      startupPhase: runtimeState.startupPhase,
+      startupMessage: runtimeState.startupMessage
     }
   });
+});
+
+app.use((req, res, next) => {
+  if (runtimeState.ready) {
+    next();
+    return;
+  }
+
+  sendError(res, runtimeState.startupMessage || "服务启动中，请稍后再试。", 503);
 });
 
 app.use(createStorefrontRouter({
@@ -66,9 +88,14 @@ app.use((req, res) => {
 });
 
 function startServer(port = DEFAULT_PORT) {
-  return app.listen(port, () => {
-    console.log(`wechat-mini-shop-server listening on http://127.0.0.1:${port}`);
+  const server = app.listen(port, () => {
+    const address = server.address();
+    const resolvedPort = address && typeof address === "object" ? address.port : port;
+
+    console.log(`wechat-mini-shop-server listening on http://127.0.0.1:${resolvedPort}`);
   });
+
+  return server;
 }
 
 if (require.main === module) {
@@ -77,5 +104,6 @@ if (require.main === module) {
 
 module.exports = {
   app,
-  startServer
+  startServer,
+  setRuntimeState
 };

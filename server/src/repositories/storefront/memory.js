@@ -1,9 +1,10 @@
 const crypto = require("crypto");
-const mallService = require("../../../../miniprogram/services/mall");
+const mallService = require("../../shared/mall");
 const {
   createStorefrontError,
   createUnauthorizedError
 } = require("../../modules/storefront/errors");
+const { resolveStorefrontSessionLoginType } = require("./session-login");
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const sessionStore = new Map();
@@ -57,25 +58,58 @@ function requireSession(sessionToken) {
   return record;
 }
 
-function resolveSessionLoginType(payload = {}) {
-  const loginType = String(payload.loginType || "mock_wechat").trim().toLowerCase();
+function createStorefrontMemoryRepository(source = mallService) {
+  function normalizeSourceError(error) {
+    if (!error) {
+      return createStorefrontError("服务异常", 500, "UNKNOWN_ERROR");
+    }
 
-  if (loginType === "mock_wechat" || loginType === "wechat_miniprogram") {
-    return loginType;
+    if (error.statusCode) {
+      return error;
+    }
+
+    const message = String(error.message || "服务异常").trim();
+
+    if (message === "订单不存在") {
+      return createStorefrontError(message, 404, "ORDER_NOT_FOUND");
+    }
+
+    if (message === "缺少订单状态") {
+      return createStorefrontError(message, 400, "ORDER_STATUS_REQUIRED");
+    }
+
+    if (message === "当前订单不能执行这个操作") {
+      return createStorefrontError(message, 400, "ORDER_STATUS_TRANSITION_INVALID");
+    }
+
+    if (message === "当前订单暂不可售后") {
+      return createStorefrontError(message, 400, "AFTERSALE_NOT_ALLOWED");
+    }
+
+    if (message === "该订单已提交售后") {
+      return createStorefrontError(message, 409, "AFTERSALE_ALREADY_EXISTS");
+    }
+
+    return createStorefrontError(message, 500, "MEMORY_SOURCE_ERROR");
   }
 
-  throw createStorefrontError("暂不支持当前登录方式", 400, "LOGIN_TYPE_UNSUPPORTED");
-}
+  function runSource(callback) {
+    try {
+      return callback();
+    } catch (error) {
+      throw normalizeSourceError(error);
+    }
+  }
 
-function createStorefrontMemoryRepository(source = mallService) {
   function withSession(sessionToken, callback) {
     requireSession(sessionToken);
-    return callback();
+    return runSource(callback);
   }
 
   return {
     mode: "memory",
     bootstrap() {
+      sessionStore.clear();
       source.bootstrap();
     },
     getHomeData() {
@@ -94,7 +128,7 @@ function createStorefrontMemoryRepository(source = mallService) {
       return source.getProductDetail(productId);
     },
     createSession(payload = {}) {
-      const loginType = resolveSessionLoginType(payload);
+      const loginType = resolveStorefrontSessionLoginType(payload, createStorefrontError);
 
       if (loginType === "wechat_miniprogram" && !String(payload.code || "").trim()) {
         throw createStorefrontError("缺少 wx.login 返回的 code，暂时无法继续微信登录", 400, "WECHAT_LOGIN_CODE_REQUIRED");
@@ -214,6 +248,36 @@ function createStorefrontMemoryRepository(source = mallService) {
     getPosterData(sessionToken) {
       return withSession(sessionToken, () => source.getPosterData());
     },
+    getAdminCategories(options = {}) {
+      return source.getAdminCategories(options);
+    },
+    saveAdminCategory(payload = {}) {
+      return runSource(() => source.saveAdminCategory(payload));
+    },
+    deleteAdminCategory(categoryId) {
+      return runSource(() => source.deleteAdminCategory(categoryId));
+    },
+    getAdminProducts(options = {}) {
+      return source.getAdminProducts(options);
+    },
+    getAdminProductDetail(productId) {
+      return source.getAdminProductDetail(productId);
+    },
+    saveAdminProduct(payload = {}) {
+      return runSource(() => source.saveAdminProduct(payload));
+    },
+    updateAdminProductStatus(productId, status) {
+      return runSource(() => source.updateAdminProductStatus(productId, status));
+    },
+    getAdminSkus(productId) {
+      return source.getAdminSkus(productId);
+    },
+    saveAdminSkus(productId, payload = {}) {
+      return runSource(() => source.saveAdminSkus(productId, payload));
+    },
+    updateAdminSkuStock(skuId, stock) {
+      return runSource(() => source.updateAdminSkuStock(skuId, stock));
+    },
     getAdminDashboardSummary() {
       return source.getAdminDashboardSummary();
     },
@@ -224,19 +288,19 @@ function createStorefrontMemoryRepository(source = mallService) {
       return source.getAdminOrderDetail(orderId);
     },
     cancelAdminOrder(orderId) {
-      return source.updateOrderStatus(orderId, "cancelled");
+      return runSource(() => source.updateOrderStatus(orderId, "cancelled"));
     },
     getPendingShipmentOrders(options = {}) {
       return source.getPendingShipmentOrders(options);
     },
     shipAdminOrder(orderId, payload = {}) {
-      return source.shipAdminOrder(orderId, payload);
+      return runSource(() => source.shipAdminOrder(orderId, payload));
     },
     getAdminAfterSales(options = {}) {
       return source.getAdminAfterSales(options);
     },
     reviewAdminAfterSale(afterSaleId, action, remark = "") {
-      return source.reviewAdminAfterSale(afterSaleId, action, remark);
+      return runSource(() => source.reviewAdminAfterSale(afterSaleId, action, remark));
     }
   };
 }

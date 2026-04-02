@@ -1,4 +1,4 @@
-const { categories: mockCategories, products: mockProducts } = require("../../../../miniprogram/data/mock");
+const { categories: mockCategories, products: mockProducts } = require("../../shared/mock");
 
 function parseSalesCount(salesText) {
   const matched = String(salesText || "").match(/\d+/);

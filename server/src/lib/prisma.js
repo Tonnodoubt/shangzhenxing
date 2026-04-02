@@ -3,6 +3,13 @@ const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 
 const globalForPrisma = global;
 
+function normalizeDatabaseUrl(value) {
+  return String(value || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/^[\s"'`“”‘’]+|[\s"'`“”‘’]+$/g, "");
+}
+
 function buildAdapterConfig(databaseUrl) {
   const url = new URL(databaseUrl);
 
@@ -21,7 +28,7 @@ function buildAdapterConfig(databaseUrl) {
 }
 
 function createPrismaClient() {
-  const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+  const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
   if (!databaseUrl) {
     throw new Error("缺少 DATABASE_URL，暂时无法初始化 Prisma Client。");

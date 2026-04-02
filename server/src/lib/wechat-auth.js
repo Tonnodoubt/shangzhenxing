@@ -1,6 +1,8 @@
 const https = require("https");
 const { createStorefrontError } = require("../modules/storefront/errors");
 
+let exchangeMiniProgramCodeOverride = null;
+
 function readWechatAuthConfig() {
   return {
     appId: String(process.env.WECHAT_APP_ID || "").trim(),
@@ -62,6 +64,10 @@ async function exchangeMiniProgramCode(code) {
     throw createStorefrontError("缺少 wx.login 返回的 code，暂时无法继续微信登录", 400, "WECHAT_LOGIN_CODE_REQUIRED");
   }
 
+  if (typeof exchangeMiniProgramCodeOverride === "function") {
+    return exchangeMiniProgramCodeOverride(normalizedCode);
+  }
+
   const config = readWechatAuthConfig();
 
   if (!config.appId || !config.appSecret) {
@@ -100,8 +106,18 @@ async function exchangeMiniProgramCode(code) {
   };
 }
 
+function setExchangeMiniProgramCodeOverrideForTest(handler) {
+  exchangeMiniProgramCodeOverride = typeof handler === "function" ? handler : null;
+}
+
+function resetExchangeMiniProgramCodeOverrideForTest() {
+  exchangeMiniProgramCodeOverride = null;
+}
+
 module.exports = {
   readWechatAuthConfig,
   isWechatAuthConfigured,
-  exchangeMiniProgramCode
+  exchangeMiniProgramCode,
+  setExchangeMiniProgramCodeOverrideForTest,
+  resetExchangeMiniProgramCodeOverrideForTest
 };
