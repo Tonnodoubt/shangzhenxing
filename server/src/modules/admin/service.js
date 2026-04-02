@@ -12,10 +12,102 @@ function normalizePageOptions(options = {}) {
   };
 }
 
+function requireBoolean(value, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value === "true";
+  }
+
+  return fallback;
+}
+
+function normalizeSkuPayloadList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => ({
+    skuId: requireString((item || {}).skuId || (item || {}).id),
+    skuCode: requireString((item || {}).skuCode),
+    specText: requireString((item || {}).specText),
+    price: Number((item || {}).price || 0),
+    originPrice: Number((item || {}).originPrice || (item || {}).price || 0),
+    stock: Number((item || {}).stock || 0),
+    lockStock: Number((item || {}).lockStock || 0),
+    status: requireString((item || {}).status, "enabled")
+  }));
+}
+
 function createAdminService(repository = createStorefrontRepository()) {
   return {
     getRepositoryMode() {
       return repository.mode || "unknown";
+    },
+    getCategories(options = {}) {
+      return repository.getAdminCategories({
+        ...normalizePageOptions(options)
+      });
+    },
+    saveCategory(payload = {}) {
+      return repository.saveAdminCategory({
+        categoryId: requireString(payload.categoryId || payload.id),
+        parentId: requireString(payload.parentId),
+        name: requireString(payload.name),
+        sortOrder: Number(payload.sortOrder || 0),
+        status: requireString(payload.status, "enabled")
+      });
+    },
+    deleteCategory(categoryId) {
+      return repository.deleteAdminCategory(requireString(categoryId));
+    },
+    getProducts(options = {}) {
+      return repository.getAdminProducts({
+        ...normalizePageOptions(options),
+        keyword: requireString(options.keyword),
+        status: requireString(options.status),
+        categoryId: requireString(options.categoryId)
+      });
+    },
+    getProductDetail(productId) {
+      return repository.getAdminProductDetail(requireString(productId));
+    },
+    saveProduct(payload = {}) {
+      return repository.saveAdminProduct({
+        productId: requireString(payload.productId || payload.id),
+        categoryId: requireString(payload.categoryId),
+        title: requireString(payload.title),
+        shortDesc: requireString(payload.shortDesc),
+        subTitle: requireString(payload.subTitle),
+        coverImage: requireString(payload.coverImage),
+        detailContent: requireString(payload.detailContent),
+        price: Number(payload.price || 0),
+        marketPrice: Number(payload.marketPrice || payload.price || 0),
+        salesCount: Number(payload.salesCount || 0),
+        favoriteCount: Number(payload.favoriteCount || 0),
+        sortOrder: Number(payload.sortOrder || 0),
+        distributionEnabled: requireBoolean(payload.distributionEnabled, true),
+        status: requireString(payload.status, "off_sale")
+      });
+    },
+    updateProductStatus(productId, status) {
+      return repository.updateAdminProductStatus(
+        requireString(productId),
+        requireString(status, "off_sale")
+      );
+    },
+    getProductSkus(productId) {
+      return repository.getAdminSkus(requireString(productId));
+    },
+    saveProductSkus(productId, payload = {}) {
+      return repository.saveAdminSkus(requireString(productId), {
+        skus: normalizeSkuPayloadList(payload.skus)
+      });
+    },
+    updateSkuStock(skuId, stock) {
+      return repository.updateAdminSkuStock(requireString(skuId), Number(stock || 0));
     },
     getDashboardSummary() {
       return repository.getAdminDashboardSummary();

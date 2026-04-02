@@ -1,5 +1,5 @@
 const express = require("express");
-const mallService = require("../../../miniprogram/services/mall");
+const mallService = require("../shared/mall");
 const { createAdminService } = require("../modules/admin/service");
 const { sendAdminData, sendAdminError } = require("./http");
 const {
@@ -29,18 +29,6 @@ function wrap(handler) {
 
 function requireString(value, fallback = "") {
   return String(value || fallback).trim();
-}
-
-function requireBoolean(value, fallback = false) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    return value === "true";
-  }
-
-  return fallback;
 }
 
 router.post("/admin/v1/auth/login", wrap((req, res) => {
@@ -100,21 +88,21 @@ router.post("/admin/v1/auth/logout", wrap((req, res) => {
   });
 }));
 
-router.get("/admin/v1/categories", requirePermission("category.view"), wrap((req, res) => {
-  sendAdminData(res, mallService.getAdminCategories(req.query || {}), {
+router.get("/admin/v1/categories", requirePermission("category.view"), wrap(async (req, res) => {
+  sendAdminData(res, await adminService.getCategories(req.query || {}), {
     requestId: req.requestId
   });
 }));
 
-router.post("/admin/v1/categories", requirePermission("category.create"), wrap((req, res) => {
-  sendAdminData(res, mallService.saveAdminCategory(req.body || {}), {
+router.post("/admin/v1/categories", requirePermission("category.create"), wrap(async (req, res) => {
+  sendAdminData(res, await adminService.saveCategory(req.body || {}), {
     statusCode: 201,
     requestId: req.requestId
   });
 }));
 
-router.put("/admin/v1/categories/:categoryId", requirePermission("category.edit"), wrap((req, res) => {
-  const record = mallService.saveAdminCategory({
+router.put("/admin/v1/categories/:categoryId", requirePermission("category.edit"), wrap(async (req, res) => {
+  const record = await adminService.saveCategory({
     ...(req.body || {}),
     categoryId: req.params.categoryId
   });
@@ -133,8 +121,8 @@ router.put("/admin/v1/categories/:categoryId", requirePermission("category.edit"
   });
 }));
 
-router.delete("/admin/v1/categories/:categoryId", requirePermission("category.delete"), wrap((req, res) => {
-  const record = mallService.deleteAdminCategory(req.params.categoryId);
+router.delete("/admin/v1/categories/:categoryId", requirePermission("category.delete"), wrap(async (req, res) => {
+  const record = await adminService.deleteCategory(req.params.categoryId);
 
   if (!record) {
     sendAdminError(res, "分类不存在", {
@@ -152,14 +140,14 @@ router.delete("/admin/v1/categories/:categoryId", requirePermission("category.de
   });
 }));
 
-router.get("/admin/v1/products", requirePermission("product.view"), wrap((req, res) => {
-  sendAdminData(res, mallService.getAdminProducts(req.query || {}), {
+router.get("/admin/v1/products", requirePermission("product.view"), wrap(async (req, res) => {
+  sendAdminData(res, await adminService.getProducts(req.query || {}), {
     requestId: req.requestId
   });
 }));
 
-router.get("/admin/v1/products/:productId", requirePermission("product.view"), wrap((req, res) => {
-  const record = mallService.getAdminProductDetail(req.params.productId);
+router.get("/admin/v1/products/:productId", requirePermission("product.view"), wrap(async (req, res) => {
+  const record = await adminService.getProductDetail(req.params.productId);
 
   if (!record) {
     sendAdminError(res, "商品不存在", {
@@ -175,15 +163,15 @@ router.get("/admin/v1/products/:productId", requirePermission("product.view"), w
   });
 }));
 
-router.post("/admin/v1/products", requirePermission("product.create"), wrap((req, res) => {
-  sendAdminData(res, mallService.saveAdminProduct(req.body || {}), {
+router.post("/admin/v1/products", requirePermission("product.create"), wrap(async (req, res) => {
+  sendAdminData(res, await adminService.saveProduct(req.body || {}), {
     statusCode: 201,
     requestId: req.requestId
   });
 }));
 
-router.put("/admin/v1/products/:productId", requirePermission("product.edit"), wrap((req, res) => {
-  const record = mallService.saveAdminProduct({
+router.put("/admin/v1/products/:productId", requirePermission("product.edit"), wrap(async (req, res) => {
+  const record = await adminService.saveProduct({
     ...(req.body || {}),
     productId: req.params.productId
   });
@@ -202,8 +190,8 @@ router.put("/admin/v1/products/:productId", requirePermission("product.edit"), w
   });
 }));
 
-router.post("/admin/v1/products/:productId/status", requirePermission("product.status"), wrap((req, res) => {
-  const record = mallService.updateAdminProductStatus(
+router.post("/admin/v1/products/:productId/status", requirePermission("product.status"), wrap(async (req, res) => {
+  const record = await adminService.updateProductStatus(
     req.params.productId,
     requireString((req.body || {}).status, "off_sale")
   );
@@ -222,14 +210,14 @@ router.post("/admin/v1/products/:productId/status", requirePermission("product.s
   });
 }));
 
-router.get("/admin/v1/products/:productId/skus", requirePermission("sku.view"), wrap((req, res) => {
-  sendAdminData(res, mallService.getAdminSkus(req.params.productId), {
+router.get("/admin/v1/products/:productId/skus", requirePermission("sku.view"), wrap(async (req, res) => {
+  sendAdminData(res, await adminService.getProductSkus(req.params.productId), {
     requestId: req.requestId
   });
 }));
 
-router.post("/admin/v1/products/:productId/skus", requirePermission("sku.edit"), wrap((req, res) => {
-  const record = mallService.saveAdminSkus(req.params.productId, req.body || {});
+router.post("/admin/v1/products/:productId/skus", requirePermission("sku.edit"), wrap(async (req, res) => {
+  const record = await adminService.saveProductSkus(req.params.productId, req.body || {});
 
   if (!record) {
     sendAdminError(res, "商品不存在", {
@@ -245,8 +233,8 @@ router.post("/admin/v1/products/:productId/skus", requirePermission("sku.edit"),
   });
 }));
 
-router.put("/admin/v1/skus/:skuId/stock", requirePermission("stock.adjust"), wrap((req, res) => {
-  const record = mallService.updateAdminSkuStock(
+router.put("/admin/v1/skus/:skuId/stock", requirePermission("stock.adjust"), wrap(async (req, res) => {
+  const record = await adminService.updateSkuStock(
     req.params.skuId,
     Number((req.body || {}).stock || 0)
   );
