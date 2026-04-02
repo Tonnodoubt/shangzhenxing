@@ -95,7 +95,7 @@
 
 更完整说明见：
 
-- `docs/tech-stack.md`
+- `docs/setup/tech-stack.md`
 
 ## 仓库结构
 
@@ -107,7 +107,7 @@ wechat-mini-shop/
 │  ├─ scripts/               # 种子与真库回归脚本
 │  ├─ public/admin-console/  # 最小履约控制台
 │  └─ src/                   # 后端代码
-└─ docs/                     # 项目说明与路线文档
+└─ docs/                     # 文档索引与分主题说明
 ```
 
 ## 快速开始
@@ -170,11 +170,7 @@ http://127.0.0.1:3000/admin-console/
 
 如果你现在只想知道“项目做到哪里了”，优先看：
 
-- `docs/project-status-snapshot.md`
-
-如果你现在只想知道“当前还剩什么没做”，优先看：
-
-- `docs/remaining-tasks.md`
+- `docs/current/project-status-snapshot.md`
 
 当前可以把项目状态概括成：
 
@@ -185,23 +181,26 @@ http://127.0.0.1:3000/admin-console/
 
 ## 文档索引
 
-- `docs/project-status-snapshot.md`
-  适合快速恢复上下文
+- `docs/README.md`
+  适合先看整体目录和阅读顺序
 
-- `docs/remaining-tasks.md`
-  适合看当前关键路径和剩余任务
+- `docs/current/project-status-snapshot.md`
+  适合看当前状态、关键路径和下一步
 
-- `docs/next-phase-roadmap.md`
-  适合看下一阶段推进顺序
-
-- `docs/cloud-hosting-deployment.md`
+- `docs/setup/cloud-hosting-deployment.md`
   适合看云托管部署边界和上线方式
 
-- `docs/environment-variables.md`
+- `docs/setup/environment-variables.md`
   适合看服务端环境变量和小程序运行配置怎么收口
 
-- `docs/frontend-regression-checklist.md`
+- `docs/setup/frontend-regression-checklist.md`
   适合做前台回归时对照执行
+
+- `docs/product/product-blueprint-roadmap.md`
+  适合看首发范围和二期边界
+
+- `docs/growth/distribution-production-checklist.md`
+  适合看分销当前进度和后续补齐顺序
 
 ## 当前关键路径
 

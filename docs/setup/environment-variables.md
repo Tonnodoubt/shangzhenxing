@@ -353,4 +353,4 @@ WECHAT_APP_SECRET=""
 - `server/src/lib/wechat-auth.js`
 - `server/Dockerfile`
 - `miniprogram/config/env.js`
-- `docs/cloud-hosting-deployment.md`
+- `docs/setup/cloud-hosting-deployment.md`

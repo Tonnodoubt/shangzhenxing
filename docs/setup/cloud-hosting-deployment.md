@@ -5,7 +5,7 @@
 补一句当前最容易混淆的边界：
 
 - 这份文档偏“云上正式部署”
-- 如果你现在是在推进本地真库联调，优先看 `docs/remaining-tasks.md`
+- 如果你现在是在推进本地真库联调，优先看 `docs/current/project-status-snapshot.md`
 
 ## 先分清两个部分
 
@@ -76,7 +76,7 @@
    文件：[env.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/config/env.js)
 
    更完整的配置收口可参考：
-   [environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/environment-variables.md)
+   [environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/environment-variables.md)
 
    需要把：
    `requestTransport` 改成 `cloud`
