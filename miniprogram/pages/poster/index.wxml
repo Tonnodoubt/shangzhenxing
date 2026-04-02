@@ -35,6 +35,6 @@
     </view>
 
     <button class="primary-button poster-button" bindtap="savePoster">保存海报</button>
-    <button class="ghost-button poster-button" bindtap="sharePoster">分享给好友</button>
+    <button class="ghost-button poster-button" open-type="share" bindtap="sharePoster">分享给好友</button>
   </view>
 </view>

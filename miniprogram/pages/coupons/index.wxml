@@ -1,4 +1,4 @@
-<view class="page-shell">
+<view class="page-shell coupon-page">
   <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
     <text class="state-tag">优惠券</text>
     <text class="state-title">优惠券数据加载中</text>
@@ -16,72 +16,98 @@
   </view>
 
   <view wx:else>
-    <view class="panel coupon-hero" wx:if="{{mode === 'select'}}">
-      <text class="section-title">本次结算可选优惠券</text>
-      <text class="section-subtitle">当前商品金额 ¥{{displayAmount}}，满足门槛的券可以直接选择。</text>
-      <text class="clear-link" bindtap="clearCoupon">{{actionLoadingId === 'clear' ? '处理中...' : '本次不使用优惠券'}}</text>
+    <view class="coupon-page-head">
+      <text class="coupon-page-title">领取优惠券</text>
+      <text class="coupon-page-copy">把新人券、满减券和已领取优惠券统一放在这里，样式会更接近图里的券面感。</text>
     </view>
 
-    <view class="section-head">
+    <view class="panel coupon-select-summary" wx:if="{{mode === 'select'}}">
+      <text class="coupon-select-title">本次结算可选优惠券</text>
+      <text class="coupon-select-copy">当前商品金额 ¥{{displayAmount}}，满足门槛的券可以直接选择。</text>
+      <text class="coupon-select-link" bindtap="clearCoupon">{{actionLoadingId === 'clear' ? '处理中...' : '本次不使用优惠券'}}</text>
+    </view>
+
+    <view class="coupon-section-head">
       <text class="section-title">可领取优惠券</text>
-      <text class="section-subtitle">先把券领下来，后面结算页就能直接用。</text>
+      <text class="section-subtitle">先把券领下来，结算页会直接识别。</text>
     </view>
 
-    <view class="coupon-list" wx:if="{{centerTemplates.length}}">
+    <view class="coupon-ticket-list" wx:if="{{centerTemplates.length}}">
       <block wx:for="{{centerTemplates}}" wx:key="id">
-        <view class="panel coupon-card">
-          <view class="coupon-main">
-            <view>
-              <text class="coupon-amount">¥{{item.amount}}</text>
-              <text class="tag-chip">{{item.badge}}</text>
-            </view>
-            <button
-              class="ghost-button claim-button"
-              bindtap="claimCoupon"
-              data-id="{{item.id}}"
-              loading="{{actionLoadingId === item.id && actionType === 'claim'}}"
-              disabled="{{item.claimed || actionLoadingId ? true : false}}"
-            >
-              {{item.claimed ? '已领取' : '立即领取'}}
-            </button>
+        <view class="coupon-ticket coupon-ticket-claim">
+          <view class="coupon-ticket-notch coupon-ticket-notch-left"></view>
+          <view class="coupon-ticket-notch coupon-ticket-notch-right"></view>
+          <view class="coupon-ticket-value">
+            <text class="coupon-currency">¥</text>
+            <text class="coupon-value">{{item.amountText}}</text>
           </view>
-          <text class="coupon-title">{{item.title}}</text>
-          <text class="coupon-desc">{{item.desc}}</text>
-          <text class="coupon-expiry">{{item.expiryText}}</text>
+          <view class="coupon-ticket-divider"></view>
+          <view class="coupon-ticket-body">
+            <view class="coupon-ticket-top">
+              <view class="coupon-ticket-main">
+                <text class="coupon-ticket-title">{{item.title}}</text>
+                <text class="coupon-ticket-rule">{{item.ruleText}}</text>
+              </view>
+              <text class="coupon-ticket-badge">{{item.badge}}</text>
+            </view>
+            <view class="coupon-ticket-bottom">
+              <text class="coupon-ticket-expiry">{{item.expiryText}}</text>
+              <button
+                class="coupon-ticket-button"
+                bindtap="claimCoupon"
+                data-id="{{item.id}}"
+                loading="{{item.isLoading}}"
+                disabled="{{item.claimed || actionLoadingId ? true : false}}"
+              >
+                {{item.actionText}}
+              </button>
+            </view>
+          </view>
         </view>
       </block>
     </view>
+
     <view class="panel content-empty" wx:else>
       <text class="content-empty-title">当前没有可领取的券</text>
-      <text class="content-empty-copy">后面接活动配置后，这里可以展示新人券、满减券和节日券。</text>
+      <text class="content-empty-copy">后面接活动配置后，这里可以继续扩新人券、满减券和节日券。</text>
     </view>
 
-    <view class="section-head">
+    <view class="coupon-section-head">
       <text class="section-title">我的优惠券</text>
-      <text class="section-subtitle">可在结算页选择使用。</text>
+      <text class="section-subtitle">当前可用 {{availableCouponCount}} 张，领完后会沉淀到这里。</text>
     </view>
 
-    <view class="coupon-list" wx:if="{{coupons.length}}">
+    <view class="coupon-ticket-list" wx:if="{{coupons.length}}">
       <block wx:for="{{coupons}}" wx:key="id">
         <view
-          class="panel coupon-card {{selectedCouponId === item.id ? 'coupon-card-active' : ''}}"
+          class="coupon-ticket coupon-ticket-owned {{selectedCouponId === item.id ? 'coupon-ticket-active' : ''}} {{item.status !== 'available' ? 'coupon-ticket-disabled' : ''}}"
           data-id="{{item.id}}"
-          data-selectable="{{mode !== 'select' ? false : (item.status === 'available' && item.meetsThreshold)}}"
+          data-selectable="{{mode !== 'select' ? false : item.isSelectable}}"
           data-reason="{{item.selectHint}}"
           bindtap="selectCoupon"
         >
-          <view class="coupon-main">
-            <view>
-              <text class="coupon-amount">¥{{item.amount}}</text>
-              <text class="tag-chip">{{item.statusLabel}}</text>
-            </view>
-            <text class="coupon-action" wx:if="{{mode === 'select'}}">
-              {{actionLoadingId === item.id && actionType === 'select' ? '选择中' : item.selectHint}}
-            </text>
+          <view class="coupon-ticket-notch coupon-ticket-notch-left"></view>
+          <view class="coupon-ticket-notch coupon-ticket-notch-right"></view>
+          <view class="coupon-ticket-value">
+            <text class="coupon-currency">¥</text>
+            <text class="coupon-value">{{item.amountText}}</text>
           </view>
-          <text class="coupon-title">{{item.title}}</text>
-          <text class="coupon-desc">满 {{item.threshold}} 可用 · {{item.sourceText}}</text>
-          <text class="coupon-expiry">{{item.expiryText}}</text>
+          <view class="coupon-ticket-divider"></view>
+          <view class="coupon-ticket-body">
+            <view class="coupon-ticket-top">
+              <view class="coupon-ticket-main">
+                <text class="coupon-ticket-title">{{item.title}}</text>
+                <text class="coupon-ticket-rule">{{item.thresholdText}} · {{item.sourceText}}</text>
+              </view>
+              <text class="coupon-ticket-status {{item.statusToneClass}}">{{item.statusLabel}}</text>
+            </view>
+            <view class="coupon-ticket-bottom">
+              <text class="coupon-ticket-expiry">{{item.expiryText}}</text>
+              <text class="coupon-ticket-action" wx:if="{{mode === 'select'}}">
+                {{item.isSelecting ? '选择中' : item.selectHint}}
+              </text>
+            </view>
+          </view>
         </view>
       </block>
     </view>

@@ -1,6 +1,6 @@
 {
   "description": "微信商城小程序基础骨架",
-  "appid": "wx94cb0f3cef0a9d0b",
+  "appid": "wx70197e364c20368b",
   "compileType": "miniprogram",
   "projectname": "wechat-mini-shop",
   "miniprogramRoot": "miniprogram/",
@@ -28,7 +28,8 @@
       "ignore": [],
       "disablePlugins": [],
       "outputPath": ""
-    }
+    },
+    "condition": false
   },
   "simulatorPluginLibVersion": {},
   "packOptions": {
@@ -36,5 +37,6 @@
     "include": []
   },
   "editorSetting": {},
-  "condition": {}
+  "condition": {},
+  "libVersion": "3.15.1"
 }

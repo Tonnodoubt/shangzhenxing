@@ -14,8 +14,32 @@ Page({
   async onLoad() {
     await this.loadCategories();
   },
+  async onShow() {
+    const app = getApp();
+    const pendingCategoryId = app && app.globalData ? app.globalData.pendingCategoryId : "";
+
+    if (!pendingCategoryId || pendingCategoryId === this.data.activeCategoryId || this.data.pageState !== "success") {
+      if (app && app.globalData) {
+        app.globalData.pendingCategoryId = "";
+      }
+
+      return;
+    }
+
+    if (app && app.globalData) {
+      app.globalData.pendingCategoryId = "";
+    }
+
+    this.setData({
+      activeCategoryId: pendingCategoryId
+    });
+
+    await this.syncProducts();
+  },
   async loadCategories() {
     try {
+      const app = getApp();
+      const pendingCategoryId = app && app.globalData ? app.globalData.pendingCategoryId : "";
       this.setData({
         pageState: "loading",
         errorMessage: "",
@@ -28,10 +52,17 @@ Page({
 
       this.setData({
         categories,
-        activeCategoryId: categories[0] ? categories[0].id : "all",
+        activeCategoryId: categories.some((item) => item.id === pendingCategoryId)
+          ? pendingCategoryId
+          : (categories[0] ? categories[0].id : "all"),
         pageState: "success",
         errorMessage: ""
       });
+
+      if (app && app.globalData) {
+        app.globalData.pendingCategoryId = "";
+      }
+
       await this.syncProducts();
     } catch (error) {
       this.setData({

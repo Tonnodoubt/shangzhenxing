@@ -1,6 +1,27 @@
 const mallService = require("../../services/mall-client");
 
-function decorateCouponList(coupons = [], mode = "manage", amount = 0, selectedCouponId = "") {
+function buildTemplateRuleText(template = {}) {
+  const threshold = Number(template.threshold || 0);
+  const badge = String(template.badge || "").trim();
+
+  if (badge.indexOf("新") > -1) {
+    return `首单满${threshold}可用`;
+  }
+
+  return `满${threshold}可用`;
+}
+
+function decorateCenterTemplates(templates = [], actionLoadingId = "", actionType = "") {
+  return templates.map((item) => ({
+    ...item,
+    amountText: String(Number(item.amount || 0)),
+    ruleText: buildTemplateRuleText(item),
+    actionText: item.claimed ? "已领取" : "立即领取",
+    isLoading: actionLoadingId === item.id && actionType === "claim"
+  }));
+}
+
+function decorateCouponList(coupons = [], mode = "manage", amount = 0, selectedCouponId = "", actionLoadingId = "", actionType = "") {
   return coupons.map((item) => {
     const threshold = Number(item.threshold || 0);
     const isAvailable = item.status === "available";
@@ -9,32 +30,38 @@ function decorateCouponList(coupons = [], mode = "manage", amount = 0, selectedC
 
     if (mode === "select") {
       if (!isAvailable) {
-        selectHint = "这张券当前不可用";
+        selectHint = "当前不可选";
       } else if (!meetsThreshold) {
-        selectHint = `满 ${threshold} 可用`;
+        selectHint = `满${threshold}可用`;
       } else if (selectedCouponId === item.id) {
         selectHint = "当前已选";
       } else {
-        selectHint = "点击选择";
+        selectHint = "点击使用";
       }
     }
 
     return {
       ...item,
+      amountText: String(Number(item.amount || 0)),
+      thresholdText: `满${threshold}可用`,
       statusLabel: isAvailable ? "可用" : "已使用",
+      statusToneClass: isAvailable ? "coupon-ticket-status-available" : "coupon-ticket-status-disabled",
       selectHint,
-      meetsThreshold
+      meetsThreshold,
+      isSelectable: isAvailable && meetsThreshold,
+      isSelecting: actionLoadingId === item.id && actionType === "select"
     };
   });
 }
 
-function buildCouponViewModel(payload = {}, mode = "manage", amount = 0) {
+function buildCouponViewModel(payload = {}, mode = "manage", amount = 0, actionLoadingId = "", actionType = "") {
   const selectedCouponId = payload.selectedCouponId || "";
 
   return {
-    centerTemplates: payload.centerTemplates || [],
-    coupons: decorateCouponList(payload.coupons || [], mode, amount, selectedCouponId),
+    centerTemplates: decorateCenterTemplates(payload.centerTemplates || [], actionLoadingId, actionType),
+    coupons: decorateCouponList(payload.coupons || [], mode, amount, selectedCouponId, actionLoadingId, actionType),
     selectedCouponId,
+    availableCouponCount: (payload.coupons || []).filter((item) => item.status === "available").length,
     pageState: "success",
     errorMessage: ""
   };
@@ -48,6 +75,7 @@ Page({
     centerTemplates: [],
     coupons: [],
     selectedCouponId: "",
+    availableCouponCount: 0,
     pageState: "loading",
     errorMessage: "",
     actionLoadingId: "",
@@ -137,8 +165,7 @@ Page({
       return;
     }
 
-    const { id } = event.currentTarget.dataset;
-    const { selectable, reason } = event.currentTarget.dataset;
+    const { id, selectable, reason } = event.currentTarget.dataset;
     let result = null;
 
     if (!selectable) {

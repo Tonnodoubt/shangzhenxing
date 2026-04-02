@@ -2,7 +2,7 @@
   <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
     <text class="state-tag">我的</text>
     <text class="state-title">个人中心加载中</text>
-    <text class="state-copy">正在同步账号、优惠券、地址和分销概览。</text>
+    <text class="state-copy">正在同步账号、订单和地址信息。</text>
   </view>
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
@@ -18,67 +18,39 @@
   <view wx:else>
     <view class="profile-hero panel">
       <view class="profile-hero-head">
-        <view>
-          <text class="profile-kicker">我的会员中心</text>
+        <view class="profile-hero-main">
+          <text class="profile-kicker">MY N.E.K.O. SPACE</text>
           <text class="profile-name">{{user.nickname || '微信用户'}}</text>
           <text class="profile-phone">{{user.phone || '未授权手机号'}}</text>
+          <text class="profile-copy">订单、地址和账号信息都收在这里。</text>
         </view>
         <text class="profile-auth-chip" bindtap="openAuth">
           {{user.isAuthorized ? '已授权' : '去授权'}}
         </text>
       </view>
 
-      <view class="profile-promo" bindtap="openDistribution">
-        <view class="profile-promo-main">
-          <text class="profile-promo-kicker">{{distributor.level || '分销权益'}}</text>
-          <text class="profile-promo-title">分享商品给好友，成交后自动累计佣金</text>
-          <text class="profile-promo-copy">
-            等级、团队和佣金进度都放在这里，推广情况随时可看。
-          </text>
-        </view>
-        <text class="profile-promo-link">立即进入</text>
+      <view class="profile-note">
+        <text class="profile-note-label">账户中心</text>
+        <text class="profile-note-copy">首页负责领券和分销，这里只保留你的个人服务。</text>
       </view>
     </view>
 
-    <view class="metric-grid">
-      <block wx:for="{{metrics}}" wx:key="id">
-        <view class="metric-card panel">
-          <text class="metric-value">{{item.value}}</text>
-          <text class="metric-label">{{item.label}}</text>
-        </view>
-      </block>
-    </view>
-
-    <view class="panel profile-section">
+    <view class="panel service-section">
       <view class="profile-section-head">
-        <text class="section-title">核心入口</text>
-        <text class="section-subtitle">订单、优惠券、地址、售后和分销入口都放在第一屏。</text>
+        <text class="section-title">常用服务</text>
+        <text class="section-subtitle">把订单、地址、售后和账号管理留在这里就够了。</text>
       </view>
 
-      <view class="service-grid">
-        <block wx:for="{{coreServices}}" wx:key="id">
-          <view class="service-card" data-action="{{item.action}}" data-label="{{item.title}}" bindtap="handleServiceTap">
-            <text class="service-badge">{{item.badge}}</text>
-            <text class="service-card-title">{{item.title}}</text>
-            <text class="service-card-copy">{{item.subtitle}}</text>
-          </view>
-        </block>
-      </view>
-    </view>
-
-    <view class="panel profile-section">
-      <view class="profile-section-head">
-        <text class="section-title">更多功能</text>
-        <text class="section-subtitle">把待处理订单、团队和佣金明细放在一起，日常查看更省事。</text>
-      </view>
-
-      <block wx:for="{{moreServices}}" wx:key="id">
+      <block wx:for="{{serviceRows}}" wx:key="id">
         <view class="service-row" data-action="{{item.action}}" data-label="{{item.label}}" bindtap="handleServiceTap">
           <view class="service-row-main">
             <text class="service-row-title">{{item.title}}</text>
             <text class="service-row-copy">{{item.copy}}</text>
           </view>
-          <text class="service-row-value">{{item.value}}</text>
+          <view class="service-row-side">
+            <text class="service-row-value">{{item.value}}</text>
+            <text class="service-row-arrow">›</text>
+          </view>
         </view>
       </block>
     </view>

@@ -4,12 +4,41 @@ const sessionStore = require("./session");
 const mockMallService = require("./mall");
 
 let sessionBootstrapPromise = null;
+let pendingInviteContext = null;
 
 function shouldUseApi() {
   return envConfig.mallDataSource === "api";
 }
 
-function bootstrap() {
+function normalizeInviteContext(options = {}) {
+  const query = options.query || {};
+  const inviterUserId = String(query.inviterUserId || options.inviterUserId || "").trim();
+
+  if (!inviterUserId) {
+    return null;
+  }
+
+  return {
+    inviterUserId,
+    sourceScene: String(query.sourceScene || options.sourceScene || "").trim() || "share"
+  };
+}
+
+function captureEntryContext(options = {}) {
+  const nextContext = normalizeInviteContext(options);
+
+  if (!nextContext) {
+    return null;
+  }
+
+  pendingInviteContext = nextContext;
+
+  return nextContext;
+}
+
+function bootstrap(options = {}) {
+  captureEntryContext(options);
+
   if (!shouldUseApi()) {
     mockMallService.bootstrap();
     return;
@@ -78,15 +107,19 @@ function runWeChatLogin() {
 }
 
 async function buildSessionCreatePayload() {
+  const inviteContext = pendingInviteContext || {};
+
   if (getSessionLoginMode() === "wechat") {
     return {
       loginType: "wechat_miniprogram",
-      code: await runWeChatLogin()
+      code: await runWeChatLogin(),
+      ...inviteContext
     };
   }
 
   return {
-    loginType: "mock_wechat"
+    loginType: "mock_wechat",
+    ...inviteContext
   };
 }
 
@@ -95,6 +128,7 @@ async function createApiSession() {
     skipAuthorization: true
   });
 
+  pendingInviteContext = null;
   sessionStore.setSession(data);
 
   return data;
@@ -494,6 +528,7 @@ async function getPosterData() {
 
 module.exports = {
   bootstrap,
+  captureEntryContext,
   getSessionLoginMode,
   getSessionLoginModeSummary,
   getAddresses,

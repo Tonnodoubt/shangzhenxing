@@ -5,6 +5,7 @@ Page({
     user: {},
     distributor: {},
     coupon: null,
+    sharePath: "/pages/home/index",
     pageState: "loading",
     errorMessage: ""
   },
@@ -34,10 +35,15 @@ Page({
     });
   },
   sharePoster() {
-    wx.showToast({
-      title: "分享能力待接微信转发",
-      icon: "none"
-    });
+    return null;
+  },
+  onShareAppMessage() {
+    const nickname = String((this.data.user || {}).nickname || "").trim() || "好友";
+
+    return {
+      title: `${nickname}邀请你来逛商城`,
+      path: this.data.sharePath || "/pages/home/index"
+    };
   },
   retryLoad() {
     this.onShow();

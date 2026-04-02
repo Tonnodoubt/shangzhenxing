@@ -2,7 +2,7 @@
   <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
     <text class="state-tag">首页</text>
     <text class="state-title">首页内容加载中</text>
-    <text class="state-copy">正在同步优惠券、常用入口和精选商品。</text>
+    <text class="state-copy">正在同步主视觉、品类入口、领券福利和首页商品。</text>
   </view>
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
@@ -16,156 +16,96 @@
   </view>
 
   <view wx:else>
-    <view class="hero panel">
-      <view class="hero-head">
-        <view>
-          <text class="hero-kicker">甄选福利商城</text>
-          <text class="hero-title">先领券，再下单，分享还能赚佣</text>
-        </view>
-        <text class="hero-status {{user.isAuthorized ? 'hero-status-active' : ''}}">
-          {{user.isAuthorized ? '已授权' : '待授权'}}
-        </text>
-      </view>
-      <text class="hero-copy">
-        新人券、热门商品和分享入口都放在首页首屏，逛店和下单都会更顺手。
-      </text>
-      <view class="hero-search" bindtap="handleSearch">
-        <text class="hero-search-text">搜索商品 / 优惠券 / 热门爆款</text>
-      </view>
-
-      <view class="hero-badges">
-        <block wx:for="{{heroBadges}}" wx:key="id">
-          <text class="hero-badge">{{item.text}}</text>
+    <view class="hero-shell">
+      <view class="hero-backdrop">
+        <block wx:for="{{hero.backdropWords}}" wx:key="id">
+          <text class="hero-backdrop-word {{item.className}}">{{item.text}}</text>
         </block>
       </view>
 
-      <view class="hero-stats">
-        <block wx:for="{{homeStats}}" wx:key="label">
-          <view class="hero-stat">
-            <text class="hero-stat-value">{{item.value}}</text>
-            <text class="hero-stat-label">{{item.label}}</text>
-          </view>
+      <view class="hero-topbar">
+        <view class="hero-search" bindtap="openCategory">
+          <text class="hero-search-icon">⌕</text>
+        </view>
+        <view class="hero-status-pill">{{hero.statusText}}</view>
+      </view>
+
+      <view class="hero-medallion" style="background: {{hero.product.accent}};">
+        <text class="hero-medallion-text">{{hero.product.coverLabel}}</text>
+      </view>
+
+      <view class="hero-copygroup">
+        <text class="hero-title">{{hero.titleTop}}</text>
+        <text class="hero-title hero-title-sub">{{hero.titleBottom}}</text>
+        <text class="hero-copy">{{hero.copy}}</text>
+      </view>
+
+      <view class="hero-dots">
+        <block wx:for="{{hero.dots}}" wx:key="id">
+          <view class="hero-dot {{item.active ? 'hero-dot-active' : ''}}"></view>
         </block>
       </view>
     </view>
 
-    <view class="banner-strip" wx:if="{{banners.length}}">
-      <block wx:for="{{banners}}" wx:key="id">
-        <view class="panel banner-card" style="background: {{item.accent}};" data-action="{{item.action}}" bindtap="handleEntryTap">
-          <text class="banner-title">{{item.title}}</text>
-          <text class="banner-subtitle">{{item.subtitle}}</text>
-          <view class="banner-footer">
-            <text class="banner-meta">{{item.meta}}</text>
-            <text class="banner-link">{{item.linkText}}</text>
+    <view class="panel category-rack">
+      <block wx:for="{{categoryNav}}" wx:key="id">
+        <view class="category-pill" data-id="{{item.id}}" bindtap="openCategory">
+          <view class="category-seal" style="background: {{item.accent}};">
+            <text class="category-seal-text">{{item.sealText}}</text>
           </view>
+          <text class="category-name">{{item.name}}</text>
         </view>
       </block>
     </view>
 
-    <view class="benefit-grid">
-      <block wx:for="{{benefitCards}}" wx:key="id">
-        <view class="panel benefit-card benefit-card-{{item.id}}" data-action="{{item.action}}" bindtap="handleEntryTap">
-          <text class="benefit-badge">{{item.badge}}</text>
-          <text class="benefit-title">{{item.title}}</text>
-          <text class="benefit-subtitle">{{item.subtitle}}</text>
-          <view class="benefit-footer">
-            <text class="benefit-meta">{{item.meta}}</text>
-            <text class="benefit-link">立即进入</text>
-          </view>
-        </view>
-      </block>
-    </view>
-
-    <view class="panel promo-banner" data-action="distribution" bindtap="handleEntryTap">
-      <view class="promo-main">
-        <text class="promo-kicker">分享有礼</text>
-        <text class="promo-title">把主推商品分享给好友，成交后自动累计佣金</text>
-        <text class="promo-copy">海报、团队和佣金明细都能在分销中心查看，推广进度一眼就能跟上。</text>
+    <view class="panel benefit-card" bindtap="openCoupons">
+      <view class="benefit-notch benefit-notch-left"></view>
+      <view class="benefit-notch benefit-notch-right"></view>
+      <view class="benefit-header">
+        <text class="benefit-badge">{{benefitCard.badge}}</text>
+        <view class="benefit-secondary-link" catchtap="openDistribution">{{benefitCard.secondaryText}}</view>
       </view>
-      <text class="promo-link">去看看</text>
+      <text class="benefit-title">{{benefitCard.title}}</text>
+      <text class="benefit-copy">{{benefitCard.copy}}</text>
+      <view class="benefit-footer">
+        <text class="benefit-meta">{{benefitCard.footer}}</text>
+        <view class="benefit-button">{{benefitCard.primaryText}}</view>
+      </view>
     </view>
 
-    <view class="section-head">
-      <text class="section-title">常用入口</text>
-      <text class="section-subtitle">把领券、订单、购物车和分销放到一屏，常用功能随手可达。</text>
+    <view class="feature-story panel" data-id="{{featureStory.id}}" bindtap="openProduct">
+      <view class="feature-story-visual" style="background: {{featureStory.accent}};">
+        <text class="feature-story-kicker">{{featureStory.kicker}}</text>
+        <text class="feature-story-seal">{{featureStory.coverLabel}}</text>
+      </view>
+      <view class="feature-story-content">
+        <text class="feature-story-title">{{featureStory.title}}</text>
+        <text class="feature-story-copy">{{featureStory.copy}}</text>
+      </view>
     </view>
 
-    <view class="entry-grid">
-      <block wx:for="{{quickEntries}}" wx:key="id">
-        <view class="entry-card panel" data-action="{{item.action}}" bindtap="handleEntryTap">
-          <text class="entry-title">{{item.title}}</text>
-          <text class="entry-subtitle">{{item.subtitle}}</text>
-        </view>
-      </block>
+    <view class="section-head home-section-head">
+      <text class="section-title">甄选商品</text>
+      <text class="section-subtitle">保留更像图稿的首页节奏，主推位下面直接接双列商品。</text>
     </view>
 
-    <view class="section-head">
-      <text class="section-title">适合分销的主推商品</text>
-      <text class="section-subtitle">可领券、可分享、适合首单转化的商品优先展示。</text>
-    </view>
-
-    <view class="product-list" wx:if="{{featuredProducts.length}}">
-      <block wx:for="{{featuredProducts}}" wx:key="id">
-        <view class="product-card panel" data-id="{{item.id}}" bindtap="openProduct">
+    <view class="product-grid">
+      <block wx:for="{{productGrid}}" wx:key="id">
+        <view class="panel product-card" data-id="{{item.id}}" bindtap="openProduct">
           <view class="product-cover" style="background: {{item.accent}};">
+            <text class="product-cover-badge">{{item.tag}}</text>
             <text class="product-cover-text">{{item.coverLabel}}</text>
           </view>
-          <view class="product-content">
-            <view class="product-top">
-              <text class="tag-chip">{{item.tag}}</text>
-              <text class="product-sales">{{item.salesText}}</text>
-            </view>
+          <view class="product-info">
             <text class="product-title">{{item.title}}</text>
-            <text class="product-desc">{{item.shortDesc}}</text>
-            <view class="product-benefits">
-              <text class="product-benefit-chip product-benefit-chip-strong">{{item.distributionBadge}}</text>
-              <text class="product-benefit-chip">{{item.couponHint}}</text>
-              <text class="product-commission">{{item.distributionHint}}</text>
-            </view>
-            <view class="product-highlights" wx:if="{{item.highlightTags.length}}">
-              <block wx:for="{{item.highlightTags}}" wx:key="*this">
-                <text class="product-highlight">{{item}}</text>
-              </block>
-            </view>
-            <text class="product-spec">{{item.specSummary}}</text>
-            <view class="price-row">
+            <text class="product-sales">{{item.salesText}}</text>
+            <view class="price-row product-price-row">
               <text class="price-now">¥{{item.displayPrice}}</text>
               <text class="price-origin">¥{{item.displayMarketPrice}}</text>
             </view>
           </view>
         </view>
       </block>
-    </view>
-    <view class="panel content-empty" wx:else>
-      <text class="content-empty-title">主推商品暂时还没准备好</text>
-      <text class="content-empty-copy">可以先从分类页继续逛逛，晚点再回来看看今日主推。</text>
-    </view>
-
-    <view class="section-head">
-      <text class="section-title">继续逛逛</text>
-      <text class="section-subtitle">再看看更多精选商品，后面也方便继续补活动专区和猜你喜欢。</text>
-    </view>
-
-    <view class="recommend-list" wx:if="{{recommendedProducts.length}}">
-      <block wx:for="{{recommendedProducts}}" wx:key="id">
-        <view class="recommend-card panel" data-id="{{item.id}}" bindtap="openProduct">
-          <view class="recommend-cover" style="background: {{item.accent}};">
-            <text class="recommend-cover-text">{{item.coverLabel}}</text>
-          </view>
-          <view class="recommend-top">
-            <text class="tag-chip">{{item.tag}}</text>
-            <text class="recommend-sales">{{item.salesText}}</text>
-          </view>
-          <text class="recommend-title">{{item.title}}</text>
-          <text class="recommend-meta">{{item.specSummary}}</text>
-          <text class="recommend-hint">{{item.distributionHint}}</text>
-          <text class="recommend-price">¥{{item.displayPrice}}</text>
-        </view>
-      </block>
-    </view>
-    <view class="panel content-empty" wx:else>
-      <text class="content-empty-title">推荐位还没有商品</text>
-      <text class="content-empty-copy">推荐位还在准备中，先去分类页看看更多商品。</text>
     </view>
   </view>
 </view>
