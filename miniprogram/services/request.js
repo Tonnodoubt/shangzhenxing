@@ -65,14 +65,15 @@ function normalizeError(error, extra = {}) {
 }
 
 function normalizePayload(payload, statusCode) {
-  if (payload && payload.success) {
+  if (payload && (payload.code === 0 || payload.success)) {
     return payload.data;
   }
 
   const normalizedStatusCode = Number(statusCode || (payload && payload.statusCode) || 0);
   const message = payload && payload.message ? payload.message : "服务返回异常";
+  const errorCode = payload && payload.code ? payload.code : undefined;
 
-  if (normalizedStatusCode === 401) {
+  if (normalizedStatusCode === 401 || errorCode === "UNAUTHORIZED") {
     throw buildError(message, {
       code: "UNAUTHORIZED",
       statusCode: 401
@@ -80,6 +81,7 @@ function normalizePayload(payload, statusCode) {
   }
 
   throw buildError(message, {
+    code: errorCode,
     statusCode: normalizedStatusCode || 500
   });
 }
@@ -175,60 +177,59 @@ function getCloudServiceName() {
   return String(((envConfig.cloud || {}).service) || "").trim();
 }
 
-function requestByHttp(options) {
-  const method = options.method || "GET";
-  const url = `${envConfig.apiBaseUrl}${options.url}`;
-  const data = options.data || {};
-  const timeout = options.timeout || envConfig.requestTimeout;
+// ── 统一传输层：消除 requestByHttp / requestByCloud 的结构性重复 ──
+
+function executeTransport(transport) {
+  const method = transport.method;
+  const identifier = transport.identifier;
+  const logPrefix = transport.logPrefix || "";
 
   return requestWithStartupRetry((attempt) => new Promise((resolve, reject) => {
     const startedAt = Date.now();
 
-    logRequest("info", "start", {
+    logRequest("info", `${logPrefix}start`, {
       method,
-      url,
-      timeout,
-      data,
+      ...transport.logStartPayload,
       attempt
     });
 
-    wx.request({
-      url,
-      method,
-      data,
-      timeout,
-      header: buildRequestHeaders(options),
+    transport.execute({
       success(res) {
         const duration = Date.now() - startedAt;
-        const requestId = getRequestId(res.header);
+        const requestId = transport.getRequestId ? transport.getRequestId(res) : "";
 
         try {
           const normalizedPayload = normalizePayload(res.data, res.statusCode);
 
-          logRequest("info", "success", {
+          logRequest("info", `${logPrefix}success`, {
             method,
-            url,
+            [transport.identifierKey || "url"]: identifier,
             statusCode: res.statusCode,
             duration,
-            requestId,
+            ...(requestId ? { requestId } : {}),
             attempt
           });
 
           resolve(normalizedPayload);
         } catch (error) {
-          const normalizedError = normalizeError(error, {
+          const errorExtra = {
             statusCode: Number(res.statusCode || 0),
-            requestId,
             response: res.data
-          });
-          const shouldRetry = shouldRetryStartup503(normalizedError);
+          };
 
-          logRequest(shouldRetry ? "info" : "warn", shouldRetry ? "response-retryable" : "response-error", {
+          if (requestId) {
+            errorExtra.requestId = requestId;
+          }
+
+          const normalizedError = normalizeError(error, errorExtra);
+          const canRetry = shouldRetryStartup503(normalizedError);
+
+          logRequest(canRetry ? "info" : "warn", `${logPrefix}${canRetry ? "response-retryable" : "response-error"}`, {
             method,
-            url,
+            [transport.identifierKey || "url"]: identifier,
             statusCode: res.statusCode,
             duration,
-            requestId,
+            ...(requestId ? { requestId } : {}),
             message: normalizedError.message,
             response: res.data,
             attempt
@@ -239,13 +240,17 @@ function requestByHttp(options) {
       },
       fail(error) {
         const duration = Date.now() - startedAt;
-        const normalizedError = buildError(buildRequestFailMessage(error));
+        const normalizedError = buildError(
+          transport.buildFailMessage
+            ? transport.buildFailMessage(error)
+            : buildRequestFailMessage(error)
+        );
 
-        logRequest("warn", "fail", {
+        logRequest("warn", `${logPrefix}fail`, {
           method,
-          url,
+          [transport.identifierKey || "url"]: identifier,
           duration,
-          timeout,
+          timeout: transport.timeout,
           error: error && error.errMsg ? error.errMsg : error,
           attempt
         });
@@ -254,10 +259,38 @@ function requestByHttp(options) {
       }
     });
   }), {
-    options,
+    options: transport.options,
     method,
-    url,
-    retryStage: "startup-retry"
+    [transport.identifierKey || "url"]: identifier,
+    retryStage: transport.retryStage || "startup-retry"
+  });
+}
+
+function requestByHttp(options) {
+  const method = options.method || "GET";
+  const url = `${envConfig.apiBaseUrl}${options.url}`;
+  const data = options.data || {};
+  const timeout = options.timeout || envConfig.requestTimeout;
+
+  return executeTransport({
+    method,
+    identifier: url,
+    identifierKey: "url",
+    logPrefix: "",
+    timeout,
+    options,
+    retryStage: "startup-retry",
+    logStartPayload: { url, timeout, data },
+    getRequestId: (res) => getRequestId(res.header),
+    execute: (callbacks) => wx.request({
+      url,
+      method,
+      data,
+      timeout,
+      header: buildRequestHeaders(options),
+      success: callbacks.success,
+      fail: callbacks.fail
+    })
   });
 }
 
@@ -331,84 +364,33 @@ function requestByCloud(options) {
     "X-WX-SERVICE": serviceName
   };
 
-  return requestWithStartupRetry((attempt) => new Promise((resolve, reject) => {
-    const startedAt = Date.now();
-
-    logRequest("info", "cloud-start", {
-      method,
+  return executeTransport({
+    method,
+    identifier: path,
+    identifierKey: "path",
+    logPrefix: "cloud-",
+    timeout,
+    options,
+    retryStage: "cloud-startup-retry",
+    logStartPayload: {
       env: envConfig.cloud.env,
       service: serviceName,
       path,
       timeout,
-      data: options.data || {},
-      attempt
-    });
-
-    wx.cloud.callContainer({
-      config: {
-        env: envConfig.cloud.env
-      },
+      data: options.data || {}
+    },
+    getRequestId: () => "",
+    buildFailMessage: (error) => error && error.errMsg ? error.errMsg : "云托管请求失败",
+    execute: (callbacks) => wx.cloud.callContainer({
+      config: { env: envConfig.cloud.env },
       path,
       method,
       header,
       data,
       timeout,
-      success(res) {
-        const duration = Date.now() - startedAt;
-
-        try {
-          const normalizedPayload = normalizePayload(res.data, res.statusCode);
-
-          logRequest("info", "cloud-success", {
-            method,
-            path,
-            statusCode: res.statusCode,
-            duration,
-            attempt
-          });
-
-          resolve(normalizedPayload);
-        } catch (error) {
-          const normalizedError = normalizeError(error, {
-            statusCode: Number(res.statusCode || 0),
-            response: res.data
-          });
-          const shouldRetry = shouldRetryStartup503(normalizedError);
-
-          logRequest(shouldRetry ? "info" : "warn", shouldRetry ? "cloud-response-retryable" : "cloud-response-error", {
-            method,
-            path,
-            statusCode: res.statusCode,
-            duration,
-            message: normalizedError.message,
-            response: res.data,
-            attempt
-          });
-
-          reject(normalizedError);
-        }
-      },
-      fail(error) {
-        const duration = Date.now() - startedAt;
-        const normalizedError = buildError(error && error.errMsg ? error.errMsg : "云托管请求失败");
-
-        logRequest("warn", "cloud-fail", {
-          method,
-          path,
-          duration,
-          timeout,
-          error: error && error.errMsg ? error.errMsg : error,
-          attempt
-        });
-
-        reject(normalizedError);
-      }
-    });
-  }), {
-    options,
-    method,
-    path,
-    retryStage: "cloud-startup-retry"
+      success: callbacks.success,
+      fail: callbacks.fail
+    })
   });
 }
 

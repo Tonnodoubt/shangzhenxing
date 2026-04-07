@@ -290,35 +290,43 @@ function createStorefrontPrismaCouponModule({
           };
         }
 
-        const existing = await prisma.userCoupon.findFirst({
-          where: {
-            userId: user.id,
-            templateId: template.id,
-            sourceType: "center_claim"
+        // 事务内查重 + 创建，防止并发重复领取
+        const coupon = await prisma.$transaction(async (tx) => {
+          const existing = await tx.userCoupon.findFirst({
+            where: {
+              userId: user.id,
+              templateId: template.id,
+              sourceType: "center_claim"
+            }
+          });
+
+          if (existing) {
+            return null;
           }
+
+          const claimedAt = new Date();
+
+          return tx.userCoupon.create({
+            data: {
+              userId: user.id,
+              templateId: template.id,
+              status: "available",
+              sourceType: "center_claim",
+              sourceText: "领券中心",
+              claimedAt,
+              expiresAt: new Date(claimedAt.getTime() + Number(template.validDays || 0) * 24 * 60 * 60 * 1000)
+            },
+            include: {
+              template: true
+            }
+          });
         });
 
-        if (existing) {
+        if (!coupon) {
           return {
             ok: false
           };
         }
-
-        const claimedAt = new Date();
-        const coupon = await prisma.userCoupon.create({
-          data: {
-            userId: user.id,
-            templateId: template.id,
-            status: "available",
-            sourceType: "center_claim",
-            sourceText: "领券中心",
-            claimedAt,
-            expiresAt: new Date(claimedAt.getTime() + Number(template.validDays || 0) * 24 * 60 * 60 * 1000)
-          },
-          include: {
-            template: true
-          }
-        });
 
         return {
           ok: true,

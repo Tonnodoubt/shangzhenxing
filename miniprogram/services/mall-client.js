@@ -10,6 +10,16 @@ function shouldUseApi() {
   return envConfig.mallDataSource === "api";
 }
 
+// ── 数据源路由：消除 shouldUseApi() 重复分支 ──
+
+function dispatch(mockMethod, apiFn) {
+  if (!shouldUseApi()) {
+    return mockMethod();
+  }
+
+  return apiFn();
+}
+
 function normalizeInviteContext(options = {}) {
   const query = options.query || {};
   const inviterUserId = String(query.inviterUserId || options.inviterUserId || "").trim();
@@ -195,286 +205,268 @@ function apiDelete(url, data, options = {}) {
   return callApi("del", url, data, options);
 }
 
-async function getAddresses() {
-  if (!shouldUseApi()) {
-    return mockMallService.getAddresses();
+function normalizeOrderPageData(payload) {
+  if (Array.isArray(payload)) {
+    return {
+      list: payload,
+      page: 1,
+      pageSize: payload.length || 20,
+      total: payload.length
+    };
   }
 
-  const data = await apiGet("/api/addresses");
-
-  return data.addresses || [];
+  return {
+    list: Array.isArray((payload || {}).list) ? payload.list : [],
+    page: Math.max(1, Number((payload || {}).page || 1)),
+    pageSize: Math.max(1, Number((payload || {}).pageSize || 20)),
+    total: Math.max(0, Number((payload || {}).total || 0))
+  };
 }
 
-async function getAddressById(addressId) {
-  if (!shouldUseApi()) {
-    return mockMallService.getAddressById(addressId);
-  }
+// ── 地址 ──
 
-  return apiGet(`/api/addresses/${addressId}`);
+function getAddresses() {
+  return dispatch(
+    () => mockMallService.getAddresses(),
+    async () => {
+      const data = await apiGet("/api/addresses");
+      return data.addresses || [];
+    }
+  );
 }
 
-async function getAddressListData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getAddressListData();
-  }
-
-  return apiGet("/api/addresses");
+function getAddressById(addressId) {
+  return dispatch(
+    () => mockMallService.getAddressById(addressId),
+    () => apiGet(`/api/addresses/${addressId}`)
+  );
 }
 
-async function getSelectedAddress() {
-  if (!shouldUseApi()) {
-    return mockMallService.getSelectedAddress();
-  }
-
-  const data = await apiGet("/api/checkout");
-
-  return data.address || null;
+function getAddressListData() {
+  return dispatch(
+    () => mockMallService.getAddressListData(),
+    () => apiGet("/api/addresses")
+  );
 }
 
-async function setSelectedAddress(addressId) {
-  if (!shouldUseApi()) {
-    return mockMallService.setSelectedAddress(addressId);
-  }
-
-  return apiPost(`/api/addresses/${addressId}/select`);
+function getSelectedAddress() {
+  return dispatch(
+    () => mockMallService.getSelectedAddress(),
+    async () => {
+      const data = await apiGet("/api/checkout");
+      return data.address || null;
+    }
+  );
 }
 
-async function saveAddress(payload = {}) {
-  if (!shouldUseApi()) {
-    return mockMallService.saveAddress(payload);
-  }
-
-  if (payload.id) {
-    return apiPut(`/api/addresses/${payload.id}`, payload);
-  }
-
-  return apiPost("/api/addresses", payload);
+function setSelectedAddress(addressId) {
+  return dispatch(
+    () => mockMallService.setSelectedAddress(addressId),
+    () => apiPost(`/api/addresses/${addressId}/select`)
+  );
 }
 
-async function deleteAddress(addressId) {
-  if (!shouldUseApi()) {
-    return mockMallService.deleteAddress(addressId);
-  }
-
-  return apiDelete(`/api/addresses/${addressId}`);
+function saveAddress(payload = {}) {
+  return dispatch(
+    () => mockMallService.saveAddress(payload),
+    () => payload.id
+      ? apiPut(`/api/addresses/${payload.id}`, payload)
+      : apiPost("/api/addresses", payload)
+  );
 }
 
-async function getCartPageData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getCartPageData();
-  }
-
-  return apiGet("/api/cart");
+function deleteAddress(addressId) {
+  return dispatch(
+    () => mockMallService.deleteAddress(addressId),
+    () => apiDelete(`/api/addresses/${addressId}`)
+  );
 }
 
-async function setCartItems(cartItems) {
-  if (!shouldUseApi()) {
-    return mockMallService.setCartItems(cartItems);
-  }
+// ── 购物车 ──
 
-  return apiPut("/api/cart", {
-    cartItems
-  });
+function getCartPageData() {
+  return dispatch(
+    () => mockMallService.getCartPageData(),
+    () => apiGet("/api/cart")
+  );
 }
 
-async function addToCart(product) {
-  if (!shouldUseApi()) {
-    return mockMallService.addToCart(product);
-  }
-
-  return apiPost("/api/cart/items/add", {
-    product
-  });
+function setCartItems(cartItems) {
+  return dispatch(
+    () => mockMallService.setCartItems(cartItems),
+    () => apiPut("/api/cart", { cartItems })
+  );
 }
 
-async function increaseCartItem(id, specText) {
-  if (!shouldUseApi()) {
-    return mockMallService.increaseCartItem(id, specText);
-  }
-
-  return apiPost("/api/cart/items/increase", {
-    id,
-    specText
-  });
+function addToCart(product) {
+  return dispatch(
+    () => mockMallService.addToCart(product),
+    () => apiPost("/api/cart/items/add", { product })
+  );
 }
 
-async function decreaseCartItem(id, specText) {
-  if (!shouldUseApi()) {
-    return mockMallService.decreaseCartItem(id, specText);
-  }
-
-  return apiPost("/api/cart/items/decrease", {
-    id,
-    specText
-  });
+function increaseCartItem(id, specText) {
+  return dispatch(
+    () => mockMallService.increaseCartItem(id, specText),
+    () => apiPost("/api/cart/items/increase", { id, specText })
+  );
 }
 
-async function removeCartItem(id, specText) {
-  if (!shouldUseApi()) {
-    return mockMallService.removeCartItem(id, specText);
-  }
-
-  return apiPost("/api/cart/items/remove", {
-    id,
-    specText
-  });
+function decreaseCartItem(id, specText) {
+  return dispatch(
+    () => mockMallService.decreaseCartItem(id, specText),
+    () => apiPost("/api/cart/items/decrease", { id, specText })
+  );
 }
 
-async function getCartCount() {
-  if (!shouldUseApi()) {
-    return mockMallService.getCartCount();
-  }
-
-  const data = await getCartPageData();
-
-  return Number(data.totalCount || 0);
+function removeCartItem(id, specText) {
+  return dispatch(
+    () => mockMallService.removeCartItem(id, specText),
+    () => apiPost("/api/cart/items/remove", { id, specText })
+  );
 }
 
-async function getCouponPageData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getCouponPageData();
-  }
-
-  return apiGet("/api/coupons");
+function getCartCount() {
+  return dispatch(
+    () => mockMallService.getCartCount(),
+    async () => {
+      const data = await getCartPageData();
+      return Number(data.totalCount || 0);
+    }
+  );
 }
 
-async function getSelectedCoupon() {
-  if (!shouldUseApi()) {
-    return mockMallService.getSelectedCoupon();
-  }
+// ── 优惠券 ──
 
-  const data = await apiGet("/api/checkout");
-
-  return data.selectedCoupon || null;
+function getCouponPageData() {
+  return dispatch(
+    () => mockMallService.getCouponPageData(),
+    () => apiGet("/api/coupons")
+  );
 }
 
-async function getAvailableCoupons(totalAmount) {
-  if (!shouldUseApi()) {
-    return mockMallService.getAvailableCoupons(totalAmount);
-  }
-
-  const data = await getCouponPageData();
-
-  return (data.coupons || []).filter((item) => {
-    return item.status === "available" && Number(totalAmount || 0) >= Number(item.threshold || 0);
-  });
+function getSelectedCoupon() {
+  return dispatch(
+    () => mockMallService.getSelectedCoupon(),
+    async () => {
+      const data = await apiGet("/api/checkout");
+      return data.selectedCoupon || null;
+    }
+  );
 }
 
-async function claimCoupon(templateId) {
-  if (!shouldUseApi()) {
-    return mockMallService.claimCoupon(templateId);
-  }
-
-  return apiPost("/api/coupons/claim", {
-    templateId
-  });
+function getAvailableCoupons(totalAmount) {
+  return dispatch(
+    () => mockMallService.getAvailableCoupons(totalAmount),
+    async () => {
+      const data = await getCouponPageData();
+      return (data.coupons || []).filter((item) => {
+        return item.status === "available" && Number(totalAmount || 0) >= Number(item.threshold || 0);
+      });
+    }
+  );
 }
 
-async function selectCoupon(couponId, amount) {
-  if (!shouldUseApi()) {
-    return mockMallService.selectCoupon(couponId, amount);
-  }
-
-  return apiPost("/api/coupons/select", {
-    couponId,
-    amount
-  });
+function claimCoupon(templateId) {
+  return dispatch(
+    () => mockMallService.claimCoupon(templateId),
+    () => apiPost("/api/coupons/claim", { templateId })
+  );
 }
 
-async function clearSelectedCoupon() {
-  if (!shouldUseApi()) {
-    return mockMallService.clearSelectedCoupon();
-  }
-
-  return apiPost("/api/coupons/clear");
+function selectCoupon(couponId, amount) {
+  return dispatch(
+    () => mockMallService.selectCoupon(couponId, amount),
+    () => apiPost("/api/coupons/select", { couponId, amount })
+  );
 }
 
-async function getCheckoutPageData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getCheckoutPageData();
-  }
-
-  return apiGet("/api/checkout");
+function clearSelectedCoupon() {
+  return dispatch(
+    () => mockMallService.clearSelectedCoupon(),
+    () => apiPost("/api/coupons/clear")
+  );
 }
 
-async function submitOrder(options = {}) {
-  if (!shouldUseApi()) {
-    return mockMallService.submitOrder(options);
-  }
+// ── 结算 / 订单 ──
 
-  return apiPost("/api/orders/submit", options);
+function getCheckoutPageData() {
+  return dispatch(
+    () => mockMallService.getCheckoutPageData(),
+    () => apiGet("/api/checkout")
+  );
 }
 
-async function getAllOrders() {
-  if (!shouldUseApi()) {
-    return mockMallService.getAllOrders();
-  }
-
-  return apiGet("/api/orders");
+function submitOrder(options = {}) {
+  return dispatch(
+    () => mockMallService.submitOrder(options),
+    () => apiPost("/api/orders/submit", options)
+  );
 }
 
-async function getOrderById(orderId) {
-  if (!shouldUseApi()) {
-    return mockMallService.getOrderById(orderId);
-  }
-
-  const data = await apiGet(`/api/orders/${orderId}`);
-
-  return data.order || null;
+function getAllOrders(options = {}) {
+  return dispatch(
+    () => normalizeOrderPageData(mockMallService.getAllOrders(options)),
+    async () => normalizeOrderPageData(await apiGet("/api/orders", options))
+  );
 }
 
-async function getOrderDetailData(orderId) {
-  if (!shouldUseApi()) {
-    return mockMallService.getOrderDetailData(orderId);
-  }
-
-  return apiGet(`/api/orders/${orderId}`);
+function getOrderById(orderId) {
+  return dispatch(
+    () => mockMallService.getOrderById(orderId),
+    async () => {
+      const data = await apiGet(`/api/orders/${orderId}`);
+      return data.order || null;
+    }
+  );
 }
 
-async function updateOrderStatus(orderId, nextStatus) {
-  if (!shouldUseApi()) {
-    return mockMallService.updateOrderStatus(orderId, nextStatus);
-  }
-
-  return apiPost(`/api/orders/${orderId}/status`, {
-    status: nextStatus
-  });
+function getOrderDetailData(orderId) {
+  return dispatch(
+    () => mockMallService.getOrderDetailData(orderId),
+    () => apiGet(`/api/orders/${orderId}`)
+  );
 }
 
-async function createAfterSale(payload = {}) {
-  if (!shouldUseApi()) {
-    return mockMallService.createAfterSale(payload);
-  }
-
-  return apiPost(`/api/orders/${payload.orderId}/aftersale`, {
-    reason: payload.reason,
-    description: payload.description
-  });
+function updateOrderStatus(orderId, nextStatus) {
+  return dispatch(
+    () => mockMallService.updateOrderStatus(orderId, nextStatus),
+    () => apiPost(`/api/orders/${orderId}/status`, { status: nextStatus })
+  );
 }
 
-async function getUser() {
-  if (!shouldUseApi()) {
-    return mockMallService.getUser();
-  }
-
-  const data = await apiGet("/api/me");
-
-  return data.user || {};
+function createAfterSale(payload = {}) {
+  return dispatch(
+    () => mockMallService.createAfterSale(payload),
+    () => apiPost(`/api/orders/${payload.orderId}/aftersale`, {
+      reason: payload.reason,
+      description: payload.description
+    })
+  );
 }
 
-async function authorizeUser() {
-  if (!shouldUseApi()) {
-    return mockMallService.authorizeUser();
-  }
+// ── 用户 / 个人中心 ──
 
-  return apiPost("/api/auth/authorize");
+function getUser() {
+  return dispatch(
+    () => mockMallService.getUser(),
+    async () => {
+      const data = await apiGet("/api/me");
+      return data.user || {};
+    }
+  );
+}
+
+function authorizeUser() {
+  return dispatch(
+    () => mockMallService.authorizeUser(),
+    () => apiPost("/api/auth/authorize")
+  );
 }
 
 async function logout() {
   if (!shouldUseApi()) {
-    return {
-      ok: true
-    };
+    return { ok: true };
   }
 
   try {
@@ -486,44 +478,41 @@ async function logout() {
   }
 }
 
-async function getProfileData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getProfileData();
-  }
-
-  return apiGet("/api/profile");
+function getProfileData() {
+  return dispatch(
+    () => mockMallService.getProfileData(),
+    () => apiGet("/api/profile")
+  );
 }
 
-async function getDistributionData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getDistributionData();
-  }
+// ── 分销 ──
 
-  return apiGet("/api/distribution");
+function getDistributionData() {
+  return dispatch(
+    () => mockMallService.getDistributionData(),
+    () => apiGet("/api/distribution")
+  );
 }
 
-async function getTeamData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getTeamData();
-  }
-
-  return apiGet("/api/team");
+function getTeamData() {
+  return dispatch(
+    () => mockMallService.getTeamData(),
+    () => apiGet("/api/team")
+  );
 }
 
-async function getCommissionData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getCommissionData();
-  }
-
-  return apiGet("/api/commissions");
+function getCommissionData() {
+  return dispatch(
+    () => mockMallService.getCommissionData(),
+    () => apiGet("/api/commissions")
+  );
 }
 
-async function getPosterData() {
-  if (!shouldUseApi()) {
-    return mockMallService.getPosterData();
-  }
-
-  return apiGet("/api/poster");
+function getPosterData() {
+  return dispatch(
+    () => mockMallService.getPosterData(),
+    () => apiGet("/api/poster")
+  );
 }
 
 module.exports = {

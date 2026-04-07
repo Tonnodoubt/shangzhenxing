@@ -270,13 +270,21 @@ function createStorefrontPrismaCartModule({
           });
 
           for (const item of cartItems) {
+            const product = await tx.product.findUnique({
+              where: { id: item.id }
+            });
+
+            if (!product) {
+              continue;
+            }
+
             await tx.cartItem.create({
               data: {
                 cartId: cart.id,
                 productId: item.id,
-                title: item.title || "",
+                title: product.title || "",
                 specText: item.specText || "",
-                price: toNumber(item.price),
+                price: toNumber(product.price),
                 quantity: Number(item.quantity || 1)
               }
             });
@@ -288,6 +296,15 @@ function createStorefrontPrismaCartModule({
       async addToCart(sessionToken, product = {}) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
         const cart = await ensureCart(prisma, user.id);
+
+        const dbProduct = await prisma.product.findUnique({
+          where: { id: product.id }
+        });
+
+        if (!dbProduct) {
+          throw Object.assign(new Error("商品不存在"), { statusCode: 404 });
+        }
+
         const existing = await prisma.cartItem.findFirst({
           where: {
             cartId: cart.id,
@@ -312,9 +329,9 @@ function createStorefrontPrismaCartModule({
             data: {
               cartId: cart.id,
               productId: product.id,
-              title: product.title || "",
+              title: dbProduct.title || "",
               specText: product.specText || "",
-              price: toNumber(product.price),
+              price: toNumber(dbProduct.price),
               quantity: Number(product.quantity || 1)
             }
           });

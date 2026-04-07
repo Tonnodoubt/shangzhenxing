@@ -1,1 +1,1 @@
-module.exports = require("../../../miniprogram/shared/mock");
+module.exports = require("./mock-data");

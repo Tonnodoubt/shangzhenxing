@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const { sendAdminError } = require("./http");
 
 const ROLE_PRESETS = {
@@ -165,43 +166,85 @@ const SCOPE_PRIORITY = {
   all: 5
 };
 
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(String(password || "")).digest("hex");
+// 会话过期时间（毫秒），默认 8 小时
+const SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 8 * 60 * 60 * 1000);
+
+/**
+ * 从环境变量加载管理员账户。
+ * 格式: ADMIN_USERS='[{"id":"admin-1","username":"admin","realName":"张三","mobile":"13800000001","passwordHash":"$2a$10$...","roleCodes":["super_admin"]}]'
+ * passwordHash 必须是 bcryptjs 生成的 hash。
+ *
+ * 如果未设置 ADMIN_USERS，使用内置的演示账户（仅限开发环境）。
+ */
+function loadAdminUsers() {
+  const raw = process.env.ADMIN_USERS;
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error("ADMIN_USERS 必须是非空数组");
+      }
+
+      return parsed.map((u) => ({
+        id: u.id,
+        username: u.username,
+        realName: u.realName || "",
+        mobile: u.mobile || "",
+        status: u.status || "enabled",
+        lastLoginAt: "",
+        passwordHash: u.passwordHash,
+        roleCodes: u.roleCodes || []
+      }));
+    } catch (err) {
+      console.error("[auth] 解析 ADMIN_USERS 失败:", err.message);
+      process.exit(1);
+    }
+  }
+
+  // 开发环境回退：使用 bcrypt hash 代替明文
+  if (process.env.NODE_ENV === "production") {
+    console.error("[auth] 生产环境必须设置 ADMIN_USERS 环境变量");
+    process.exit(1);
+  }
+
+  console.warn("[auth] ⚠ 未设置 ADMIN_USERS，使用开发演示账户");
+  return [
+    {
+      id: "admin-1",
+      username: "admin",
+      realName: "张三",
+      mobile: "13800000001",
+      status: "enabled",
+      lastLoginAt: "",
+      passwordHash: bcrypt.hashSync("Admin@123456", 10),
+      roleCodes: ["super_admin"]
+    },
+    {
+      id: "admin-2",
+      username: "ops",
+      realName: "李运营",
+      mobile: "13800000002",
+      status: "enabled",
+      lastLoginAt: "",
+      passwordHash: bcrypt.hashSync("Ops@123456", 10),
+      roleCodes: ["ops_manager"]
+    },
+    {
+      id: "admin-3",
+      username: "order",
+      realName: "王订单",
+      mobile: "13800000003",
+      status: "enabled",
+      lastLoginAt: "",
+      passwordHash: bcrypt.hashSync("Order@123456", 10),
+      roleCodes: ["order_manager", "aftersale_service"]
+    }
+  ];
 }
 
-const adminUsers = [
-  {
-    id: "admin-1",
-    username: "admin",
-    realName: "张三",
-    mobile: "13800000001",
-    status: "enabled",
-    lastLoginAt: "",
-    passwordHash: hashPassword("Admin@123456"),
-    roleCodes: ["super_admin"]
-  },
-  {
-    id: "admin-2",
-    username: "ops",
-    realName: "李运营",
-    mobile: "13800000002",
-    status: "enabled",
-    lastLoginAt: "",
-    passwordHash: hashPassword("Ops@123456"),
-    roleCodes: ["ops_manager"]
-  },
-  {
-    id: "admin-3",
-    username: "order",
-    realName: "王订单",
-    mobile: "13800000003",
-    status: "enabled",
-    lastLoginAt: "",
-    passwordHash: hashPassword("Order@123456"),
-    roleCodes: ["order_manager", "aftersale_service"]
-  }
-];
-
+const adminUsers = loadAdminUsers();
 const sessions = new Map();
 
 function formatAdminUser(user) {
@@ -265,7 +308,7 @@ function createSessionToken() {
 function loginAdmin(username, password) {
   const user = adminUsers.find((item) => item.username === username);
 
-  if (!user || user.passwordHash !== hashPassword(password)) {
+  if (!user || !bcrypt.compareSync(String(password || ""), user.passwordHash)) {
     return {
       ok: false,
       message: "账号或密码错误"
@@ -284,6 +327,7 @@ function loginAdmin(username, password) {
   const sessionToken = createSessionToken();
   const session = buildSession(user);
 
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
   sessions.set(sessionToken, session);
 
   return {
@@ -300,7 +344,18 @@ function getAdminSession(token) {
     return null;
   }
 
-  return sessions.get(normalizedToken) || null;
+  const session = sessions.get(normalizedToken);
+
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt && Date.now() > session.expiresAt) {
+    sessions.delete(normalizedToken);
+    return null;
+  }
+
+  return session;
 }
 
 function logoutAdmin(token) {
@@ -319,7 +374,29 @@ function logoutAdmin(token) {
   };
 }
 
+function parseCookieHeader(header) {
+  const result = {};
+
+  String(header || "").split(";").forEach((pair) => {
+    const idx = pair.indexOf("=");
+
+    if (idx > 0) {
+      result[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+    }
+  });
+
+  return result;
+}
+
 function readAdminToken(req) {
+  // 优先从 httpOnly cookie 读取（防 XSS）
+  const cookies = parseCookieHeader(req.headers.cookie);
+
+  if (cookies.admin_token) {
+    return cookies.admin_token;
+  }
+
+  // 兼容 Authorization header（API 调用场景）
   const authHeader = String(req.headers.authorization || "");
 
   if (authHeader.startsWith("Bearer ")) {
@@ -329,9 +406,19 @@ function readAdminToken(req) {
   return String(req.headers["x-admin-token"] || "").trim();
 }
 
+function setAdminTokenCookie(res, token) {
+  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
+
+  res.setHeader("Set-Cookie", `admin_token=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${maxAge}`);
+}
+
+function clearAdminTokenCookie(res) {
+  res.setHeader("Set-Cookie", "admin_token=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0");
+}
+
 function adminAuth(req, res, next) {
   const token = readAdminToken(req);
-  const session = sessions.get(token);
+  const session = getAdminSession(token);
 
   if (!token || !session) {
     sendAdminError(res, "登录已失效，请重新登录", {
@@ -375,5 +462,7 @@ module.exports = {
   loginAdmin,
   getAdminSession,
   logoutAdmin,
-  readAdminToken
+  readAdminToken,
+  setAdminTokenCookie,
+  clearAdminTokenCookie
 };

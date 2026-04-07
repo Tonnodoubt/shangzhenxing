@@ -15,8 +15,7 @@
             <h1>微信小程序商城运营控制台</h1>
             <p>这套后台现在把商品、分类、SKU、订单和售后放在同一个工作台里。登录后先维护分类和商品，再去处理发货和售后，日常运营会顺很多。</p>
             <div class="credentials">
-              <div class="credential-chip">管理员账号：<strong>admin / Admin@123456</strong></div>
-              <div class="credential-chip">履约账号：<strong>order / Order@123456</strong></div>
+              <div class="credential-chip">请使用管理员账号登录</div>
             </div>
           </div>
           <div class="hero-side">
@@ -42,11 +41,11 @@
             <form id="login-form" class="stack">
               <label>
                 用户名
-                <input id="login-username" name="username" autocomplete="username" value="admin" />
+                <input id="login-username" name="username" autocomplete="username" placeholder="请输入用户名" />
               </label>
               <label>
                 密码
-                <input id="login-password" name="password" type="password" autocomplete="current-password" value="Admin@123456" />
+                <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" />
               </label>
               <button class="primary" id="login-submit" type="submit">登录控制台</button>
             </form>
@@ -201,7 +200,7 @@
               </label>
               <label>
                 详情介绍
-                <textarea id="product-detail-content" placeholder="支持简单文本或 HTML"></textarea>
+                <textarea id="product-detail-content" placeholder="请输入纯文本详情，换行会保留"></textarea>
               </label>
               <div class="action-row">
                 <button class="primary" id="product-save" type="submit">保存商品</button>

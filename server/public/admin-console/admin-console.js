@@ -1,5 +1,5 @@
 const state = {
-  adminToken: window.localStorage.getItem("mall_admin_token") || "",
+  loggedIn: false,
   session: null,
   repositoryMode: "-",
   activeSection: "summary",
@@ -307,13 +307,10 @@ async function request(url, options = {}) {
     options.headers || {}
   );
 
-  if (options.auth !== false && state.adminToken) {
-    headers.Authorization = "Bearer " + state.adminToken;
-  }
-
   const response = await fetch(url, {
     method: options.method || "GET",
     headers,
+    credentials: "same-origin",
     body: typeof options.body === "undefined" ? undefined : JSON.stringify(options.body)
   });
   const payload = await response.json().catch(() => ({}));
@@ -454,7 +451,7 @@ function populateProductForm(detail) {
 }
 
 function renderSession() {
-  const loggedIn = !!(state.session && state.adminToken);
+  const loggedIn = !!state.loggedIn;
 
   nodes.sessionPanel.classList.toggle("hidden", !loggedIn);
   nodes.navigationPanel.classList.toggle("hidden", !loggedIn);
@@ -870,21 +867,17 @@ async function login(username, password) {
     }
   });
 
-  state.adminToken = payload.adminToken;
+  state.loggedIn = true;
   state.session = payload;
-  window.localStorage.setItem("mall_admin_token", state.adminToken);
   await ensureRepositoryMode();
   renderSession();
   await refreshAll();
 }
 
 async function validateSession() {
-  if (!state.adminToken) {
-    return;
-  }
-
   try {
     state.session = await request("/admin/v1/auth/me");
+    state.loggedIn = true;
     await ensureRepositoryMode();
     renderSession();
     await refreshAll();
@@ -894,7 +887,7 @@ async function validateSession() {
 }
 
 function clearSession() {
-  state.adminToken = "";
+  state.loggedIn = false;
   state.session = null;
   state.activeSection = "summary";
   state.summary = null;
@@ -905,7 +898,6 @@ function clearSession() {
   state.orders = [];
   state.afterSales = [];
   state.orderDetails = new Map();
-  window.localStorage.removeItem("mall_admin_token");
   renderSession();
   renderSummary();
   renderCategorySelects();

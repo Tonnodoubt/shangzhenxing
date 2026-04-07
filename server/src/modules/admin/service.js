@@ -1,16 +1,6 @@
 const { createStorefrontError } = require("../storefront/errors");
 const { createStorefrontRepository } = require("../../repositories/storefront");
-
-function requireString(value, fallback = "") {
-  return String(value || fallback).trim();
-}
-
-function normalizePageOptions(options = {}) {
-  return {
-    page: Math.max(1, Number(options.page || 1)),
-    pageSize: Math.min(100, Math.max(1, Number(options.pageSize || 20)))
-  };
-}
+const { requireString, normalizeDetailContent, normalizePageOptions } = require("../../../../shared/utils");
 
 function requireBoolean(value, fallback = false) {
   if (typeof value === "boolean") {
@@ -82,7 +72,10 @@ function createAdminService(repository = createStorefrontRepository()) {
         shortDesc: requireString(payload.shortDesc),
         subTitle: requireString(payload.subTitle),
         coverImage: requireString(payload.coverImage),
-        detailContent: requireString(payload.detailContent),
+        detailContent: normalizeDetailContent(
+          requireString(payload.detailContent),
+          requireString(payload.shortDesc || payload.subTitle || payload.title)
+        ),
         price: Number(payload.price || 0),
         marketPrice: Number(payload.marketPrice || payload.price || 0),
         salesCount: Number(payload.salesCount || 0),
@@ -157,6 +150,50 @@ function createAdminService(repository = createStorefrontRepository()) {
         action,
         requireString(payload.remark),
         actor || {}
+      );
+    },
+
+    // ── 优惠券管理（原 mallService 直调，现归入 adminService） ──
+
+    getCouponTemplates(options = {}) {
+      return repository.getAdminCouponTemplates(normalizePageOptions(options));
+    },
+    saveCouponTemplate(payload = {}) {
+      return repository.saveAdminCouponTemplate({
+        templateId: requireString(payload.templateId || payload.id),
+        title: requireString(payload.title),
+        amount: Number(payload.amount || payload.amountCent / 100 || 0),
+        threshold: Number(payload.threshold || payload.thresholdAmountCent / 100 || 0),
+        issueType: requireString(payload.issueType, "center_claim"),
+        status: requireString(payload.status, "enabled"),
+        validDays: Number(payload.validDays || 0)
+      });
+    },
+    updateCouponTemplateStatus(templateId, status) {
+      return repository.updateAdminCouponTemplateStatus(
+        requireString(templateId),
+        requireString(status, "disabled")
+      );
+    },
+
+    // ── 分销管理（原 mallService 直调，现归入 adminService） ──
+
+    getDistributionRules() {
+      return repository.getAdminDistributionRules();
+    },
+    updateDistributionRules(payload = {}, actor = {}) {
+      return repository.updateAdminDistributionRules(payload, actor);
+    },
+    getDistributors(options = {}) {
+      return repository.getAdminDistributors(normalizePageOptions(options));
+    },
+    getDistributorDetail(distributorId) {
+      return repository.getAdminDistributorDetail(requireString(distributorId));
+    },
+    updateDistributorStatus(distributorId, status) {
+      return repository.updateAdminDistributorStatus(
+        requireString(distributorId),
+        requireString(status, "disabled")
       );
     }
   };

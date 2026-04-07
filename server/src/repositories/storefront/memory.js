@@ -4,6 +4,7 @@ const {
   createStorefrontError,
   createUnauthorizedError
 } = require("../../modules/storefront/errors");
+const { ERROR_CODES, isAppError } = require("../../../../shared/error-codes");
 const { resolveStorefrontSessionLoginType } = require("./session-login");
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -69,28 +70,13 @@ function createStorefrontMemoryRepository(source = mallService) {
     }
 
     const message = String(error.message || "服务异常").trim();
+    const code = String(error.code || "").trim();
 
-    if (message === "订单不存在") {
-      return createStorefrontError(message, 404, "ORDER_NOT_FOUND");
+    if (code && ERROR_CODES[code]) {
+      return createStorefrontError(message, ERROR_CODES[code].statusCode, code);
     }
 
-    if (message === "缺少订单状态") {
-      return createStorefrontError(message, 400, "ORDER_STATUS_REQUIRED");
-    }
-
-    if (message === "当前订单不能执行这个操作") {
-      return createStorefrontError(message, 400, "ORDER_STATUS_TRANSITION_INVALID");
-    }
-
-    if (message === "当前订单暂不可售后") {
-      return createStorefrontError(message, 400, "AFTERSALE_NOT_ALLOWED");
-    }
-
-    if (message === "该订单已提交售后") {
-      return createStorefrontError(message, 409, "AFTERSALE_ALREADY_EXISTS");
-    }
-
-    return createStorefrontError(message, 500, "MEMORY_SOURCE_ERROR");
+    return createStorefrontError(message, 500, code || "MEMORY_SOURCE_ERROR");
   }
 
   function runSource(callback) {
@@ -218,8 +204,8 @@ function createStorefrontMemoryRepository(source = mallService) {
     submitOrder(sessionToken, payload = {}) {
       return withSession(sessionToken, () => source.submitOrder(payload));
     },
-    getAllOrders(sessionToken) {
-      return withSession(sessionToken, () => source.getAllOrders());
+    getAllOrders(sessionToken, options = {}) {
+      return withSession(sessionToken, () => source.getAllOrders(options));
     },
     getOrderDetail(sessionToken, orderId) {
       return withSession(sessionToken, () => source.getOrderDetailData(orderId));
@@ -301,6 +287,36 @@ function createStorefrontMemoryRepository(source = mallService) {
     },
     reviewAdminAfterSale(afterSaleId, action, remark = "") {
       return runSource(() => source.reviewAdminAfterSale(afterSaleId, action, remark));
+    },
+
+    // ── 优惠券管理 ──
+
+    getAdminCouponTemplates(options = {}) {
+      return source.getAdminCouponTemplates(options);
+    },
+    saveAdminCouponTemplate(payload = {}) {
+      return runSource(() => source.saveAdminCouponTemplate(payload));
+    },
+    updateAdminCouponTemplateStatus(templateId, status) {
+      return runSource(() => source.updateAdminCouponTemplateStatus(templateId, status));
+    },
+
+    // ── 分销管理 ──
+
+    getAdminDistributionRules() {
+      return source.getAdminDistributionRules();
+    },
+    updateAdminDistributionRules(payload = {}, actor = {}) {
+      return runSource(() => source.updateAdminDistributionRules(payload, actor));
+    },
+    getAdminDistributors(options = {}) {
+      return source.getAdminDistributors(options);
+    },
+    getAdminDistributorDetail(distributorId) {
+      return source.getAdminDistributorDetail(distributorId);
+    },
+    updateAdminDistributorStatus(distributorId, status) {
+      return runSource(() => source.updateAdminDistributorStatus(distributorId, status));
     }
   };
 }

@@ -5,6 +5,8 @@ function createStorefrontApi(deps) {
     categories,
     products,
     cloneData,
+    formatDateTime,
+    paginateList,
     decorateProducts,
     searchProductSource,
     decorateProduct,
@@ -388,10 +390,17 @@ function createStorefrontApi(deps) {
     });
   }
 
-  function getAllOrders() {
+  function getAllOrders(options = {}) {
     return withState((state) => {
       syncPendingOrderLifecycle(state);
-      return cloneData(state.orderRecords || []);
+
+      const status = String(options.status || "all").trim();
+      const source = cloneData(state.orderRecords || []);
+      const filtered = status && status !== "all"
+        ? source.filter((item) => item.status === status)
+        : source;
+
+      return paginateList(filtered, options);
     });
   }
 
@@ -451,7 +460,7 @@ function createStorefrontApi(deps) {
         description: payload.description || "",
         status: "processing",
         statusText: "售后处理中",
-        createdAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+        createdAt: formatDateTime()
       };
 
       state.afterSales = [record].concat(state.afterSales || []);
@@ -499,8 +508,7 @@ function createStorefrontApi(deps) {
     return withState((state) => {
       state.user = {
         ...state.user,
-        nickname: "微信用户",
-        phone: "138****6699",
+        nickname: state.user.nickname || "微信用户",
         isAuthorized: true
       };
 
