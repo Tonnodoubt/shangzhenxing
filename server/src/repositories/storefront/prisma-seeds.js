@@ -1,4 +1,5 @@
 const { categories: mockCategories, products: mockProducts } = require("../../shared/mock");
+const { normalizeDetailContent } = require("../../../shared/utils");
 
 function parseSalesCount(salesText) {
   const matched = String(salesText || "").match(/\d+/);
@@ -28,7 +29,10 @@ function buildProductSeeds() {
     shortDesc: item.shortDesc || "",
     subTitle: item.subTitle || item.shortDesc || "",
     coverImage: item.coverImage || `https://example.com/products/${item.id}.jpg`,
-    detailContent: item.detailContent || `<p>${item.shortDesc || item.title || "商品详情"}</p><p>${(item.highlights || []).join(" / ")}</p>`,
+    detailContent: normalizeDetailContent(
+      item.detailContent,
+      [item.shortDesc || item.title || "商品详情", (item.highlights || []).join(" / ")].filter(Boolean).join("\n")
+    ),
     price: Number(item.price || 0),
     marketPrice: Number(item.marketPrice || item.price || 0),
     salesCount: Number(item.salesCount || parseSalesCount(item.salesText)),

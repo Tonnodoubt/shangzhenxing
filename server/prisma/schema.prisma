@@ -229,6 +229,10 @@ model Order {
   commissionAmount     Decimal          @default(0.00) @db.Decimal(10, 2)
   couponTitle          String?
   remark               String?
+  // 地址快照
+  snapReceiver         String?
+  snapPhone            String?
+  snapAddress          String?
   shipmentCompanyCode  String?
   shipmentCompanyName  String?
   shipmentTrackingNo   String?

@@ -1,6 +1,6 @@
 const { createStorefrontError } = require("../storefront/errors");
 const { createStorefrontRepository } = require("../../repositories/storefront");
-const { requireString, normalizeDetailContent, normalizePageOptions } = require("../../../../shared/utils");
+const { requireString, normalizeDetailContent, normalizePageOptions } = require("../../../shared/utils");
 
 function requireBoolean(value, fallback = false) {
   if (typeof value === "boolean") {

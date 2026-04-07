@@ -1,6 +1,6 @@
 # 环境变量梳理
 
-更新时间：2026-03-30
+更新时间：2026-04-07
 
 这份文档只回答一件事：
 
@@ -19,7 +19,7 @@
 1. 服务端环境变量
 
 - 位置：`server/.env` 或云托管环境变量面板
-- 作用：控制后端端口、数据库、数据源模式、真实微信登录
+- 作用：控制后端端口、数据库、数据源模式、真实微信登录、后台管理员和云托管启动行为
 
 2. 小程序端运行配置
 
@@ -42,20 +42,24 @@
 | `STOREFRONT_DATA_SOURCE` | 已使用 | 所有后端运行场景 | `memory` 或 `prisma` | 控制后端走内存仓库还是真库仓库 |
 | `WECHAT_APP_ID` | 已使用 | 真实微信登录 | 空字符串 | `wx.login -> code2Session` 所需的小程序 AppID |
 | `WECHAT_APP_SECRET` | 已使用 | 真实微信登录 | 空字符串 | `wx.login -> code2Session` 所需的小程序密钥 |
+| `ADMIN_USERS` | 已使用 | `NODE_ENV=production` 的后台登录 | `'[{"id":"admin-1",...}]'` | 生产环境后台账号与角色；未配置会直接阻止生产启动 |
+| `CORS_ORIGINS` | 已使用 | 需要浏览器跨域访问接口时 | `https://admin.example.com` | API 允许跨域的来源白名单，多个用逗号分隔 |
+| `ADMIN_SESSION_TTL_MS` | 已使用 | 可选 | `28800000` | 后台登录态有效期，默认 8 小时 |
+| `DATABASE_TCP_PROBE_TIMEOUT_MS` | 已使用 | 可选 | `2000` | 云托管启动前数据库 TCP 探测超时时间（毫秒） |
 | `NODE_ENV` | 已使用 | 云托管生产建议显式配置 | `production` | 当前 Dockerfile 会设置，用于运行环境标识 |
 
 ### 小程序端运行配置
 
-| 配置项 | 文件位置 | 当前默认值 | 什么时候改 | 作用 |
+| 配置项 | 文件位置 | 当前仓库值 | 什么时候改 | 作用 |
 | --- | --- | --- | --- | --- |
-| `mallDataSource` | `miniprogram/config/env.js` | `"mock"` | 联调后端时改成 `"api"` | 控制前台数据来源 |
-| `sessionLoginMode` | `miniprogram/config/env.js` | `"mock"` | 接真实微信登录时改成 `"wechat"` | 控制会话获取方式 |
-| `requestTransport` | `miniprogram/config/env.js` | `"http"` | 切云托管时改成 `"cloud"` | 控制 HTTP 还是 `wx.cloud.callContainer` |
-| `apiBaseUrl` | `miniprogram/config/env.js` | `http://127.0.0.1:3000` | 本地端口变化时修改 | 本地接口地址 |
+| `mallDataSource` | `miniprogram/config/env.js` | `"api"` | 本地纯演示时可临时改成 `"mock"` | 控制前台数据来源 |
+| `sessionLoginMode` | `miniprogram/config/env.js` | `"wechat"` | 本地调试时可临时改成 `"mock"` | 控制会话获取方式 |
+| `requestTransport` | `miniprogram/config/env.js` | `"cloud"` | 本地 HTTP 联调时改成 `"http"` | 控制 HTTP 还是 `wx.cloud.callContainer` |
+| `apiBaseUrl` | `miniprogram/config/env.js` | `http://127.0.0.1:3000` | 本地端口变化时修改 | 仅在 `requestTransport="http"` 时生效 |
 | `requestTimeout` | `miniprogram/config/env.js` | `8000` | 一般不用改 | 请求超时毫秒数 |
-| `enableRequestDebug` | `miniprogram/config/env.js` | `true` | 正式环境可考虑关掉 | 是否打印请求调试日志 |
-| `cloud.env` | `miniprogram/config/env.js` | `""` | 切云托管时填写 | 云环境 ID |
-| `cloud.service` | `miniprogram/config/env.js` | `""` | 当前不用填 | 预留字段，当前请求层未读取 |
+| `enableRequestDebug` | `miniprogram/config/env.js` | `false` | 本地排查请求时可临时改成 `true` | 是否打印请求调试日志 |
+| `cloud.env` | `miniprogram/config/env.js` | `"shangzhenxing-7guu17m1a644fd92"` | 切换云环境时修改 | 云环境 ID |
+| `cloud.service` | `miniprogram/config/env.js` | `"mini-shop-api04"` | 云托管服务名变化时修改 | 当前请求层会通过 `X-WX-SERVICE` 定位云托管服务 |
 | `cloud.path` | `miniprogram/config/env.js` | `"/api"` | 一般保持默认 | 容器调用的基础路径 |
 
 ## 每个服务端变量怎么理解
@@ -182,6 +186,91 @@ NODE_ENV=production
 - 本地开发不依赖它
 - 云托管生产建议显式设置，避免环境语义不清
 
+### `ADMIN_USERS`
+
+当前用途：
+
+- `server/src/admin/auth.js`
+
+什么时候必须填：
+
+- 只要 `NODE_ENV=production`，就必须填
+
+不填时的表现：
+
+- 服务会在启动阶段直接退出，不允许生产环境继续使用演示账号
+
+推荐做法：
+
+1. 先运行 `npm run admin:hash-password -- '你的强密码'`
+2. 把输出的 bcrypt hash 填进 `ADMIN_USERS`
+3. 再把完整 JSON 放到云托管环境变量里
+
+示例：
+
+```bash
+ADMIN_USERS='[{"id":"admin-1","username":"admin","realName":"商城管理员","mobile":"13800000001","passwordHash":"$2b$10$请替换为真实bcrypt哈希","roleCodes":["super_admin"]}]'
+```
+
+补充说明：
+
+- 仓库里新增了 `server/.env.cloud.example`，可以直接拿它当生产环境模板
+- 如果要配置多账号，继续在同一个 JSON 数组里追加即可
+
+### `CORS_ORIGINS`
+
+当前用途：
+
+- `server/src/index.js`
+
+什么时候建议填：
+
+- 需要从浏览器跨域访问接口时
+- 需要从独立域名访问后台或 API 调试页时
+
+示例：
+
+```bash
+CORS_ORIGINS="https://admin.example.com,https://shop.example.com"
+```
+
+补充说明：
+
+- 小程序通过 `wx.cloud.callContainer` 调后端时，不依赖浏览器 CORS
+- 如果后台页面继续和服务端走同域部署，也可以先不额外配置
+
+### `ADMIN_SESSION_TTL_MS`
+
+当前用途：
+
+- `server/src/admin/auth.js`
+
+什么时候需要：
+
+- 想缩短或延长后台登录有效期时
+
+默认值：
+
+```bash
+ADMIN_SESSION_TTL_MS=28800000
+```
+
+### `DATABASE_TCP_PROBE_TIMEOUT_MS`
+
+当前用途：
+
+- `server/scripts/start-cloud.js`
+
+什么时候需要：
+
+- 云托管连接数据库较慢、需要调大启动探测超时时
+
+默认值：
+
+```bash
+DATABASE_TCP_PROBE_TIMEOUT_MS=2000
+```
+
 ## 三种场景怎么配
 
 ### 场景 A：本地前台演示
@@ -264,6 +353,7 @@ NODE_ENV=production
 STOREFRONT_DATA_SOURCE=prisma
 WECHAT_APP_ID="你的小程序AppID"
 WECHAT_APP_SECRET="你的小程序AppSecret"
+ADMIN_USERS='[{"id":"admin-1","username":"admin","realName":"商城管理员","mobile":"13800000001","passwordHash":"REPLACE_WITH_BCRYPT_HASH","roleCodes":["super_admin"]}]'
 ```
 
 小程序配置建议：
@@ -274,14 +364,16 @@ sessionLoginMode: "wechat"
 requestTransport: "cloud"
 cloud: {
   env: "你的云环境ID",
+  service: "你的云托管服务名",
   path: "/api"
 }
 ```
 
 补充说明：
 
-- 当前请求层实际读取的是 `cloud.env` 和 `cloud.path`
-- `cloud.service` 目前仍是预留字段，先保持空字符串即可
+- 当前请求层会实际读取 `cloud.env`、`cloud.service` 和 `cloud.path`
+- `cloud.service` 必须和云托管控制台里的服务名称保持一致
+- 如果准备生产变量，优先从 `server/.env.cloud.example` 开始整理
 
 ## 当前推荐的变量收口方式
 
@@ -311,7 +403,8 @@ WECHAT_APP_SECRET=""
 原因：
 
 - `WECHAT_APP_SECRET` 和正式 `DATABASE_URL` 不应该进 git
-- 当前仓库只保留 `server/.env.example`
+- `ADMIN_USERS` 这类生产敏感配置也不应该进 git
+- 当前仓库保留 `server/.env.example` 和 `server/.env.cloud.example` 作为模板
 
 ## 当前还不用新增的变量
 
@@ -333,8 +426,8 @@ WECHAT_APP_SECRET=""
 最小交付标准可以很简单：
 
 1. 确认本地 `server/.env` 的最终模板
-2. 确认未来云托管必须填写的 6 个服务端变量
-3. 确认小程序正式切云时 `miniprogram/config/env.js` 需要改哪 4 个字段
+2. 确认未来云托管必须填写的 7 个服务端变量
+3. 确认小程序正式切云时 `miniprogram/config/env.js` 需要改哪 5 个字段
 
 建议按下面理解：
 
@@ -342,15 +435,17 @@ WECHAT_APP_SECRET=""
 - 必改：`sessionLoginMode`
 - 必改：`requestTransport`
 - 必填：`cloud.env`
+- 必填：`cloud.service`
 - 一般确认即可：`cloud.path`
-- 当前不用填：`cloud.service`
 
 ## 相关文件
 
 - `server/.env.example`
+- `server/.env.cloud.example`
 - `server/src/index.js`
 - `server/src/lib/prisma.js`
 - `server/src/lib/wechat-auth.js`
+- `server/src/admin/auth.js`
 - `server/Dockerfile`
 - `miniprogram/config/env.js`
 - `docs/setup/cloud-hosting-deployment.md`

@@ -1,6 +1,6 @@
 # 项目进度表
 
-最后更新时间：2026-04-02
+最后更新时间：2026-04-07
 
 这份进度表放在仓库根目录，方便直接看当前做到哪一步。
 
@@ -27,6 +27,11 @@
 | 订单完成后记佣 | 已完成 | 确认收货后佣金记到 inviter 的分销账户 |
 | 团队直属成员沉淀 | 已完成第一版 | 团队数据优先读取真实邀请关系，能看到直属成员和人数 |
 | 海报分享带参 | 已完成第一版 | 海报页已能生成带 inviter 的分享路径 |
+| 审查收口第 1 批 | 已完成 | 已补 CSP、全局 Express 错误中间件、5xx 通用错误兜底 |
+| 订单分页 | 已完成 | `/api/orders` 已支持 `status/page/pageSize`，小程序订单页已联动分页和“加载更多” |
+| 授权状态收口 | 已完成 | `authorizeUser` 不再写假手机号，只同步授权状态 |
+| 商品详情清洗 | 已完成 | `detailContent` 写入/读取统一清洗为纯文本，移除 HTML / script / style 内容 |
+| 小程序 session 存储告警 | 已完成 | storage 异常已改为 warning 日志，不再静默吞掉 |
 | 自动化验证 | 已完成 | `npm run lint`、`npm test` 当前已跑通，`test:prisma` 仍可按需做真库回归 |
 
 ## 3. 还没做完
@@ -39,6 +44,7 @@
 | 邀请奖励闭环 | 未做 | 邀请成功后发券 / 礼包 / 奖励还没接 |
 | 裂变统计 | 部分做 | 已有直属关系和基础团队数据，首单转化统计还可继续补细 |
 | 积分系统 | 未做 | 仍是后续独立主线 |
+| 上线审查剩余治理 | 部分做 | `pre-launch-audit.md` 当前还剩 `MEDIUM 5` 项和 `LOW 7` 项，优先建议继续收口时区、memory 隔离、schema 校验 |
 
 ## 4. 推荐下一步
 
@@ -75,6 +81,7 @@
 | 双实现契约回归第 1 批 | 已完成 | 已补 `memory / prisma` 在 `session / catalog / address / cart` 上的契约式回归测试 |
 | 双实现契约回归第 2 批 | 已完成 | 已补 `coupon / checkout / order / aftersale / profile / distribution` 契约回归，并修正售后返回里的公开 `orderId` 语义 |
 | 默认自动化回归 | 已增强 | `npm test` 现在同时覆盖 memory API、`prisma-admin`、`prisma-distribution`、`prisma-coupon`、`prisma-order`、`prisma-catalog`、`prisma-cart`、`prisma-session`、`prisma-profile`、`prisma-mappers`、`storefront-contract`、`session-login` 测试 |
+| 审查收口回归 | 已完成第 1 批 | 已补 `prisma-profile`、`prisma-order`、`storefront-contract` 针对订单分页 / 授权状态 / 详情清洗的回归验证 |
 | Prisma 主文件体量 | 已大幅收敛 | `server/src/repositories/storefront/prisma.js` 已从约 `3753` 行降到 `288` 行 |
 | Admin Console 资源拆分 | 已完成 | `server/public/admin-console/index.html` 已拆成 `index.html`、`admin-console.css`、`admin-console.js` 三个职责文件 |
 | 下一刀 | 待做 | 优先收口 `server/src/shared/mall.js` 和 `miniprogram/services/mall.js` 的双份逻辑，或继续细拆 `admin-console.js` |

@@ -1,8 +1,5 @@
 const { createStorefrontRepository } = require("../../repositories/storefront");
-
-function requireString(value, fallback = "") {
-  return String(value || fallback).trim();
-}
+const { requireString, normalizePageOptions } = require("../../../shared/utils");
 
 function createStorefrontService(repository = createStorefrontRepository()) {
   return {
@@ -110,8 +107,11 @@ function createStorefrontService(repository = createStorefrontRepository()) {
     submitOrder(sessionToken, payload = {}) {
       return repository.submitOrder(requireString(sessionToken), payload);
     },
-    getAllOrders(sessionToken) {
-      return repository.getAllOrders(requireString(sessionToken));
+    getAllOrders(sessionToken, options = {}) {
+      return repository.getAllOrders(requireString(sessionToken), {
+        ...normalizePageOptions(options),
+        status: requireString(options.status, "all")
+      });
     },
     getOrderDetail(sessionToken, orderId) {
       return repository.getOrderDetail(requireString(sessionToken), requireString(orderId));

@@ -193,6 +193,9 @@ http://127.0.0.1:3000/admin-console/
 - `docs/setup/environment-variables.md`
   适合看服务端环境变量和小程序运行配置怎么收口
 
+- `server/.env.cloud.example`
+  适合直接拿去整理云托管生产环境变量模板
+
 - `docs/setup/frontend-regression-checklist.md`
   适合做前台回归时对照执行
 

@@ -1,1 +1,1 @@
-module.exports = require("../../../shared/mall-core");
+module.exports = require("../../shared/mall-core");

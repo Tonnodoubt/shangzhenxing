@@ -1,10 +1,19 @@
 const SESSION_TOKEN_STORAGE_KEY = "wechat-mini-shop:session-token";
 const SESSION_EXPIRES_AT_STORAGE_KEY = "wechat-mini-shop:session-expires-at";
 
+function logStorageError(action, key, error) {
+  console.warn("[mall-session][storage-error]", {
+    action,
+    key,
+    message: error && error.message ? error.message : error
+  });
+}
+
 function safeGetStorageSync(key) {
   try {
     return wx.getStorageSync(key);
   } catch (error) {
+    logStorageError("get", key, error);
     return "";
   }
 }
@@ -12,21 +21,21 @@ function safeGetStorageSync(key) {
 function safeSetStorageSync(key, value) {
   try {
     wx.setStorageSync(key, value);
+    return true;
   } catch (error) {
-    return null;
+    logStorageError("set", key, error);
+    return false;
   }
-
-  return null;
 }
 
 function safeRemoveStorageSync(key) {
   try {
     wx.removeStorageSync(key);
+    return true;
   } catch (error) {
-    return null;
+    logStorageError("remove", key, error);
+    return false;
   }
-
-  return null;
 }
 
 function getSessionToken() {

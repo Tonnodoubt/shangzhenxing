@@ -655,11 +655,25 @@ function createContractMemorySource(fixtures, helpers) {
         order: helpers.mapOrder(getHydratedOrder(nextOrder))
       };
     },
-    getAllOrders() {
-      return state.orders
+    getAllOrders(options = {}) {
+      const status = String(options.status || "all").trim();
+      const page = Math.max(1, Number(options.page || 1));
+      const pageSize = Math.min(100, Math.max(1, Number(options.pageSize || 20)));
+      const sorted = state.orders
         .slice()
         .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
         .map((item) => helpers.mapOrder(getHydratedOrder(item)));
+      const filtered = status && status !== "all"
+        ? sorted.filter((item) => item.status === status)
+        : sorted;
+      const start = (page - 1) * pageSize;
+
+      return {
+        list: filtered.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: filtered.length
+      };
     },
     getOrderDetailData(orderId) {
       const order = state.orders.find((item) => item.orderNo === orderId) || null;
@@ -745,8 +759,7 @@ function createContractMemorySource(fixtures, helpers) {
     authorizeUser() {
       state.user = {
         ...state.user,
-        nickname: "微信用户",
-        mobile: "138****6699",
+        nickname: state.user.nickname || "微信用户",
         isAuthorized: true
       };
 
@@ -1061,7 +1074,17 @@ function createContractPrisma(fixtures) {
     },
     order: {
       count: async ({ where } = {}) => {
-        return state.orders.filter((item) => !where.userId || item.userId === where.userId).length;
+        return state.orders.filter((item) => {
+          if (where && where.userId && item.userId !== where.userId) {
+            return false;
+          }
+
+          if (where && where.status && item.status !== where.status) {
+            return false;
+          }
+
+          return true;
+        }).length;
       },
       create: async ({ data }) => {
         const record = {
@@ -1082,12 +1105,24 @@ function createContractPrisma(fixtures) {
 
         return include ? hydrateOrder(order) : (order ? { ...order } : null);
       },
-      findMany: async ({ where, include }) => {
-        return state.orders
-          .filter((item) => !where.userId || item.userId === where.userId)
+      findMany: async ({ where, include, skip = 0, take }) => {
+        const filtered = state.orders
+          .filter((item) => {
+            if (where.userId && item.userId !== where.userId) {
+              return false;
+            }
+
+            if (where.status && item.status !== where.status) {
+              return false;
+            }
+
+            return true;
+          })
           .slice()
           .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-          .map((item) => (include ? hydrateOrder(item) : { ...item }));
+          .slice(skip, typeof take === "number" ? skip + take : undefined);
+
+        return filtered.map((item) => (include ? hydrateOrder(item) : { ...item }));
       },
       findUnique: async ({ where, include }) => {
         const order = state.orders.find((item) => item.id === where.id) || null;
@@ -1115,6 +1150,44 @@ function createContractPrisma(fixtures) {
         return { ...record };
       }
     },
+    productSku: {
+      findUnique: async ({ where }) => {
+        for (const product of state.products) {
+          const sku = (product.skus || []).find((item) => item.id === where.id);
+
+          if (sku) {
+            return { ...sku };
+          }
+        }
+
+        return null;
+      },
+      update: async ({ where, data }) => {
+        for (const product of state.products) {
+          const sku = (product.skus || []).find((item) => item.id === where.id);
+
+          if (!sku) {
+            continue;
+          }
+
+          if (data.stock && typeof data.stock.decrement === "number") {
+            sku.stock = Number(sku.stock || 0) - data.stock.decrement;
+          }
+
+          Object.assign(sku, Object.keys(data || {}).reduce((result, key) => {
+            if (key !== "stock") {
+              result[key] = data[key];
+            }
+
+            return result;
+          }, {}));
+
+          return { ...sku };
+        }
+
+        return null;
+      }
+    },
     product: {
       findMany: async ({ where }) => {
         const keyword = (((where || {}).OR || []).map((item) => {
@@ -1139,6 +1212,27 @@ function createContractPrisma(fixtures) {
         }
 
         return cloned;
+      },
+      update: async ({ where, data }) => {
+        const product = state.products.find((item) => item.id === where.id);
+
+        if (!product) {
+          return null;
+        }
+
+        if (data.salesCount && typeof data.salesCount.increment === "number") {
+          product.salesCount = Number(product.salesCount || 0) + data.salesCount.increment;
+        }
+
+        Object.assign(product, Object.keys(data || {}).reduce((result, key) => {
+          if (key !== "salesCount") {
+            result[key] = data[key];
+          }
+
+          return result;
+        }, {}));
+
+        return cloneProduct(product);
       }
     },
     referralBinding: {
@@ -1421,6 +1515,14 @@ function normalizeContractOrder(order) {
     return null;
   }
 
+  const address = order.address
+    ? {
+        receiver: order.address.receiver,
+        phone: order.address.phone,
+        detail: order.address.detail
+      }
+    : null;
+
   return {
     status: order.status,
     statusText: order.statusText,
@@ -1431,7 +1533,7 @@ function normalizeContractOrder(order) {
     couponTitle: order.couponTitle,
     remark: order.remark,
     sourceScene: order.sourceScene,
-    address: order.address,
+    address,
     items: (order.items || []).map((item) => ({
       id: item.id,
       skuId: item.skuId,
@@ -1578,13 +1680,22 @@ test("memory and prisma repositories share coupon order profile and distribution
   assert.match(prismaSubmit.order.id, /^NO/);
   assert.deepEqual(normalizeContractOrder(prismaSubmit.order), normalizeContractOrder(memorySubmit.order));
 
-  const memoryOrders = memoryRepository.getAllOrders(memorySession.sessionToken);
-  const prismaOrders = await prismaRepository.getAllOrders(prismaSession.sessionToken);
+  const memoryOrders = memoryRepository.getAllOrders(memorySession.sessionToken, {
+    page: 1,
+    pageSize: 20
+  });
+  const prismaOrders = await prismaRepository.getAllOrders(prismaSession.sessionToken, {
+    page: 1,
+    pageSize: 20
+  });
 
   assert.deepEqual(
-    prismaOrders.map((item) => normalizeContractOrder(item)),
-    memoryOrders.map((item) => normalizeContractOrder(item))
+    prismaOrders.list.map((item) => normalizeContractOrder(item)),
+    memoryOrders.list.map((item) => normalizeContractOrder(item))
   );
+  assert.equal(prismaOrders.page, memoryOrders.page);
+  assert.equal(prismaOrders.pageSize, memoryOrders.pageSize);
+  assert.equal(prismaOrders.total, memoryOrders.total);
 
   const memoryCancelled = memoryRepository.updateOrderStatus(
     memorySession.sessionToken,

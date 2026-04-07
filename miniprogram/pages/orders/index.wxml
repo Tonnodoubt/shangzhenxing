@@ -29,7 +29,7 @@
     </view>
 
     <view wx:if="{{!isEmpty}}">
-      <block wx:for="{{filteredOrders}}" wx:key="id">
+      <block wx:for="{{orders}}" wx:key="id">
         <view class="order-card panel">
           <view class="order-top">
             <text class="order-number">{{item.id}}</text>
@@ -64,6 +64,21 @@
           </view>
         </view>
       </block>
+
+      <view class="panel order-pagination">
+        <text class="order-pagination-copy">
+          {{loadingMore ? '正在加载更多订单...' : (hasMore ? '还有更多订单，继续往下看或点按钮加载' : ('已展示当前分类全部 ' + totalOrders + ' 笔订单'))}}
+        </text>
+        <button
+          class="ghost-button order-pagination-button"
+          wx:if="{{hasMore}}"
+          bindtap="loadMore"
+          loading="{{loadingMore}}"
+          disabled="{{loadingMore}}"
+        >
+          {{loadingMore ? '加载中...' : '加载更多'}}
+        </button>
+      </view>
     </view>
 
     <view class="order-empty panel" wx:else>

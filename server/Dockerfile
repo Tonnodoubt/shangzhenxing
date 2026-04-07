@@ -17,6 +17,7 @@ COPY prisma.config.ts ./prisma.config.ts
 RUN npm ci --omit=dev
 
 COPY scripts ./scripts
+COPY shared ./shared
 COPY src ./src
 COPY public ./public
 

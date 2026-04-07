@@ -54,8 +54,7 @@ function createStorefrontPrismaProfileModule({
             id: user.id
           },
           data: {
-            nickname: "微信用户",
-            mobile: "138****6699",
+            nickname: user.nickname || "微信用户",
             isAuthorized: true
           }
         });

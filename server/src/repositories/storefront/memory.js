@@ -4,7 +4,7 @@ const {
   createStorefrontError,
   createUnauthorizedError
 } = require("../../modules/storefront/errors");
-const { ERROR_CODES, isAppError } = require("../../../../shared/error-codes");
+const { ERROR_CODES } = require("../../../shared/error-codes");
 const { resolveStorefrontSessionLoginType } = require("./session-login");
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;

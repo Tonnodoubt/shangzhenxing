@@ -1,3 +1,5 @@
+const { normalizeDetailContent } = require("../../../shared/utils");
+
 function createStorefrontPrismaMapperModule({
   accentPalette,
   createStorefrontError
@@ -8,6 +10,16 @@ function createStorefrontPrismaMapperModule({
 
   function toNumber(value) {
     return Number(value || 0);
+  }
+
+  // 元转分（整数），避免浮点精度丢失
+  function toCents(value) {
+    return Math.round(Number(value || 0) * 100);
+  }
+
+  // 分转元
+  function centsToYuan(cents) {
+    return cents / 100;
   }
 
   function formatDateTime(date) {
@@ -112,29 +124,32 @@ function createStorefrontPrismaMapperModule({
     return statusMap[status] || "";
   }
 
-  function getCouponDiscount(coupon, goodsAmount) {
+  function getCouponDiscount(coupon, goodsAmountCents) {
     if (!coupon) {
       return 0;
     }
 
-    const threshold = Number(coupon.threshold || 0);
-    const amount = Number(coupon.amount || 0);
-    const numericGoodsAmount = Number(goodsAmount || 0);
+    const thresholdCents = toCents(coupon.threshold);
+    const amountCents = toCents(coupon.amount);
 
-    if (numericGoodsAmount < threshold) {
+    if (goodsAmountCents < thresholdCents) {
       return 0;
     }
 
-    return Math.min(amount, numericGoodsAmount);
+    return Math.min(amountCents, goodsAmountCents);
   }
 
   function buildCheckoutSummary(cartItems = [], coupon = null) {
-    const goodsAmountNumber = (cartItems || []).reduce((sum, item) => {
-      return sum + toNumber(item.price) * Number(item.quantity || 0);
+    const goodsAmountCents = (cartItems || []).reduce((sum, item) => {
+      return sum + toCents(item.price) * Number(item.quantity || 0);
     }, 0);
     const totalCount = (cartItems || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-    const discountAmountNumber = getCouponDiscount(coupon, goodsAmountNumber);
-    const payableAmountNumber = Math.max(goodsAmountNumber - discountAmountNumber, 0);
+    const discountAmountCents = getCouponDiscount(coupon, goodsAmountCents);
+    const payableAmountCents = Math.max(goodsAmountCents - discountAmountCents, 0);
+
+    const goodsAmountNumber = centsToYuan(goodsAmountCents);
+    const discountAmountNumber = centsToYuan(discountAmountCents);
+    const payableAmountNumber = centsToYuan(payableAmountCents);
 
     return {
       totalCount,
@@ -214,7 +229,7 @@ function createStorefrontPrismaMapperModule({
       highlights: buildHighlightTags(product),
       favoriteCount: toNumber(product.favoriteCount),
       productType: "general",
-      detailContent: product.detailContent || `<p>${product.shortDesc || product.title}</p>`,
+      detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       coverImage: product.coverImage || "",
       imageList: product.coverImage ? [product.coverImage] : [],
       distributionEnabled: typeof product.distributionEnabled === "boolean" ? product.distributionEnabled : true,
@@ -260,6 +275,15 @@ function createStorefrontPrismaMapperModule({
     const status = order.status || "pending";
     const aftersaleStatus = ((order.afterSale || {}).status) || "";
 
+    // 优先使用地址快照，回退到关联地址
+    const snappedAddress = order.snapReceiver
+      ? {
+          receiver: order.snapReceiver,
+          phone: order.snapPhone || "",
+          detail: order.snapAddress || ""
+        }
+      : mapAddress(order.address);
+
     return {
       id: order.orderNo,
       status,
@@ -272,7 +296,7 @@ function createStorefrontPrismaMapperModule({
       couponTitle: order.couponTitle || "",
       remark: order.remark || "",
       sourceScene: order.sourceScene || "direct",
-      address: mapAddress(order.address),
+      address: snappedAddress,
       items: (order.items || []).map((item) => {
         const subtotalAmount = toNumber(item.subtotalAmount);
 

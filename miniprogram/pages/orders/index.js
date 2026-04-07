@@ -1,4 +1,5 @@
 const mallService = require("../../services/mall-client");
+const ORDER_PAGE_SIZE = 20;
 
 const tabs = [
   { status: "all", label: "全部" },
@@ -7,11 +8,11 @@ const tabs = [
   { status: "done", label: "已完成" }
 ];
 
-function buildEmptyState(activeStatus, orders = []) {
+function buildEmptyState(activeStatus, total = 0) {
   const currentTab = tabs.find((item) => item.status === activeStatus);
   const currentLabel = currentTab ? currentTab.label : "当前状态";
 
-  if (!orders.length) {
+  if (Number(total || 0) <= 0 && activeStatus === "all") {
     return {
       emptyTitle: "你还没有任何订单",
       emptyCopy: "可以先去首页挑商品，把下单链路再完整走一遍。"
@@ -44,7 +45,11 @@ Page({
     tabs,
     activeStatus: "all",
     orders: [],
-    filteredOrders: [],
+    totalOrders: 0,
+    orderPage: 0,
+    orderPageSize: ORDER_PAGE_SIZE,
+    hasMore: false,
+    loadingMore: false,
     isEmpty: false,
     emptyTitle: "",
     emptyCopy: "",
@@ -61,32 +66,73 @@ Page({
     });
   },
   async onShow() {
-    await this.loadOrders();
+    await this.loadOrders({
+      reset: true
+    });
   },
-  async loadOrders() {
+  async loadOrders(options = {}) {
+    const reset = options.reset !== false;
+    const nextPage = reset ? 1 : this.data.orderPage + 1;
+
+    if (!reset && (this.data.loadingMore || !this.data.hasMore || this.data.pageState !== "success")) {
+      return;
+    }
+
     try {
-      this.setData({
-        pageState: "loading",
-        errorMessage: ""
-      });
+      if (reset) {
+        this.setData({
+          pageState: "loading",
+          errorMessage: "",
+          loadingMore: false
+        });
+      } else {
+        this.setData({
+          loadingMore: true
+        });
+      }
 
       wx.showNavigationBarLoading();
-      const orders = await mallService.getAllOrders();
+      const pageData = await mallService.getAllOrders({
+        status: this.data.activeStatus,
+        page: nextPage,
+        pageSize: this.data.orderPageSize
+      });
+      const nextOrders = decorateOrdersForList(pageData.list || []);
+      const orders = reset ? nextOrders : this.data.orders.concat(nextOrders);
+      const totalOrders = Number(pageData.total || 0);
+      const hasMore = orders.length < totalOrders;
+      const emptyState = buildEmptyState(this.data.activeStatus, totalOrders);
 
-      this.setData(
-        {
-          orders: decorateOrdersForList(orders),
-          pageState: "success",
-          errorMessage: ""
-        },
-        () => {
-          this.applyFilter();
-        }
-      );
+      this.setData({
+        orders,
+        totalOrders,
+        orderPage: Number(pageData.page || nextPage),
+        hasMore,
+        loadingMore: false,
+        isEmpty: orders.length === 0,
+        emptyTitle: emptyState.emptyTitle,
+        emptyCopy: emptyState.emptyCopy,
+        pageState: "success",
+        errorMessage: ""
+      });
     } catch (error) {
+      if (!reset) {
+        this.setData({
+          loadingMore: false
+        });
+        wx.showToast({
+          title: error.message || "加载更多失败",
+          icon: "none"
+        });
+        return;
+      }
+
       this.setData({
         orders: [],
-        filteredOrders: [],
+        totalOrders: 0,
+        orderPage: 0,
+        hasMore: false,
+        loadingMore: false,
         isEmpty: false,
         emptyTitle: "",
         emptyCopy: "",
@@ -98,33 +144,22 @@ Page({
     }
   },
   switchStatus(event) {
-    if (this.data.pageState !== "success") {
+    if (this.data.loadingMore) {
       return;
     }
 
     const { status } = event.currentTarget.dataset;
 
-    this.setData(
-      {
-        activeStatus: status
-      },
-      () => {
-        this.applyFilter();
-      }
-    );
-  },
-  applyFilter() {
-    const { activeStatus, orders } = this.data;
-    const filteredOrders = activeStatus === "all"
-      ? orders
-      : orders.filter((item) => item.status === activeStatus);
-    const emptyState = buildEmptyState(activeStatus, orders);
+    if (!status || status === this.data.activeStatus) {
+      return;
+    }
 
     this.setData({
-      filteredOrders,
-      isEmpty: filteredOrders.length === 0,
-      emptyTitle: emptyState.emptyTitle,
-      emptyCopy: emptyState.emptyCopy
+      activeStatus: status
+    });
+
+    this.loadOrders({
+      reset: true
     });
   },
   openOrderDetail(event) {
@@ -146,7 +181,17 @@ Page({
     });
   },
   retryLoad() {
-    this.loadOrders();
+    this.loadOrders({
+      reset: true
+    });
+  },
+  loadMore() {
+    this.loadOrders({
+      reset: false
+    });
+  },
+  onReachBottom() {
+    this.loadMore();
   },
   goHome() {
     wx.switchTab({

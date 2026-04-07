@@ -12,6 +12,12 @@ function createOrderModule(overrides = {}) {
 
       return { currentStatus, nextStatus };
     },
+    buildPaginatedResult: (list, total, options = {}) => ({
+      list,
+      page: Number(options.page || 1),
+      pageSize: Number(options.pageSize || list.length || 20),
+      total
+    }),
     buildCheckoutSummary: (cartItems = [], coupon = null) => {
       const goodsAmountNumber = (cartItems || []).reduce((sum, item) => {
         return sum + Number(item.price || 0) * Number(item.quantity || 0);
@@ -49,6 +55,17 @@ function createOrderModule(overrides = {}) {
         commissionAmount: 0
       }),
       syncDistributionAfterOrderDone: async () => null
+    },
+    getPaginationQuery: (options = {}) => {
+      const page = Math.max(1, Number(options.page || 1));
+      const pageSize = Math.min(100, Math.max(1, Number(options.pageSize || 20)));
+
+      return {
+        page,
+        pageSize,
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      };
     },
     getCartItems: async () => [],
     getCartRecord: async () => ({
@@ -182,11 +199,22 @@ test("order method submits order with coupon and referral snapshots", async () =
         couponTitle: "满 99 减 20"
       })
     },
+    productSku: {
+      findUnique: async () => ({
+        id: "sku-1",
+        stock: 20,
+        lockStock: 0
+      }),
+      update: async ({ data }) => data
+    },
     orderItem: {
       create: async ({ data }) => {
         createdOrderItems.push(data);
         return data;
       }
+    },
+    product: {
+      update: async ({ data }) => data
     },
     userCoupon: {
       update: async (payload) => {
@@ -399,5 +427,71 @@ test("order method creates aftersale only for eligible orders", async () => {
     id: "as-1",
     orderId: "NO20260402004",
     status: "processing"
+  });
+});
+
+test("order method paginates orders by status", async () => {
+  let findManyPayload = null;
+  let countPayload = null;
+  const orderModule = createOrderModule({
+    getCurrentUserContext: async () => ({
+      prisma: {
+        order: {
+          findMany: async (payload) => {
+            findManyPayload = payload;
+            return [
+              {
+                orderNo: "NO20260402005",
+                status: "shipping",
+                address: null,
+                afterSale: null,
+                items: []
+              }
+            ];
+          },
+          count: async (payload) => {
+            countPayload = payload;
+            return 3;
+          }
+        }
+      },
+      user: {
+        id: "user-1"
+      }
+    }),
+    mapOrder: (order = {}) => ({
+      id: order.orderNo || "",
+      status: order.status || ""
+    })
+  });
+
+  const result = await orderModule.methods.getAllOrders("session-token", {
+    status: "shipping",
+    page: 2,
+    pageSize: 1
+  });
+
+  assert.deepEqual(findManyPayload.where, {
+    userId: "user-1",
+    status: "shipping"
+  });
+  assert.equal(findManyPayload.skip, 1);
+  assert.equal(findManyPayload.take, 1);
+  assert.deepEqual(countPayload, {
+    where: {
+      userId: "user-1",
+      status: "shipping"
+    }
+  });
+  assert.deepEqual(result, {
+    list: [
+      {
+        id: "NO20260402005",
+        status: "shipping"
+      }
+    ],
+    page: 2,
+    pageSize: 1,
+    total: 3
   });
 });

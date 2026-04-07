@@ -154,7 +154,6 @@ test("profile method authorizes current user with mapped payload", async () => {
     },
     data: {
       nickname: "微信用户",
-      mobile: "138****6699",
       isAuthorized: true
     }
   });

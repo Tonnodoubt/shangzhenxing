@@ -232,11 +232,13 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
 
   const orderModule = createStorefrontPrismaOrderModule({
     assertUserOrderStatusTransition,
+    buildPaginatedResult,
     buildCheckoutSummary,
     buildPublicOrderNo,
     couponHelpers: couponModule.helpers,
     createStorefrontError,
     distributionHelpers: distributionModule.helpers,
+    getPaginationQuery,
     getCartItems: cartModule.helpers.getCartItems,
     getCartRecord: cartModule.helpers.getCartRecord,
     getCurrentUserContext: sessionModule.helpers.getCurrentUserContext,

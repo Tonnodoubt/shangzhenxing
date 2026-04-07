@@ -176,3 +176,19 @@
 .order-empty-button {
   margin-top: 28rpx;
 }
+
+.order-pagination {
+  margin-top: 22rpx;
+  padding: 28rpx 26rpx;
+  text-align: center;
+}
+
+.order-pagination-copy {
+  display: block;
+  color: #7f7569;
+  line-height: 1.7;
+}
+
+.order-pagination-button {
+  margin-top: 20rpx;
+}

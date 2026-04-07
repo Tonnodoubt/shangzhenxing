@@ -1,7 +1,7 @@
 const express = require("express");
 const { createAdminService } = require("../modules/admin/service");
 const { sendData, sendError, wrap } = require("../shared/http");
-const { requireString } = require("../../../shared/utils");
+const { requireString } = require("../../shared/utils");
 const {
   adminAuth,
   requirePermission,

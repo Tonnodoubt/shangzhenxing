@@ -1,4 +1,5 @@
 const { createStorefrontError } = require("../../modules/storefront/errors");
+const { normalizeDetailContent } = require("../../../shared/utils");
 
 function createStorefrontPrismaAdminRepository({
   getPrisma,
@@ -284,7 +285,7 @@ function createStorefrontPrismaAdminRepository({
       productType: "general",
       coverImage: product.coverImage || "",
       imageList: product.coverImage ? [product.coverImage] : [],
-      detailContent: product.detailContent || "",
+      detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       labelTags: buildHighlightTags(product),
       status,
       statusText: getProductStatusText(status),
@@ -744,7 +745,10 @@ function createStorefrontPrismaAdminRepository({
         shortDesc: String(payload.shortDesc || "").trim() || null,
         subTitle: String(payload.subTitle || payload.shortDesc || "").trim() || null,
         coverImage: String(payload.coverImage || "").trim() || null,
-        detailContent: String(payload.detailContent || "").trim() || null,
+        detailContent: normalizeDetailContent(
+          String(payload.detailContent || "").trim(),
+          String(payload.shortDesc || payload.subTitle || payload.title || "").trim()
+        ) || null,
         price: toNumber(payload.price),
         marketPrice: toNumber(payload.marketPrice || payload.price),
         salesCount: Math.max(0, Number(payload.salesCount || 0)),

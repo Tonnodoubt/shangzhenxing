@@ -1,10 +1,12 @@
 function createStorefrontPrismaOrderModule({
   assertUserOrderStatusTransition,
+  buildPaginatedResult,
   buildCheckoutSummary,
   buildPublicOrderNo,
   couponHelpers,
   createStorefrontError,
   distributionHelpers,
+  getPaginationQuery,
   getCartItems,
   getCartRecord,
   getCurrentUserContext,
@@ -115,11 +117,37 @@ function createStorefrontPrismaOrderModule({
               commissionRate: referralSnapshot.commissionRate,
               commissionAmount: referralSnapshot.commissionAmount,
               couponTitle: appliedCoupon ? (appliedCoupon.template || {}).title || "" : null,
-              remark: payload.remark || ""
+              remark: payload.remark || "",
+              // 地址快照
+              snapReceiver: currentAddress ? currentAddress.receiver : null,
+              snapPhone: currentAddress ? currentAddress.phone : null,
+              snapAddress: currentAddress
+                ? [currentAddress.province, currentAddress.city, currentAddress.district, currentAddress.detail].filter(Boolean).join(" ")
+                : null
             }
           });
 
+          // ── 库存校验 & 扣减 ──
           for (const item of currentCartItems) {
+            const qty = Number(item.quantity || 0);
+
+            if (item.skuId) {
+              const sku = await tx.productSku.findUnique({ where: { id: item.skuId } });
+
+              if (!sku || sku.stock - sku.lockStock < qty) {
+                throw createStorefrontError(
+                  `「${item.title || "商品"}」库存不足`,
+                  400,
+                  "STOCK_INSUFFICIENT"
+                );
+              }
+
+              await tx.productSku.update({
+                where: { id: sku.id },
+                data: { stock: { decrement: qty } }
+              });
+            }
+
             await tx.orderItem.create({
               data: {
                 orderId: nextOrder.id,
@@ -128,9 +156,15 @@ function createStorefrontPrismaOrderModule({
                 title: item.title,
                 specText: item.specText || "",
                 price: toNumber(item.price),
-                quantity: Number(item.quantity || 0),
-                subtotalAmount: toNumber(item.price) * Number(item.quantity || 0)
+                quantity: qty,
+                subtotalAmount: toNumber(item.price) * qty
               }
+            });
+
+            // 累加商品销量
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { salesCount: { increment: qty } }
             });
           }
 
@@ -183,30 +217,44 @@ function createStorefrontPrismaOrderModule({
           };
         });
       },
-      async getAllOrders(sessionToken) {
+      async getAllOrders(sessionToken, options = {}) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
+        const pagination = getPaginationQuery(options);
+        const status = String(options.status || "all").trim();
+        const where = {
+          userId: user.id
+        };
+
+        if (status && status !== "all") {
+          where.status = status;
+        }
 
         await syncPendingOrderLifecycle(prisma, user.id);
 
-        const orders = await prisma.order.findMany({
-          where: {
-            userId: user.id
-          },
-          include: {
-            address: true,
-            afterSale: true,
-            items: {
-              orderBy: {
-                createdAt: "asc"
+        const [orders, total] = await Promise.all([
+          prisma.order.findMany({
+            where,
+            include: {
+              address: true,
+              afterSale: true,
+              items: {
+                orderBy: {
+                  createdAt: "asc"
+                }
               }
-            }
-          },
-          orderBy: {
-            createdAt: "desc"
-          }
-        });
+            },
+            orderBy: {
+              createdAt: "desc"
+            },
+            skip: pagination.skip,
+            take: pagination.take
+          }),
+          prisma.order.count({
+            where
+          })
+        ]);
 
-        return orders.map((item) => mapOrder(item));
+        return buildPaginatedResult(orders.map((item) => mapOrder(item)), total, pagination);
       },
       async getOrderDetail(sessionToken, orderId) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);

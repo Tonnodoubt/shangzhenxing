@@ -67,6 +67,15 @@
    `STOREFRONT_DATA_SOURCE=prisma`
    `WECHAT_APP_ID`
    `WECHAT_APP_SECRET`
+   `ADMIN_USERS`
+
+   按需补：
+   `CORS_ORIGINS`
+   `ADMIN_SESSION_TTL_MS`
+
+   可以直接从：
+   `server/.env.cloud.example`
+   这份模板开始整理生产变量。
 
 3. 用 `server/` 目录部署后端容器
    当前容器启动命令已经配置为：
@@ -78,20 +87,25 @@
    更完整的配置收口可参考：
    [environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/environment-variables.md)
 
-   需要把：
-   `requestTransport` 改成 `cloud`
-
-   并填写：
+   需要确认：
+   `requestTransport=cloud`
    `cloud.env`
+   `cloud.service`
    `cloud.path`
 
    说明：
-   当前请求层实际读取的是 `cloud.env` 和 `cloud.path`；
-   `cloud.service` 仍是预留字段，当前代码还没有用到。
+   当前请求层实际读取的是 `cloud.env`、`cloud.service` 和 `cloud.path`；
+   其中 `cloud.service` 必须和云托管控制台里的服务名称完全一致。
 
 5. 小程序里继续通过 `wx.cloud.callContainer` 请求后端
    当前这条能力已经在请求层预留好了：
    [request.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/services/request.js)
+
+6. 为生产后台准备正式管理员账号
+   生产环境下如果没配置 `ADMIN_USERS`，服务会直接拒绝启动。
+   当前仓库已经补了：
+   `npm run admin:hash-password -- '你的强密码'`
+   用来生成 bcrypt 哈希，再填入 `server/.env.cloud.example` 里的 JSON 模板即可。
 
 ## 备案边界和快速上线的关系
 
@@ -213,8 +227,9 @@ DATABASE_URL="mysql://用户名:密码@主机:端口/数据库名"
 3. 保持启动命令为 `npm run start:cloud`
 4. 让容器启动时执行 `prisma migrate deploy`
 5. 配置 `WECHAT_APP_ID / WECHAT_APP_SECRET`
-6. 把小程序 `miniprogram/config/env.js` 里的 `sessionLoginMode` 改成 `wechat`
-7. 部署后先访问 `/health`，确认 `storefrontRepositoryMode` 已变成 `prisma`
+6. 配置 `ADMIN_USERS`
+7. 把小程序 `miniprogram/config/env.js` 里的 `sessionLoginMode` 改成 `wechat`
+8. 部署后先访问 `/health`，确认服务已经返回 `ok: true`
 
 在这之前，继续保持 `memory` 就行，不会影响你现在的小程序联调。
 

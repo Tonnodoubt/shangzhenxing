@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const adminRouter = require("./admin/router");
-const { createRequestId } = require("./admin/http");
+const { createRequestId, sendCaughtError, sendData, sendError } = require("./shared/http");
 const { createStorefrontService } = require("./modules/storefront/service");
 const { createStorefrontRouter } = require("./modules/storefront/router");
 
@@ -15,13 +15,6 @@ const runtimeState = {
   startupMessage: ""
 };
 
-function sendError(res, message, statusCode = 500) {
-  res.status(statusCode).json({
-    success: false,
-    message
-  });
-}
-
 function setRuntimeState(nextState = {}) {
   runtimeState.ready = typeof nextState.ready === "boolean" ? nextState.ready : runtimeState.ready;
   runtimeState.startupPhase = String(nextState.startupPhase || runtimeState.startupPhase || "ready");
@@ -29,6 +22,9 @@ function setRuntimeState(nextState = {}) {
 }
 
 const storefrontService = createStorefrontService();
+
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "http://127.0.0.1:3000,http://localhost:3000")
+  .split(",").map((s) => s.trim()).filter(Boolean);
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -40,9 +36,21 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  const origin = req.headers.origin || "";
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Session-Token, X-Admin-Token");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -57,15 +65,8 @@ storefrontService.bootstrap();
 app.use("/admin-console", express.static(path.join(__dirname, "../public/admin-console")));
 
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    data: {
-      ok: runtimeState.ready,
-      service: "wechat-mini-shop-server",
-      storefrontRepositoryMode: storefrontService.getRepositoryMode(),
-      startupPhase: runtimeState.startupPhase,
-      startupMessage: runtimeState.startupMessage
-    }
+  sendData(res, { ok: runtimeState.ready }, {
+    requestId: req.requestId
   });
 });
 
@@ -75,7 +76,10 @@ app.use((req, res, next) => {
     return;
   }
 
-  sendError(res, runtimeState.startupMessage || "服务启动中，请稍后再试。", 503);
+  sendError(res, runtimeState.startupMessage || "服务启动中，请稍后再试。", {
+    statusCode: 503,
+    requestId: req.requestId
+  });
 });
 
 app.use(createStorefrontRouter({
@@ -84,7 +88,21 @@ app.use(createStorefrontRouter({
 app.use(adminRouter);
 
 app.use((req, res) => {
-  sendError(res, "接口不存在", 404);
+  sendError(res, "接口不存在", {
+    statusCode: 404,
+    requestId: req.requestId
+  });
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  sendCaughtError(res, error, {
+    requestId: req.requestId
+  });
 });
 
 function startServer(port = DEFAULT_PORT) {
