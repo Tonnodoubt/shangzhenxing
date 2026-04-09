@@ -18,8 +18,10 @@
 和“项目现在做到哪、接下来先做什么”相关。
 
 - [project-status-snapshot.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/project-status-snapshot.md)
+- [go-live-support-checklist.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/go-live-support-checklist.md)
 - [feature-status-matrix.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/feature-status-matrix.md)
 - [code-health-audit.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/code-health-audit.md)
+- [repo-structure-naming.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/repo-structure-naming.md)
 
 ### `setup/`
 
@@ -27,6 +29,7 @@
 
 - [tech-stack.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/tech-stack.md)
 - [environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/environment-variables.md)
+- [cloud-hosting-sop.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/cloud-hosting-sop.md)
 - [cloud-hosting-deployment.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/cloud-hosting-deployment.md)
 - [frontend-regression-checklist.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/frontend-regression-checklist.md)
 
@@ -51,7 +54,9 @@
 ## 推荐阅读顺序
 
 1. 先看当前状态：[current/project-status-snapshot.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/project-status-snapshot.md)
-2. 需要落环境时看：[setup/environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/environment-variables.md)
-3. 需要上云时看：[setup/cloud-hosting-deployment.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/cloud-hosting-deployment.md)
-4. 需要讨论首发边界时看：[product/product-blueprint-roadmap.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/product/product-blueprint-roadmap.md)
-5. 需要继续补分销时看：[growth/distribution-production-checklist.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/growth/distribution-production-checklist.md)
+2. 需要判断离正式上线还差什么时看：[current/go-live-support-checklist.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/current/go-live-support-checklist.md)
+3. 需要落环境时看：[setup/environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/environment-variables.md)
+4. 需要上云时先看：[setup/cloud-hosting-sop.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/cloud-hosting-sop.md)
+5. 需要看部署原理和边界时再看：[setup/cloud-hosting-deployment.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/cloud-hosting-deployment.md)
+6. 需要讨论首发边界时看：[product/product-blueprint-roadmap.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/product/product-blueprint-roadmap.md)
+7. 需要继续补分销时看：[growth/distribution-production-checklist.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/growth/distribution-production-checklist.md)

@@ -1,6 +1,6 @@
 # 环境变量梳理
 
-更新时间：2026-04-07
+更新时间：2026-04-08
 
 这份文档只回答一件事：
 
@@ -19,7 +19,7 @@
 1. 服务端环境变量
 
 - 位置：`server/.env` 或云托管环境变量面板
-- 作用：控制后端端口、数据库、数据源模式、真实微信登录、后台管理员和云托管启动行为
+- 作用：控制后端端口、数据库、数据源模式、真实微信登录、是否允许 mock 登录、后台管理员和云托管启动行为
 
 2. 小程序端运行配置
 
@@ -42,6 +42,7 @@
 | `STOREFRONT_DATA_SOURCE` | 已使用 | 所有后端运行场景 | `memory` 或 `prisma` | 控制后端走内存仓库还是真库仓库 |
 | `WECHAT_APP_ID` | 已使用 | 真实微信登录 | 空字符串 | `wx.login -> code2Session` 所需的小程序 AppID |
 | `WECHAT_APP_SECRET` | 已使用 | 真实微信登录 | 空字符串 | `wx.login -> code2Session` 所需的小程序密钥 |
+| `ALLOW_MOCK_WECHAT_LOGIN` | 已使用 | 本地调试、云托管生产建议显式配置 | `true` / `false` | 控制 `/api/auth/session` 是否还允许 `mock_wechat` 登录 |
 | `ADMIN_USERS` | 已使用 | `NODE_ENV=production` 的后台登录 | `'[{"id":"admin-1",...}]'` | 生产环境后台账号与角色；未配置会直接阻止生产启动 |
 | `CORS_ORIGINS` | 已使用 | 需要浏览器跨域访问接口时 | `https://admin.example.com` | API 允许跨域的来源白名单，多个用逗号分隔 |
 | `ADMIN_SESSION_TTL_MS` | 已使用 | 可选 | `28800000` | 后台登录态有效期，默认 8 小时 |
@@ -58,8 +59,8 @@
 | `apiBaseUrl` | `miniprogram/config/env.js` | `http://127.0.0.1:3000` | 本地端口变化时修改 | 仅在 `requestTransport="http"` 时生效 |
 | `requestTimeout` | `miniprogram/config/env.js` | `8000` | 一般不用改 | 请求超时毫秒数 |
 | `enableRequestDebug` | `miniprogram/config/env.js` | `false` | 本地排查请求时可临时改成 `true` | 是否打印请求调试日志 |
-| `cloud.env` | `miniprogram/config/env.js` | `"shangzhenxing-7guu17m1a644fd92"` | 切换云环境时修改 | 云环境 ID |
-| `cloud.service` | `miniprogram/config/env.js` | `"mini-shop-api04"` | 云托管服务名变化时修改 | 当前请求层会通过 `X-WX-SERVICE` 定位云托管服务 |
+| `cloud.env` | `miniprogram/config/env.js` | `"shangzhenxing-9gcnl5k01ed8de51"` | 切换云环境时修改 | 云环境 ID |
+| `cloud.service` | `miniprogram/config/env.js` | `"shangzhenxing"` | 云托管服务名变化时修改 | 当前请求层会通过 `X-WX-SERVICE` 定位云托管服务 |
 | `cloud.path` | `miniprogram/config/env.js` | `"/api"` | 一般保持默认 | 容器调用的基础路径 |
 
 ## 每个服务端变量怎么理解
@@ -168,6 +169,36 @@ STOREFRONT_DATA_SOURCE=prisma
 
 - 这是服务端密钥，不应该写进小程序端代码
 - 只应该放在 `server/.env` 或云托管环境变量面板
+
+### `ALLOW_MOCK_WECHAT_LOGIN`
+
+当前用途：
+
+- `server/src/repositories/storefront/session-login.js`
+- `server/src/modules/storefront/router.js`
+
+什么时候建议填：
+
+- 本地如果要继续保留演示登录，建议显式写 `true`
+- 云托管生产建议显式写 `false`
+
+默认行为：
+
+- 非 `production` 环境默认允许 `mock_wechat`
+- `production` 环境默认关闭 `mock_wechat`
+
+推荐值：
+
+```bash
+ALLOW_MOCK_WECHAT_LOGIN=true
+ALLOW_MOCK_WECHAT_LOGIN=false
+```
+
+补充说明：
+
+- 当它为 `false` 时，`/api/auth/session` 会拒绝 `mock_wechat` 登录，并默认走 `wechat_miniprogram`
+- 当前仓库已补了 `GET /api/auth/login-readiness`
+- 这个接口可以直接检查“真实微信登录是否已配置”和“mock 登录是否已关闭”
 
 ### `NODE_ENV`
 
@@ -285,6 +316,7 @@ DATABASE_TCP_PROBE_TIMEOUT_MS=2000
 ```bash
 PORT=3000
 STOREFRONT_DATA_SOURCE=memory
+ALLOW_MOCK_WECHAT_LOGIN=true
 ```
 
 `DATABASE_URL`：
@@ -295,6 +327,7 @@ STOREFRONT_DATA_SOURCE=memory
 
 - `WECHAT_APP_ID` 不填
 - `WECHAT_APP_SECRET` 不填
+- `ALLOW_MOCK_WECHAT_LOGIN=true`
 
 小程序配置建议：
 
@@ -320,6 +353,7 @@ PORT=3000
 STOREFRONT_DATA_SOURCE=prisma
 WECHAT_APP_ID=""
 WECHAT_APP_SECRET=""
+ALLOW_MOCK_WECHAT_LOGIN=true
 ```
 
 小程序配置建议：
@@ -353,6 +387,7 @@ NODE_ENV=production
 STOREFRONT_DATA_SOURCE=prisma
 WECHAT_APP_ID="你的小程序AppID"
 WECHAT_APP_SECRET="你的小程序AppSecret"
+ALLOW_MOCK_WECHAT_LOGIN=false
 ADMIN_USERS='[{"id":"admin-1","username":"admin","realName":"商城管理员","mobile":"13800000001","passwordHash":"REPLACE_WITH_BCRYPT_HASH","roleCodes":["super_admin"]}]'
 ```
 
@@ -363,8 +398,8 @@ mallDataSource: "api"
 sessionLoginMode: "wechat"
 requestTransport: "cloud"
 cloud: {
-  env: "你的云环境ID",
-  service: "你的云托管服务名",
+  env: "shangzhenxing-9gcnl5k01ed8de51",
+  service: "shangzhenxing",
   path: "/api"
 }
 ```
@@ -373,7 +408,10 @@ cloud: {
 
 - 当前请求层会实际读取 `cloud.env`、`cloud.service` 和 `cloud.path`
 - `cloud.service` 必须和云托管控制台里的服务名称保持一致
+- 当前仓库里的示例值已经按现在线上配置写成 `shangzhenxing-9gcnl5k01ed8de51 / shangzhenxing`
+- 如果你后面改了服务名或切了云环境，这里也要一起改，不然小程序会请求到错误服务
 - 如果准备生产变量，优先从 `server/.env.cloud.example` 开始整理
+- 服务部署后，可以先访问 `GET /api/auth/login-readiness`；理想返回应是 `wechatMiniProgram.configured=true`、`mockWechat.enabled=false`
 
 ## 当前推荐的变量收口方式
 
@@ -389,6 +427,7 @@ PORT=3000
 STOREFRONT_DATA_SOURCE=memory
 WECHAT_APP_ID=""
 WECHAT_APP_SECRET=""
+ALLOW_MOCK_WECHAT_LOGIN=true
 ```
 
 ### 2. 小程序运行配置继续显式放在 `miniprogram/config/env.js`
@@ -426,7 +465,7 @@ WECHAT_APP_SECRET=""
 最小交付标准可以很简单：
 
 1. 确认本地 `server/.env` 的最终模板
-2. 确认未来云托管必须填写的 7 个服务端变量
+2. 确认未来云托管必须填写的 8 个服务端变量
 3. 确认小程序正式切云时 `miniprogram/config/env.js` 需要改哪 5 个字段
 
 建议按下面理解：

@@ -1,6 +1,12 @@
 # 微信云托管部署说明
 
+更新时间：2026-04-08
+
 这份说明只讲“真实部署”下该怎么理解当前项目，不再把小程序前台和后端混在一起。
+
+如果你现在只想照着步骤直接部署，先看：
+
+- [cloud-hosting-sop.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/cloud-hosting-sop.md)
 
 补一句当前最容易混淆的边界：
 
@@ -32,23 +38,25 @@
 - Prisma 数据模型：[server/prisma/schema.prisma](/Users/tongqianqiu/store/wechat-mini-shop/server/prisma/schema.prisma)
 - 首版迁移脚本：[migration.sql](/Users/tongqianqiu/store/wechat-mini-shop/server/prisma/migrations/20260329132000_init/migration.sql)
 - 环境变量示例：[server/.env.example](/Users/tongqianqiu/store/wechat-mini-shop/server/.env.example)
+- 云托管变量模板：[server/.env.cloud.example](/Users/tongqianqiu/store/wechat-mini-shop/server/.env.cloud.example)
 
 ## 当前真实状态
 
 这部分很重要，先说清楚现在到底到了哪一步：
 
 - 后端已经支持 `memory` 和 `prisma` 两种 storefront 数据源
-- 当前默认仍是 `memory`
-- `GET /health` 会返回当前的 `storefrontRepositoryMode`
+- 服务端如果不显式配置 `STOREFRONT_DATA_SOURCE`，默认仍会回到 `memory`
+- 当前云托管主线应该明确按 `prisma` 来配
+- `GET /health` 当前只返回 `ok`，不要再按旧口径找 `storefrontRepositoryMode`
 - Prisma 仓库已经不是空骨架，前台用户态主模块已补齐
-- 登录态基础设施第一批也已补上：`/api/auth/session`、`/api/me`、`/api/auth/logout`
-- `wx.login + code2Session` 的代码路径也已经预埋好，但默认开关仍保持 `mock`
-- 真实云上 `DATABASE_URL` 还没有，所以现在还不能正式切到真库模式
+- 登录态接口已经落地：`/api/auth/session`、`/api/me`、`/api/auth/logout`
+- 小程序仓库当前配置已经是 `sessionLoginMode=wechat`、`requestTransport=cloud`
+- 云上是否已有真实 `DATABASE_URL`，取决于你当前环境，不再默认假设“还没有”
 
 也就是说：
 
 - 真实部署路径已经铺好了
-- 但当前运行中的演示环境，仍然是以内存态数据为主
+- 但本地演示和云上正式配置，仍然要分开理解
 
 ## 真实部署时的建议顺序
 
@@ -67,6 +75,7 @@
    `STOREFRONT_DATA_SOURCE=prisma`
    `WECHAT_APP_ID`
    `WECHAT_APP_SECRET`
+   `ALLOW_MOCK_WECHAT_LOGIN=false`
    `ADMIN_USERS`
 
    按需补：
@@ -81,13 +90,20 @@
    当前容器启动命令已经配置为：
    `npm run start:cloud`
 
-4. 让小程序前台改走云托管调用
+   部署后建议先做一个不依赖登录态的自检：
+   `GET /api/auth/login-readiness`
+   期望结果是：
+   `wechatMiniProgram.configured=true`
+   `mockWechat.enabled=false`
+
+4. 确认小程序前台走云托管调用
    文件：[env.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/config/env.js)
 
    更完整的配置收口可参考：
    [environment-variables.md](/Users/tongqianqiu/store/wechat-mini-shop/docs/setup/environment-variables.md)
 
    需要确认：
+   `sessionLoginMode=wechat`
    `requestTransport=cloud`
    `cloud.env`
    `cloud.service`
@@ -96,6 +112,11 @@
    说明：
    当前请求层实际读取的是 `cloud.env`、`cloud.service` 和 `cloud.path`；
    其中 `cloud.service` 必须和云托管控制台里的服务名称完全一致。
+
+   当前仓库里的示例值是：
+   `cloud.env=shangzhenxing-9gcnl5k01ed8de51`
+   `cloud.service=shangzhenxing`
+   `cloud.path=/api`
 
 5. 小程序里继续通过 `wx.cloud.callContainer` 请求后端
    当前这条能力已经在请求层预留好了：
@@ -199,8 +220,8 @@
 
 - 结构上已经具备“真实部署骨架”
 - 核心商城数据和前台用户态主模块已有 Prisma 实现
-- 但默认运行模式仍然保持 `memory`
-- 等拿到真实 `DATABASE_URL` 后，再把 `STOREFRONT_DATA_SOURCE=prisma`
+- 本地演示仍可保留 `memory`
+- 云托管正式链路建议直接使用 `STOREFRONT_DATA_SOURCE=prisma`
 
 ## 以后拿到云上数据库连接串时，要准备哪些信息
 
@@ -220,7 +241,7 @@ DATABASE_URL="mysql://用户名:密码@主机:端口/数据库名"
 
 如果云上数据库要求 SSL，再额外补对应连接参数。
 
-## 未来真正切到 Prisma 模式时怎么切
+## 云托管按 Prisma 跑时怎么配
 
 1. 把云上 MySQL 的真实连接串填进 `DATABASE_URL`
 2. 在云托管环境变量里把 `STOREFRONT_DATA_SOURCE` 改成 `prisma`
@@ -228,12 +249,13 @@ DATABASE_URL="mysql://用户名:密码@主机:端口/数据库名"
 4. 让容器启动时执行 `prisma migrate deploy`
 5. 配置 `WECHAT_APP_ID / WECHAT_APP_SECRET`
 6. 配置 `ADMIN_USERS`
-7. 把小程序 `miniprogram/config/env.js` 里的 `sessionLoginMode` 改成 `wechat`
-8. 部署后先访问 `/health`，确认服务已经返回 `ok: true`
+7. 确认小程序 `miniprogram/config/env.js` 里仍是 `sessionLoginMode=wechat`
+8. 部署后先访问 `/health`，确认服务返回 `ok: true`
+9. 再检查 `/admin-console/` 能打开，并用小程序实际走一遍商品到下单链路
 
-在这之前，继续保持 `memory` 就行，不会影响你现在的小程序联调。
+如果你暂时还没切云托管正式库，本地或演示环境继续保持 `memory` 也可以。
 
-## 现在没有 DATABASE_URL 时，应该怎么继续
+## 如果现在还没有 DATABASE_URL，应该怎么继续
 
 当前最稳的做法不是停下来等，而是继续做这些不依赖云上连接串的工作：
 
@@ -241,7 +263,7 @@ DATABASE_URL="mysql://用户名:密码@主机:端口/数据库名"
 2. 重点回归优惠券、售后、分销相关 Prisma 链路
 3. 验证 Prisma 的 `user_sessions`
 4. 补上 `WECHAT_APP_ID / WECHAT_APP_SECRET`
-5. 再把小程序 `sessionLoginMode` 从 `mock` 改成 `wechat`
+5. 确认小程序 `sessionLoginMode` 已切到 `wechat`
 6. 在真正上云前，继续保留 `memory` 作为稳定演示兜底
 
 这样你既不会偏离真实上线路线，也不会因为云资源还没就位就卡住。
