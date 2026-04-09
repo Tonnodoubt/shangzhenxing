@@ -1,7 +1,36 @@
 const mallService = require("../../services/mall-client");
 
+const MAX_QUANTITY = 99;
+
+function hasFiniteStock(value) {
+  return value !== "" && value !== null && typeof value !== "undefined" && Number.isFinite(Number(value));
+}
+
+function normalizeCartItem(item = {}) {
+  const availableStock = hasFiniteStock(item.availableStock)
+    ? Math.max(0, Number(item.availableStock))
+    : null;
+  const maxQuantity = hasFiniteStock(availableStock)
+    ? Math.max(0, Math.min(MAX_QUANTITY, availableStock))
+    : MAX_QUANTITY;
+  const canIncrease = maxQuantity > 0 && Number(item.quantity || 0) < maxQuantity;
+  let stockHint = "";
+
+  if (hasFiniteStock(availableStock)) {
+    stockHint = availableStock > 0 ? `库存仅剩 ${availableStock} 件` : "当前规格已售罄";
+  }
+
+  return {
+    ...item,
+    availableStock,
+    maxQuantity,
+    canIncrease,
+    stockHint
+  };
+}
+
 function buildCartViewModel(payload = {}) {
-  const cartItems = payload.cartItems || [];
+  const cartItems = (payload.cartItems || []).map((item) => normalizeCartItem(item));
 
   return {
     ...payload,
@@ -75,8 +104,17 @@ Page({
       return;
     }
 
-    const { id, spec } = event.currentTarget.dataset;
+    const { id, spec, canIncrease, maxQuantity } = event.currentTarget.dataset;
     const cartKey = event.currentTarget.dataset.key;
+
+    if (canIncrease === false || canIncrease === "false") {
+      const numericMaxQuantity = Number(maxQuantity || 0);
+      wx.showToast({
+        title: numericMaxQuantity > 0 ? `当前最多购买 ${numericMaxQuantity} 件` : "当前规格已售罄",
+        icon: "none"
+      });
+      return;
+    }
 
     try {
       this.setData({

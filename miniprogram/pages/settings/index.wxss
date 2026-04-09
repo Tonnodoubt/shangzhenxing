@@ -1,0 +1,126 @@
+page {
+  background: #f4f1eb;
+}
+
+.settings-shell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8f5ef 0%, #f3f0e9 100%);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 28rpx);
+}
+
+.page-block {
+  padding: 24rpx;
+}
+
+.state-card {
+  margin-top: 24rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 36rpx 28rpx;
+}
+
+.state-title {
+  display: block;
+  font-size: 34rpx;
+  color: #2f2f2f;
+  font-weight: 600;
+}
+
+.state-copy {
+  margin-top: 14rpx;
+  display: block;
+  color: #7a7a7a;
+  line-height: 1.7;
+}
+
+.retry-btn,
+.logout-btn {
+  margin: 28rpx 0 0;
+  border-radius: 999rpx;
+}
+
+.retry-btn::after,
+.logout-btn::after {
+  border: 0;
+}
+
+.retry-btn {
+  height: 84rpx;
+  line-height: 84rpx;
+  background: #fff4ee;
+  color: #bf6846;
+}
+
+.user-card {
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 26rpx;
+  display: flex;
+  align-items: center;
+}
+
+.user-avatar {
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f16f6a 0%, #dd5653 100%);
+  flex-shrink: 0;
+}
+
+.user-meta {
+  margin-left: 22rpx;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-name {
+  display: block;
+  color: #2d2d2d;
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.user-id,
+.user-phone {
+  display: block;
+  margin-top: 8rpx;
+  color: #6b6b6b;
+  font-size: 24rpx;
+}
+
+.menu-card {
+  margin-top: 20rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 0 24rpx;
+}
+
+.menu-row {
+  min-height: 98rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1rpx solid #f1ece3;
+}
+
+.menu-row:last-child {
+  border-bottom: 0;
+}
+
+.menu-label {
+  color: #2f2f2f;
+  font-size: 28rpx;
+}
+
+.menu-value {
+  color: #a98d66;
+  font-size: 24rpx;
+}
+
+.logout-btn {
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #ca6f4b;
+  color: #ffffff;
+  font-size: 30rpx;
+}

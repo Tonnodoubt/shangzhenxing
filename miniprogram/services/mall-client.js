@@ -2,6 +2,7 @@ const envConfig = require("../config/env");
 const request = require("./request");
 const sessionStore = require("./session");
 const mockMallService = require("./mall");
+const WECHAT_PROFILE_STORAGE_KEY = "wechat-mini-shop:wechat-profile";
 
 let sessionBootstrapPromise = null;
 let pendingInviteContext = null;
@@ -54,6 +55,10 @@ function bootstrap(options = {}) {
     return;
   }
 
+  if (sessionStore.isLogoutLocked && sessionStore.isLogoutLocked()) {
+    return;
+  }
+
   ensureApiSession().catch((error) => {
     console.warn("[mall-session][bootstrap-fail]", error && error.message ? error.message : error);
   });
@@ -91,6 +96,18 @@ function getSessionLoginModeSummary() {
   };
 }
 
+function getDefaultLoginReadiness() {
+  return {
+    wechatMiniProgram: {
+      enabled: getSessionLoginMode() === "wechat",
+      configured: false
+    },
+    mockWechat: {
+      enabled: true
+    }
+  };
+}
+
 function runWeChatLogin() {
   return new Promise((resolve, reject) => {
     if (typeof wx === "undefined" || typeof wx.login !== "function") {
@@ -116,8 +133,12 @@ function runWeChatLogin() {
   });
 }
 
+function getPendingInvitePayload() {
+  return pendingInviteContext || {};
+}
+
 async function buildSessionCreatePayload() {
-  const inviteContext = pendingInviteContext || {};
+  const inviteContext = getPendingInvitePayload();
 
   if (getSessionLoginMode() === "wechat") {
     return {
@@ -133,20 +154,38 @@ async function buildSessionCreatePayload() {
   };
 }
 
-async function createApiSession() {
-  const data = await request.post("/api/auth/session", await buildSessionCreatePayload(), {
+async function createApiSessionByPayload(payload = {}) {
+  const data = await request.post("/api/auth/session", payload, {
     skipAuthorization: true
   });
 
   pendingInviteContext = null;
   sessionStore.setSession(data);
+  if (sessionStore.setLogoutLock) {
+    sessionStore.setLogoutLock(false);
+  }
 
   return data;
+}
+
+async function createApiSession() {
+  return createApiSessionByPayload(await buildSessionCreatePayload());
 }
 
 async function ensureApiSession(options = {}) {
   if (!shouldUseApi()) {
     return null;
+  }
+
+  if (
+    !options.forceRefresh
+    && !sessionStore.getSessionToken()
+    && sessionStore.isLogoutLocked
+    && sessionStore.isLogoutLocked()
+  ) {
+    const error = new Error("请先登录");
+    error.code = "LOGGED_OUT";
+    throw error;
   }
 
   if (!options.forceRefresh && sessionStore.getSessionToken()) {
@@ -165,6 +204,25 @@ async function ensureApiSession(options = {}) {
   }
 
   return sessionBootstrapPromise;
+}
+
+async function refreshSession(options = {}) {
+  if (!shouldUseApi()) {
+    mockMallService.bootstrap();
+    return null;
+  }
+
+  if (options.clearStoredSession !== false) {
+    sessionStore.clearSession();
+  }
+
+  if (sessionStore.setLogoutLock) {
+    sessionStore.setLogoutLock(false);
+  }
+
+  return ensureApiSession({
+    forceRefresh: true
+  });
 }
 
 async function callApi(method, url, data, options = {}) {
@@ -203,6 +261,15 @@ function apiPut(url, data, options = {}) {
 
 function apiDelete(url, data, options = {}) {
   return callApi("del", url, data, options);
+}
+
+function getLoginReadiness() {
+  return dispatch(
+    () => Promise.resolve(getDefaultLoginReadiness()),
+    () => request.get("/api/auth/login-readiness", {}, {
+      skipAuthorization: true
+    })
+  );
 }
 
 function normalizeOrderPageData(payload) {
@@ -451,21 +518,42 @@ function getUser() {
   return dispatch(
     () => mockMallService.getUser(),
     async () => {
-      const data = await apiGet("/api/me");
-      return data.user || {};
+      try {
+        const data = await apiGet("/api/me");
+        return data.user || {};
+      } catch (error) {
+        if (error && error.code === "LOGGED_OUT") {
+          return {
+            id: "",
+            nickname: "",
+            phone: "",
+            isAuthorized: false
+          };
+        }
+
+        throw error;
+      }
     }
   );
 }
 
-function authorizeUser() {
+function authorizeUser(payload = {}) {
   return dispatch(
-    () => mockMallService.authorizeUser(),
-    () => apiPost("/api/auth/authorize")
+    () => mockMallService.authorizeUser(payload),
+    () => apiPost("/api/auth/authorize", payload || {})
   );
 }
 
 async function logout() {
   if (!shouldUseApi()) {
+    if (sessionStore.setLogoutLock) {
+      sessionStore.setLogoutLock(true);
+    }
+    try {
+      wx.removeStorageSync(WECHAT_PROFILE_STORAGE_KEY);
+    } catch (error) {
+      console.warn("[mall-session][clear-wechat-profile-fail]", error && error.message ? error.message : error);
+    }
     return { ok: true };
   }
 
@@ -475,13 +563,47 @@ async function logout() {
     });
   } finally {
     sessionStore.clearSession();
+    if (sessionStore.setLogoutLock) {
+      sessionStore.setLogoutLock(true);
+    }
+    try {
+      wx.removeStorageSync(WECHAT_PROFILE_STORAGE_KEY);
+    } catch (error) {
+      console.warn("[mall-session][clear-wechat-profile-fail]", error && error.message ? error.message : error);
+    }
   }
 }
 
 function getProfileData() {
   return dispatch(
     () => mockMallService.getProfileData(),
-    () => apiGet("/api/profile")
+    async () => {
+      try {
+        return await apiGet("/api/profile");
+      } catch (error) {
+        if (error && error.code === "LOGGED_OUT") {
+          return {
+            user: {
+              id: "",
+              nickname: "",
+              phone: "",
+              isAuthorized: false
+            },
+            address: {},
+            coupons: [],
+            distributor: {
+              pendingCommission: 0,
+              totalCommission: 0,
+              todayIncome: 0,
+              todayCommission: 0,
+              todayEarning: 0
+            }
+          };
+        }
+
+        throw error;
+      }
+    }
   );
 }
 
@@ -518,6 +640,8 @@ function getPosterData() {
 module.exports = {
   bootstrap,
   captureEntryContext,
+  refreshSession,
+  getLoginReadiness,
   getSessionLoginMode,
   getSessionLoginModeSummary,
   getAddresses,

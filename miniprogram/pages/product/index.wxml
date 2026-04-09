@@ -82,9 +82,9 @@
       <view class="quantity-row">
         <view class="quantity-button {{quantity <= 1 ? 'quantity-button-disabled' : ''}}" bindtap="decreaseQuantity">-</view>
         <text class="quantity-value">{{quantity}}</text>
-        <view class="quantity-button quantity-button-active {{quantity >= 99 ? 'quantity-button-disabled' : ''}}" bindtap="increaseQuantity">+</view>
+        <view class="quantity-button quantity-button-active {{quantity >= maxQuantity ? 'quantity-button-disabled' : ''}}" bindtap="increaseQuantity">+</view>
       </view>
-      <text class="detail-block-copy">当前单次最多先买 99 件，避免误操作。</text>
+      <text class="detail-block-copy">{{quantityHint}}</text>
     </view>
 
     <view class="panel detail-block">

@@ -42,6 +42,7 @@
                 </text>
               </view>
               <text class="cart-spec">{{item.specText}}</text>
+              <text class="cart-spec" wx:if="{{item.stockHint}}">{{item.stockHint}}</text>
               <view class="cart-bottom">
                 <view class="quantity-row">
                   <view
@@ -55,10 +56,12 @@
                   </view>
                   <text class="quantity-value">{{item.quantity}}</text>
                   <view
-                    class="quantity-button quantity-button-active {{loadingCartKey === item.cartKey ? 'quantity-button-disabled' : ''}}"
+                    class="quantity-button quantity-button-active {{loadingCartKey === item.cartKey || !item.canIncrease ? 'quantity-button-disabled' : ''}}"
                     data-id="{{item.id}}"
                     data-key="{{item.cartKey}}"
                     data-spec="{{item.specText}}"
+                    data-can-increase="{{item.canIncrease}}"
+                    data-max-quantity="{{item.maxQuantity}}"
                     bindtap="increaseQuantity"
                   >
                     +

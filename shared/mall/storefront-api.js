@@ -504,11 +504,14 @@ function createStorefrontApi(deps) {
     return cloneData(getState().user);
   }
 
-  function authorizeUser() {
+  function authorizeUser(payload = {}) {
+    const phoneNumber = String(payload.phoneNumber || "").trim();
+
     return withState((state) => {
       state.user = {
         ...state.user,
         nickname: state.user.nickname || "微信用户",
+        phone: phoneNumber || state.user.phone || "138****6699",
         isAuthorized: true
       };
 

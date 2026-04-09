@@ -495,12 +495,17 @@ function createStorefrontApi(deps) {
     return cloneData(getState().user);
   }
 
-  function authorizeUser() {
+  function authorizeUser(payload = {}) {
+    const phoneNumber = String(payload.phoneNumber || "").trim();
+    const nickname = String(payload.nickname || "").trim();
+    const avatarUrl = String(payload.avatarUrl || "").trim();
+
     return withState((state) => {
       state.user = {
         ...state.user,
-        nickname: "微信用户",
-        phone: "138****6699",
+        nickname: nickname || state.user.nickname || "微信用户",
+        avatarUrl: avatarUrl || state.user.avatarUrl || "",
+        phone: phoneNumber || state.user.phone || "138****6699",
         isAuthorized: true
       };
 

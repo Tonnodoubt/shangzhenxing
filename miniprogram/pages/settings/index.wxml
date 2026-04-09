@@ -1,0 +1,51 @@
+<view class="settings-shell">
+  <view class="page-block" wx:if="{{pageState === 'loading'}}">
+    <view class="state-card">
+      <text class="state-title">设置加载中</text>
+      <text class="state-copy">正在同步账号与设置项。</text>
+    </view>
+  </view>
+
+  <view class="page-block" wx:elif="{{pageState === 'error'}}">
+    <view class="state-card">
+      <text class="state-title">设置页暂时不可用</text>
+      <text class="state-copy">{{errorMessage || '请稍后再试。'}}</text>
+      <button class="retry-btn" bindtap="retryLoad">重新加载</button>
+    </view>
+  </view>
+
+  <view class="page-block" wx:else>
+    <view class="user-card">
+      <view class="user-avatar"></view>
+      <view class="user-meta">
+        <text class="user-name">{{user.nickname || '微信用户'}}</text>
+        <text class="user-id">ID {{userIdLabel}}</text>
+        <text class="user-phone">{{phoneMasked}}</text>
+      </view>
+    </view>
+
+    <view class="menu-card">
+      <view class="menu-row" bindtap="openAddressList">
+        <text class="menu-label">收货地址管理</text>
+        <text class="menu-value">去查看</text>
+      </view>
+      <view class="menu-row" bindtap="openAuthPage">
+        <text class="menu-label">微信登录与授权</text>
+        <text class="menu-value">去查看</text>
+      </view>
+      <view class="menu-row" bindtap="openMessageSettings">
+        <text class="menu-label">消息通知设置</text>
+        <text class="menu-value">开发中</text>
+      </view>
+    </view>
+
+    <button
+      class="logout-btn"
+      bindtap="handleLogout"
+      loading="{{logoutSubmitting}}"
+      disabled="{{logoutSubmitting}}"
+    >
+      {{logoutSubmitting ? '退出中...' : '退出登录'}}
+    </button>
+  </view>
+</view>

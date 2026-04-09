@@ -1,5 +1,6 @@
 const SESSION_TOKEN_STORAGE_KEY = "wechat-mini-shop:session-token";
 const SESSION_EXPIRES_AT_STORAGE_KEY = "wechat-mini-shop:session-expires-at";
+const LOGOUT_LOCK_STORAGE_KEY = "wechat-mini-shop:logout-lock";
 
 function logStorageError(action, key, error) {
   console.warn("[mall-session][storage-error]", {
@@ -73,9 +74,24 @@ function clearSession() {
   safeRemoveStorageSync(SESSION_EXPIRES_AT_STORAGE_KEY);
 }
 
+function isLogoutLocked() {
+  return String(safeGetStorageSync(LOGOUT_LOCK_STORAGE_KEY) || "") === "1";
+}
+
+function setLogoutLock(locked) {
+  if (locked) {
+    safeSetStorageSync(LOGOUT_LOCK_STORAGE_KEY, "1");
+    return;
+  }
+
+  safeRemoveStorageSync(LOGOUT_LOCK_STORAGE_KEY);
+}
+
 module.exports = {
   getSessionToken,
   getSession,
   setSession,
-  clearSession
+  clearSession,
+  isLogoutLocked,
+  setLogoutLock
 };
