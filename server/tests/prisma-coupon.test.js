@@ -242,7 +242,8 @@ test("coupon method claims enabled templates once", async () => {
           }
         };
       }
-    }
+    },
+    $transaction: async (handler) => handler(prisma)
   };
   const couponModule = createCouponModule({
     getCurrentUserContext: async () => ({

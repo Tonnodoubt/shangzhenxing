@@ -10,6 +10,7 @@ function createStorefrontPrismaAdminRepository({
   formatMoney,
   getPaginationQuery,
   getStatusText,
+  restoreOrderStock,
   restoreUsedCouponForOrder,
   toNumber
 }) {
@@ -1083,6 +1084,7 @@ function createStorefrontPrismaAdminRepository({
           }
         });
 
+        await restoreOrderStock(tx, current.items);
         await restoreUsedCouponForOrder(tx, current.id);
 
         return nextOrder;

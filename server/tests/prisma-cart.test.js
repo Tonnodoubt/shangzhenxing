@@ -13,6 +13,12 @@ function buildCartPageData(cartItems = []) {
 function createCartModule(overrides = {}) {
   return createStorefrontPrismaCartModule({
     buildCartPageData,
+    createStorefrontError: (message, statusCode, code) => {
+      const error = new Error(message);
+      error.statusCode = statusCode;
+      error.code = code;
+      return error;
+    },
     getCurrentUserContext: async () => ({
       prisma: {},
       user: {
@@ -133,6 +139,24 @@ test("cart method promotes the next address when deleting the current one", asyn
 test("cart method increments existing cart items", async () => {
   let updatedPayload = null;
   const prisma = {
+    product: {
+      findUnique: async () => ({
+        id: "product-1",
+        title: "坚果礼盒",
+        price: 49.9,
+        status: "on_sale",
+        skus: [
+          {
+            id: "sku-1",
+            specText: "默认规格",
+            price: 49.9,
+            stock: 10,
+            lockStock: 0,
+            status: "enabled"
+          }
+        ]
+      })
+    },
     cart: {
       upsert: async () => ({
         id: "cart-1"
@@ -172,7 +196,8 @@ test("cart method increments existing cart items", async () => {
   const result = await cartModule.methods.addToCart("session-token", {
     id: "product-1",
     title: "坚果礼盒",
-    quantity: 2
+    quantity: 2,
+    specText: "默认规格"
   });
 
   assert.deepEqual(updatedPayload, {
@@ -180,6 +205,10 @@ test("cart method increments existing cart items", async () => {
       id: "item-1"
     },
     data: {
+      skuId: "sku-1",
+      title: "坚果礼盒",
+      specText: "默认规格",
+      price: 49.9,
       quantity: {
         increment: 2
       }
@@ -195,4 +224,54 @@ test("cart method increments existing cart items", async () => {
       }
     ]
   });
+});
+
+test("cart method rejects add to cart when requested quantity exceeds stock", async () => {
+  const cartModule = createCartModule({
+    getCurrentUserContext: async () => ({
+      prisma: {
+        product: {
+          findUnique: async () => ({
+            id: "product-2",
+            title: "现烤吐司",
+            price: 12.8,
+            status: "on_sale",
+            skus: [
+              {
+                id: "sku-2",
+                specText: "标准装",
+                price: 12.8,
+                stock: 1,
+                lockStock: 0,
+                status: "enabled"
+              }
+            ]
+          })
+        },
+        cart: {
+          upsert: async () => ({
+            id: "cart-1"
+          })
+        },
+        cartItem: {
+          findFirst: async () => null
+        }
+      },
+      user: {
+        id: "user-1"
+      }
+    })
+  });
+
+  await assert.rejects(
+    () => cartModule.methods.addToCart("session-token", {
+      id: "product-2",
+      quantity: 2,
+      specText: "标准装"
+    }),
+    (error) => {
+      assert.equal(error.code, "STOCK_INSUFFICIENT");
+      return true;
+    }
+  );
 });

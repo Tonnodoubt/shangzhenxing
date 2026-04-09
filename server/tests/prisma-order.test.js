@@ -128,6 +128,7 @@ test("order method submits order with coupon and referral snapshots", async () =
   let usedCouponUpdate = null;
   let cartSelectionCleared = false;
   let cartItemsCleared = false;
+  const decrementedSkuIds = [];
   const selectedCoupon = {
     id: "coupon-1",
     template: {
@@ -139,7 +140,6 @@ test("order method submits order with coupon and referral snapshots", async () =
   const currentCartItems = [
     {
       productId: "prod-1",
-      skuId: "sku-1",
       title: "坚果礼盒",
       specText: "默认规格",
       price: 60,
@@ -200,12 +200,10 @@ test("order method submits order with coupon and referral snapshots", async () =
       })
     },
     productSku: {
-      findUnique: async () => ({
-        id: "sku-1",
-        stock: 20,
-        lockStock: 0
-      }),
-      update: async ({ data }) => data
+      update: async ({ where, data }) => {
+        decrementedSkuIds.push(where.id);
+        return data;
+      }
     },
     orderItem: {
       create: async ({ data }) => {
@@ -214,6 +212,22 @@ test("order method submits order with coupon and referral snapshots", async () =
       }
     },
     product: {
+      findUnique: async () => ({
+        id: "prod-1",
+        title: "坚果礼盒",
+        status: "on_sale",
+        price: 60,
+        skus: [
+          {
+            id: "sku-1",
+            specText: "默认规格",
+            price: 60,
+            stock: 20,
+            lockStock: 0,
+            status: "enabled"
+          }
+        ]
+      }),
       update: async ({ data }) => data
     },
     userCoupon: {
@@ -248,6 +262,8 @@ test("order method submits order with coupon and referral snapshots", async () =
   });
   assert.equal(createdOrderItems.length, 1);
   assert.equal(createdOrderItems[0].orderId, "order-1");
+  assert.equal(createdOrderItems[0].skuId, "sku-1");
+  assert.deepEqual(decrementedSkuIds, ["sku-1"]);
   assert.equal(usedCouponUpdate.data.status, "used");
   assert.equal(cartSelectionCleared, true);
   assert.equal(cartItemsCleared, true);
@@ -255,6 +271,7 @@ test("order method submits order with coupon and referral snapshots", async () =
 
 test("order status update restores coupon when cancelling a pending order", async () => {
   let restoredOrderId = null;
+  const restoredSkuIds = [];
   const orderModule = createOrderModule({
     couponHelpers: {
       ensureCouponFeatureData: async () => {},
@@ -289,7 +306,12 @@ test("order status update restores coupon when cancelling a pending order", asyn
         status: "pending",
         address: null,
         afterSale: null,
-        items: []
+        items: [
+          {
+            skuId: "sku-9",
+            quantity: 2
+          }
+        ]
       }),
       update: async () => ({
         id: "order-2",
@@ -307,12 +329,18 @@ test("order status update restores coupon when cancelling a pending order", asyn
         afterSale: null,
         items: []
       })
+    },
+    productSku: {
+      update: async ({ where }) => {
+        restoredSkuIds.push(where.id);
+      }
     }
   };
 
   const result = await orderModule.methods.updateOrderStatus("session-token", "NO20260402002", "cancelled");
 
   assert.equal(restoredOrderId, "order-2");
+  assert.deepEqual(restoredSkuIds, ["sku-9"]);
   assert.deepEqual(result, {
     id: "NO20260402002",
     status: "cancelled"

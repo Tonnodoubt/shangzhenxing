@@ -15,6 +15,103 @@ function createStorefrontPrismaOrderModule({
   mapOrder,
   toNumber
 }) {
+  function getSellableStock(sku = {}) {
+    return Math.max(0, Number(sku.stock || 0) - Number(sku.lockStock || 0));
+  }
+
+  async function resolveOrderCartItem(tx, item = {}) {
+    const product = await tx.product.findUnique({
+      where: {
+        id: item.productId
+      },
+      include: {
+        skus: {
+          orderBy: {
+            createdAt: "asc"
+          }
+        }
+      }
+    });
+
+    if (!product) {
+      throw createStorefrontError(
+        `「${item.title || "商品"}」不存在`,
+        404,
+        "PRODUCT_NOT_FOUND"
+      );
+    }
+
+    if (product.status !== "on_sale") {
+      throw createStorefrontError(
+        `「${product.title || item.title || "商品"}」已下架`,
+        409,
+        "PRODUCT_OFF_SALE"
+      );
+    }
+
+    const enabledSkus = (product.skus || []).filter((sku) => sku.status === "enabled");
+
+    if (!enabledSkus.length) {
+      throw createStorefrontError(
+        `「${product.title || item.title || "商品"}」规格不存在`,
+        404,
+        "SKU_NOT_FOUND"
+      );
+    }
+
+    const normalizedSpecText = String(item.specText || "").trim();
+    let matchedSku = item.skuId ? enabledSkus.find((sku) => sku.id === item.skuId) : null;
+
+    if (!matchedSku && normalizedSpecText) {
+      matchedSku = enabledSkus.find((sku) => String(sku.specText || "").trim() === normalizedSpecText);
+    }
+
+    if (!matchedSku && enabledSkus.length === 1) {
+      matchedSku = enabledSkus[0];
+    }
+
+    if (!matchedSku) {
+      throw createStorefrontError(
+        `「${product.title || item.title || "商品"}」规格不存在`,
+        404,
+        "SKU_NOT_FOUND"
+      );
+    }
+
+    return {
+      ...item,
+      productId: product.id,
+      title: product.title || item.title || "",
+      skuId: matchedSku.id,
+      specText: String(matchedSku.specText || normalizedSpecText || "").trim(),
+      price: toNumber(matchedSku.price || item.price || product.price),
+      quantity: Math.max(1, Number(item.quantity || 0)),
+      product,
+      sku: matchedSku
+    };
+  }
+
+  async function restoreOrderStock(tx, orderItems = []) {
+    for (const item of orderItems) {
+      const quantity = Math.max(0, Number(item.quantity || 0));
+
+      if (!item.skuId || quantity <= 0) {
+        continue;
+      }
+
+      await tx.productSku.update({
+        where: {
+          id: item.skuId
+        },
+        data: {
+          stock: {
+            increment: quantity
+          }
+        }
+      });
+    }
+  }
+
   async function getOrderRecord(prisma, userId, orderNo) {
     return prisma.order.findFirst({
       where: {
@@ -54,6 +151,7 @@ function createStorefrontPrismaOrderModule({
   return {
     helpers: {
       getOrderRecord,
+      restoreOrderStock,
       syncPendingOrderLifecycle
     },
     methods: {
@@ -87,8 +185,29 @@ function createStorefrontPrismaOrderModule({
           const currentCartItems = await getCartItems(tx, user.id);
           const currentAddress = await getSelectedAddress(tx, user.id);
           const selectedCoupon = await couponHelpers.getSelectedCouponRecord(tx, user.id, cart);
+          const normalizedCartItems = [];
+          const remainingStockBySku = new Map();
+
+          for (const item of currentCartItems) {
+            const normalizedItem = await resolveOrderCartItem(tx, item);
+            const currentAvailableStock = remainingStockBySku.has(normalizedItem.skuId)
+              ? remainingStockBySku.get(normalizedItem.skuId)
+              : getSellableStock(normalizedItem.sku);
+
+            if (currentAvailableStock < normalizedItem.quantity) {
+              throw createStorefrontError(
+                `「${normalizedItem.title || "商品"}」库存不足`,
+                400,
+                "STOCK_INSUFFICIENT"
+              );
+            }
+
+            remainingStockBySku.set(normalizedItem.skuId, currentAvailableStock - normalizedItem.quantity);
+            normalizedCartItems.push(normalizedItem);
+          }
+
           const checkoutSummary = buildCheckoutSummary(
-            currentCartItems,
+            normalizedCartItems,
             selectedCoupon
               ? {
                   amount: toNumber((selectedCoupon.template || {}).amount),
@@ -99,7 +218,7 @@ function createStorefrontPrismaOrderModule({
           const appliedCoupon = selectedCoupon && checkoutSummary.discountAmountNumber > 0
             ? selectedCoupon
             : null;
-          const referralSnapshot = await distributionHelpers.buildOrderReferralSnapshot(tx, user, currentCartItems);
+          const referralSnapshot = await distributionHelpers.buildOrderReferralSnapshot(tx, user, normalizedCartItems);
 
           const nextOrder = await tx.order.create({
             data: {
@@ -128,36 +247,30 @@ function createStorefrontPrismaOrderModule({
           });
 
           // ── 库存校验 & 扣减 ──
-          for (const item of currentCartItems) {
+          for (const item of normalizedCartItems) {
             const qty = Number(item.quantity || 0);
 
-            if (item.skuId) {
-              const sku = await tx.productSku.findUnique({ where: { id: item.skuId } });
-
-              if (!sku || sku.stock - sku.lockStock < qty) {
-                throw createStorefrontError(
-                  `「${item.title || "商品"}」库存不足`,
-                  400,
-                  "STOCK_INSUFFICIENT"
-                );
+            await tx.productSku.update({
+              where: {
+                id: item.skuId
+              },
+              data: {
+                stock: {
+                  decrement: qty
+                }
               }
-
-              await tx.productSku.update({
-                where: { id: sku.id },
-                data: { stock: { decrement: qty } }
-              });
-            }
+            });
 
             await tx.orderItem.create({
               data: {
                 orderId: nextOrder.id,
                 productId: item.productId,
-                skuId: item.skuId || null,
+                skuId: item.skuId,
                 title: item.title,
                 specText: item.specText || "",
-                price: toNumber(item.price),
+                price: item.price,
                 quantity: qty,
-                subtotalAmount: toNumber(item.price) * qty
+                subtotalAmount: item.price * qty
               }
             });
 
@@ -316,6 +429,7 @@ function createStorefrontPrismaOrderModule({
           });
 
           if (current.status === "pending" && status === "cancelled") {
+            await restoreOrderStock(tx, current.items);
             await couponHelpers.restoreUsedCouponForOrder(tx, current.id);
           }
 

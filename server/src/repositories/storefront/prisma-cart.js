@@ -1,9 +1,74 @@
 function createStorefrontPrismaCartModule({
   buildCartPageData,
+  createStorefrontError,
   getCurrentUserContext,
   mapAddress,
   toNumber
 }) {
+  function getSellableStock(sku = {}) {
+    return Math.max(0, Number(sku.stock || 0) - Number(sku.lockStock || 0));
+  }
+
+  async function resolveCartProductSnapshot(prisma, productId, specText = "", skuId = "") {
+    const product = await prisma.product.findUnique({
+      where: {
+        id: productId
+      },
+      include: {
+        skus: {
+          orderBy: {
+            createdAt: "asc"
+          }
+        }
+      }
+    });
+
+    if (!product) {
+      throw createStorefrontError("商品不存在", 404, "PRODUCT_NOT_FOUND");
+    }
+
+    if (product.status !== "on_sale") {
+      throw createStorefrontError("商品已下架", 409, "PRODUCT_OFF_SALE");
+    }
+
+    const enabledSkus = (product.skus || []).filter((item) => item.status === "enabled");
+
+    if (!enabledSkus.length) {
+      throw createStorefrontError("商品规格不存在", 404, "SKU_NOT_FOUND");
+    }
+
+    const normalizedSpecText = String(specText || "").trim();
+    let matchedSku = skuId ? enabledSkus.find((item) => item.id === skuId) : null;
+
+    if (!matchedSku && normalizedSpecText) {
+      matchedSku = enabledSkus.find((item) => String(item.specText || "").trim() === normalizedSpecText);
+    }
+
+    if (!matchedSku && enabledSkus.length === 1) {
+      matchedSku = enabledSkus[0];
+    }
+
+    if (!matchedSku) {
+      throw createStorefrontError("所选规格不存在", 404, "SKU_NOT_FOUND");
+    }
+
+    return {
+      product,
+      sku: matchedSku,
+      specText: String(matchedSku.specText || normalizedSpecText || "").trim()
+    };
+  }
+
+  function assertCartItemStock(product, sku, nextQuantity) {
+    if (getSellableStock(sku) < nextQuantity) {
+      throw createStorefrontError(
+        `「${product.title || "商品"}」库存不足`,
+        400,
+        "STOCK_INSUFFICIENT"
+      );
+    }
+  }
+
   async function getSelectedAddress(prisma, userId) {
     return prisma.address.findFirst({
       where: {
@@ -54,6 +119,9 @@ function createStorefrontPrismaCartModule({
     return prisma.cartItem.findMany({
       where: {
         cartId: cart.id
+      },
+      include: {
+        sku: true
       },
       orderBy: [
         {
@@ -270,22 +338,24 @@ function createStorefrontPrismaCartModule({
           });
 
           for (const item of cartItems) {
-            const product = await tx.product.findUnique({
-              where: { id: item.id }
-            });
+            const quantity = Math.max(1, Number(item.quantity || 1));
+            const {
+              product,
+              sku,
+              specText
+            } = await resolveCartProductSnapshot(tx, item.id, item.specText, item.skuId);
 
-            if (!product) {
-              continue;
-            }
+            assertCartItemStock(product, sku, quantity);
 
             await tx.cartItem.create({
               data: {
                 cartId: cart.id,
                 productId: item.id,
+                skuId: sku.id,
                 title: product.title || "",
-                specText: item.specText || "",
-                price: toNumber(product.price),
-                quantity: Number(item.quantity || 1)
+                specText,
+                price: toNumber(sku.price || product.price),
+                quantity
               }
             });
           }
@@ -296,22 +366,26 @@ function createStorefrontPrismaCartModule({
       async addToCart(sessionToken, product = {}) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
         const cart = await ensureCart(prisma, user.id);
-
-        const dbProduct = await prisma.product.findUnique({
-          where: { id: product.id }
-        });
-
-        if (!dbProduct) {
-          throw Object.assign(new Error("商品不存在"), { statusCode: 404 });
-        }
+        const quantity = Math.max(1, Number(product.quantity || 1));
+        const {
+          product: dbProduct,
+          sku,
+          specText
+        } = await resolveCartProductSnapshot(prisma, product.id, product.specText, product.skuId);
 
         const existing = await prisma.cartItem.findFirst({
           where: {
             cartId: cart.id,
             productId: product.id,
-            specText: product.specText || ""
+            specText
           }
         });
+
+        assertCartItemStock(
+          dbProduct,
+          sku,
+          quantity + Number(existing ? existing.quantity || 0 : 0)
+        );
 
         if (existing) {
           await prisma.cartItem.update({
@@ -319,8 +393,12 @@ function createStorefrontPrismaCartModule({
               id: existing.id
             },
             data: {
+              skuId: sku.id,
+              title: dbProduct.title || "",
+              specText,
+              price: toNumber(sku.price || dbProduct.price),
               quantity: {
-                increment: Number(product.quantity || 1)
+                increment: quantity
               }
             }
           });
@@ -329,10 +407,11 @@ function createStorefrontPrismaCartModule({
             data: {
               cartId: cart.id,
               productId: product.id,
+              skuId: sku.id,
               title: dbProduct.title || "",
-              specText: product.specText || "",
-              price: toNumber(dbProduct.price),
-              quantity: Number(product.quantity || 1)
+              specText,
+              price: toNumber(sku.price || dbProduct.price),
+              quantity
             }
           });
         }
@@ -351,11 +430,23 @@ function createStorefrontPrismaCartModule({
         });
 
         if (item) {
+          const {
+            product,
+            sku,
+            specText: resolvedSpecText
+          } = await resolveCartProductSnapshot(prisma, productId, item.specText, item.skuId);
+
+          assertCartItemStock(product, sku, Number(item.quantity || 0) + 1);
+
           await prisma.cartItem.update({
             where: {
               id: item.id
             },
             data: {
+              skuId: sku.id,
+              title: product.title || "",
+              specText: resolvedSpecText,
+              price: toNumber(sku.price || product.price),
               quantity: {
                 increment: 1
               }

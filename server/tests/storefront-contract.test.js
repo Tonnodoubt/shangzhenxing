@@ -60,6 +60,10 @@ function createContractFixtureData() {
       skus: [
         {
           id: "sku-1",
+          price: 129,
+          originPrice: 159,
+          stock: 12,
+          lockStock: 1,
           specText: "标准装",
           status: "enabled",
           createdAt: new Date("2026-03-03T10:00:00+08:00")
@@ -85,6 +89,10 @@ function createContractFixtureData() {
       skus: [
         {
           id: "sku-2",
+          price: 88,
+          originPrice: 99,
+          stock: 10,
+          lockStock: 0,
           specText: "礼袋装",
           status: "enabled",
           createdAt: new Date("2026-03-04T10:00:00+08:00")
@@ -119,6 +127,7 @@ function createContractFixtureData() {
       id: "cart-item-1",
       cartId: "cart-1",
       productId: "prod-1",
+      skuId: "sku-1",
       title: "坚果礼盒",
       specText: "标准装",
       price: 129,
@@ -291,9 +300,21 @@ function cloneProduct(product) {
   };
 }
 
+function getSellableStock(sku = {}) {
+  return Math.max(0, Number(sku.stock || 0) - Number(sku.lockStock || 0));
+}
+
+function isSellableContractProduct(product = {}) {
+  if (product.status !== "on_sale") {
+    return false;
+  }
+
+  return (product.skus || []).some((sku) => sku.status === "enabled" && getSellableStock(sku) > 0);
+}
+
 function filterContractProducts(products, keyword = "", categoryId = "") {
   return (products || []).filter((product) => {
-    if (product.status !== "on_sale") {
+    if (!isSellableContractProduct(product)) {
       return false;
     }
 
@@ -460,6 +481,48 @@ function createContractMemorySource(fixtures, helpers) {
       .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
   }
 
+  function findProductById(productId) {
+    return state.products.find((item) => item.id === productId) || null;
+  }
+
+  function findSkuById(skuId) {
+    if (!skuId) {
+      return null;
+    }
+
+    for (const product of state.products) {
+      const matchedSku = (product.skus || []).find((item) => item.id === skuId);
+
+      if (matchedSku) {
+        return matchedSku;
+      }
+    }
+
+    return null;
+  }
+
+  function resolveCartItemSku(item = {}) {
+    const product = findProductById(item.productId);
+
+    if (!product) {
+      return null;
+    }
+
+    const enabledSkus = (product.skus || []).filter((sku) => sku.status === "enabled");
+    const normalizedSpecText = String(item.specText || "").trim();
+    let matchedSku = item.skuId ? enabledSkus.find((sku) => sku.id === item.skuId) : null;
+
+    if (!matchedSku && normalizedSpecText) {
+      matchedSku = enabledSkus.find((sku) => String(sku.specText || "").trim() === normalizedSpecText);
+    }
+
+    if (!matchedSku && enabledSkus.length === 1) {
+      matchedSku = enabledSkus[0];
+    }
+
+    return matchedSku || null;
+  }
+
   function getHydratedOrder(order) {
     if (!order) {
       return null;
@@ -500,7 +563,7 @@ function createContractMemorySource(fixtures, helpers) {
     getProductDetail(productId) {
       const product = state.products.find((item) => item.id === productId);
 
-      return product ? helpers.mapProduct(cloneProduct(product)) : null;
+      return product && isSellableContractProduct(product) ? helpers.mapProduct(cloneProduct(product)) : null;
     },
     getAddressListData() {
       const selectedAddress = getSelectedAddress();
@@ -627,16 +690,23 @@ function createContractMemorySource(fixtures, helpers) {
 
       state.orders.unshift(nextOrder);
       state.cartItems.forEach((item) => {
+        const matchedSku = resolveCartItemSku(item);
+        const linePrice = matchedSku ? helpers.toNumber(matchedSku.price || item.price) : helpers.toNumber(item.price);
+
+        if (matchedSku) {
+          matchedSku.stock = Math.max(0, Number(matchedSku.stock || 0) - Number(item.quantity || 0));
+        }
+
         state.orderItems.push({
           id: `order-item-${orderItemCounter++}`,
           orderId: nextOrder.id,
           productId: item.productId,
-          skuId: null,
+          skuId: matchedSku ? matchedSku.id : (item.skuId || null),
           title: item.title,
-          specText: item.specText || "",
-          price: item.price,
+          specText: matchedSku ? String(matchedSku.specText || item.specText || "").trim() : (item.specText || ""),
+          price: linePrice,
           quantity: item.quantity,
-          subtotalAmount: helpers.toNumber(item.price) * Number(item.quantity || 0),
+          subtotalAmount: linePrice * Number(item.quantity || 0),
           createdAt: new Date()
         });
       });
@@ -698,6 +768,14 @@ function createContractMemorySource(fixtures, helpers) {
       order.status = nextStatus;
 
       if (nextStatus === "cancelled") {
+        getOrderItems(order.id).forEach((item) => {
+          const matchedSku = findSkuById(item.skuId);
+
+          if (matchedSku) {
+            matchedSku.stock = Number(matchedSku.stock || 0) + Number(item.quantity || 0);
+          }
+        });
+
         state.userCoupons.forEach((item) => {
           if (item.usedOrderId === order.id && item.status === "used") {
             item.status = "available";
@@ -1172,6 +1250,10 @@ function createContractPrisma(fixtures) {
 
           if (data.stock && typeof data.stock.decrement === "number") {
             sku.stock = Number(sku.stock || 0) - data.stock.decrement;
+          }
+
+          if (data.stock && typeof data.stock.increment === "number") {
+            sku.stock = Number(sku.stock || 0) + data.stock.increment;
           }
 
           Object.assign(sku, Object.keys(data || {}).reduce((result, key) => {

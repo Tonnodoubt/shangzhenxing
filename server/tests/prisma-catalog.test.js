@@ -36,7 +36,17 @@ function createCatalogModule(overrides = {}) {
 test("catalog method builds home payload from mapped products", async () => {
   const products = Array.from({ length: 6 }, (_, index) => ({
     id: `product-${index + 1}`,
-    title: `商品 ${index + 1}`
+    title: `商品 ${index + 1}`,
+    status: "on_sale",
+    skus: [
+      {
+        id: `sku-${index + 1}`,
+        specText: "默认规格",
+        stock: 5,
+        lockStock: 0,
+        status: "enabled"
+      }
+    ]
   }));
   const catalogModule = createCatalogModule({
     getPrisma: async () => ({
@@ -119,6 +129,37 @@ test("catalog method returns null when product detail is missing", async () => {
   const catalogModule = createCatalogModule();
 
   const result = await catalogModule.methods.getProductDetail("missing-product");
+
+  assert.equal(result, null);
+});
+
+test("catalog method hides sold out product detail", async () => {
+  const catalogModule = createCatalogModule({
+    getPrisma: async () => ({
+      product: {
+        findMany: async () => [],
+        findUnique: async () => ({
+          id: "product-9",
+          title: "售罄商品",
+          status: "on_sale",
+          skus: [
+            {
+              id: "sku-9",
+              specText: "默认规格",
+              stock: 1,
+              lockStock: 1,
+              status: "enabled"
+            }
+          ]
+        })
+      },
+      category: {
+        findMany: async () => []
+      }
+    })
+  });
+
+  const result = await catalogModule.methods.getProductDetail("product-9");
 
   assert.equal(result, null);
 });
