@@ -208,12 +208,32 @@ async function requestJson(pathname, options = {}) {
 
   return {
     status: response.status,
-    payload
+    payload,
+    setCookies: typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : []
   };
 }
 
+function assertOkEnvelope(payload) {
+  assert.equal(payload.code, 0);
+  assert.ok(payload.requestId);
+}
+
+function assertErrorEnvelope(payload) {
+  assert.notEqual(payload.code, 0);
+  assert.equal(payload.data, null);
+  assert.ok(payload.requestId);
+}
+
+function getCookieHeader(setCookies = [], cookieName) {
+  return (setCookies || [])
+    .map((item) => String(item || "").split(";")[0].trim())
+    .find((item) => item.startsWith(`${cookieName}=`)) || "";
+}
+
 async function createAdminSession(credentials = {}) {
-  const { status, payload } = await requestJson("/admin/v1/auth/login", {
+  const { status, payload, setCookies } = await requestJson("/admin/v1/auth/login", {
     method: "POST",
     body: {
       username: credentials.username || "admin",
@@ -222,10 +242,13 @@ async function createAdminSession(credentials = {}) {
   });
 
   assert.equal(status, 200);
-  assert.equal(payload.code, 0);
-  assert.ok(payload.data.adminToken);
+  assertOkEnvelope(payload);
 
-  return payload.data.adminToken;
+  const adminCookie = getCookieHeader(setCookies, "admin_token");
+
+  assert.ok(adminCookie);
+
+  return adminCookie;
 }
 
 async function cleanupWechatUsers(prisma, options = {}) {
@@ -317,8 +340,8 @@ test("prisma wechat login returns 503 when app credentials are missing", async (
     });
 
     assert.equal(loginResponse.status, 503);
-    assert.equal(loginResponse.payload.success, false);
-    assert.equal(loginResponse.payload.statusCode, 503);
+    assertErrorEnvelope(loginResponse.payload);
+    assert.equal(loginResponse.payload.code, "WECHAT_LOGIN_NOT_CONFIGURED");
     assert.match(loginResponse.payload.message, /缺少 WECHAT_APP_ID 或 WECHAT_APP_SECRET/);
   } finally {
     process.env.WECHAT_APP_ID = originalAppId;
@@ -374,7 +397,7 @@ test("prisma wechat login can create and reuse users through HTTP with mocked co
     });
 
     assert.equal(firstLoginResponse.status, 201);
-    assert.equal(firstLoginResponse.payload.success, true);
+    assertOkEnvelope(firstLoginResponse.payload);
     assert.match(firstLoginResponse.payload.data.sessionToken, /^prisma_/);
     assert.equal(firstLoginResponse.payload.data.user.nickname, "微信用户");
     assert.equal(firstLoginResponse.payload.data.user.isAuthorized, false);
@@ -397,7 +420,7 @@ test("prisma wechat login can create and reuse users through HTTP with mocked co
     });
 
     assert.equal(secondLoginResponse.status, 201);
-    assert.equal(secondLoginResponse.payload.success, true);
+    assertOkEnvelope(secondLoginResponse.payload);
     assert.match(secondLoginResponse.payload.data.sessionToken, /^prisma_/);
 
     user = await prisma.user.findUnique({
@@ -431,7 +454,7 @@ test("prisma wechat login can create and reuse users through HTTP with mocked co
     });
 
     assert.equal(meResponse.status, 200);
-    assert.equal(meResponse.payload.success, true);
+    assertOkEnvelope(meResponse.payload);
     assert.equal(meResponse.payload.data.user.nickname, "微信用户");
     assert.equal(meResponse.payload.data.user.isAuthorized, false);
   } finally {
@@ -491,7 +514,7 @@ test("prisma wechat login can bind inviter on first session over HTTP", async (t
     });
 
     assert.equal(inviterLoginResponse.status, 201);
-    assert.equal(inviterLoginResponse.payload.success, true);
+    assertOkEnvelope(inviterLoginResponse.payload);
 
     const inviterUserId = inviterLoginResponse.payload.data.user.id;
 
@@ -508,7 +531,7 @@ test("prisma wechat login can bind inviter on first session over HTTP", async (t
     });
 
     assert.equal(inviteeLoginResponse.status, 201);
-    assert.equal(inviteeLoginResponse.payload.success, true);
+    assertOkEnvelope(inviteeLoginResponse.payload);
 
     const binding = await prisma.referralBinding.findUnique({
       where: {
@@ -549,8 +572,8 @@ test("prisma wechat login surfaces upstream exchange errors over HTTP", async (t
   });
 
   assert.equal(loginResponse.status, 502);
-  assert.equal(loginResponse.payload.success, false);
-  assert.equal(loginResponse.payload.statusCode, 502);
+  assertErrorEnvelope(loginResponse.payload);
+  assert.equal(loginResponse.payload.code, "WECHAT_LOGIN_FAILED");
   assert.match(loginResponse.payload.message, /微信登录 code 无效/);
 });
 
@@ -570,12 +593,12 @@ test("prisma admin can manage categories, products, and skus over HTTP", async (
   try {
     await startPrismaServer();
 
-    const adminToken = await createAdminSession();
+    const adminCookie = await createAdminSession();
 
     const createCategoryResponse = await requestJson("/admin/v1/categories", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`
+        Cookie: adminCookie
       },
       body: {
         name: categoryName,
@@ -591,7 +614,7 @@ test("prisma admin can manage categories, products, and skus over HTTP", async (
     const createProductResponse = await requestJson("/admin/v1/products", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`
+        Cookie: adminCookie
       },
       body: {
         title: productTitle,
@@ -611,7 +634,7 @@ test("prisma admin can manage categories, products, and skus over HTTP", async (
     const saveSkuResponse = await requestJson(`/admin/v1/products/${productId}/skus`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`
+        Cookie: adminCookie
       },
       body: {
         skus: [
@@ -643,7 +666,7 @@ test("prisma admin can manage categories, products, and skus over HTTP", async (
     const updateStatusResponse = await requestJson(`/admin/v1/products/${productId}/status`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${adminToken}`
+        Cookie: adminCookie
       },
       body: {
         status: "on_sale"

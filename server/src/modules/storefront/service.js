@@ -134,8 +134,13 @@ function createStorefrontService(repository = createStorefrontRepository()) {
     getProfileData(sessionToken) {
       return repository.getProfileData(requireString(sessionToken));
     },
-    authorizeUser(sessionToken) {
-      return repository.authorizeUser(requireString(sessionToken));
+    authorizeUser(sessionToken, payload = {}) {
+      return repository.authorizeUser(requireString(sessionToken), {
+        phoneCode: requireString(payload.phoneCode),
+        phoneNumber: requireString(payload.phoneNumber),
+        nickname: requireString(payload.nickname),
+        avatarUrl: requireString(payload.avatarUrl)
+      });
     },
     getDistributionData(sessionToken) {
       return repository.getDistributionData(requireString(sessionToken));

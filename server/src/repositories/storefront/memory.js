@@ -5,7 +5,9 @@ const {
   createUnauthorizedError
 } = require("../../modules/storefront/errors");
 const { ERROR_CODES } = require("../../../shared/error-codes");
-const { resolveStorefrontSessionLoginType } = require("./session-login");
+const {
+  resolveStorefrontSessionLoginType
+} = require("./session-login");
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const sessionStore = new Map();
@@ -219,8 +221,8 @@ function createStorefrontMemoryRepository(source = mallService) {
     getProfileData(sessionToken) {
       return withSession(sessionToken, () => source.getProfileData());
     },
-    authorizeUser(sessionToken) {
-      return withSession(sessionToken, () => source.authorizeUser());
+    authorizeUser(sessionToken, payload = {}) {
+      return withSession(sessionToken, () => source.authorizeUser(payload));
     },
     getDistributionData(sessionToken) {
       return withSession(sessionToken, () => source.getDistributionData());

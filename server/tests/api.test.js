@@ -60,8 +60,28 @@ async function requestJson(path, options = {}) {
 
   return {
     status: response.status,
-    payload
+    payload,
+    setCookies: typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : []
   };
+}
+
+function assertOkEnvelope(payload) {
+  assert.equal(payload.code, 0);
+  assert.ok(payload.requestId);
+}
+
+function assertErrorEnvelope(payload) {
+  assert.notEqual(payload.code, 0);
+  assert.equal(payload.data, null);
+  assert.ok(payload.requestId);
+}
+
+function getCookieHeader(setCookies = [], cookieName) {
+  return (setCookies || [])
+    .map((item) => String(item || "").split(";")[0].trim())
+    .find((item) => item.startsWith(`${cookieName}=`)) || "";
 }
 
 async function createUserSession() {
@@ -73,14 +93,14 @@ async function createUserSession() {
   });
 
   assert.equal(status, 201);
-  assert.equal(payload.success, true);
+  assertOkEnvelope(payload);
   assert.match(payload.data.sessionToken, /^memory_/);
 
   return payload.data.sessionToken;
 }
 
 async function createAdminSession(credentials = {}) {
-  const { status, payload } = await requestJson("/admin/v1/auth/login", {
+  const { status, payload, setCookies } = await requestJson("/admin/v1/auth/login", {
     method: "POST",
     body: {
       username: credentials.username || "order",
@@ -89,10 +109,13 @@ async function createAdminSession(credentials = {}) {
   });
 
   assert.equal(status, 200);
-  assert.equal(payload.code, 0);
-  assert.ok(payload.data.adminToken);
+  assertOkEnvelope(payload);
 
-  return payload.data.adminToken;
+  const adminCookie = getCookieHeader(setCookies, "admin_token");
+
+  assert.ok(adminCookie);
+
+  return adminCookie;
 }
 
 test.beforeEach(async () => {
@@ -113,7 +136,7 @@ test("session lifecycle works over HTTP", async () => {
   });
 
   assert.equal(meResponse.status, 200);
-  assert.equal(meResponse.payload.success, true);
+  assertOkEnvelope(meResponse.payload);
   assert.equal(meResponse.payload.data.user.nickname, "访客用户");
   assert.equal(meResponse.payload.data.session.status, "active");
 
@@ -136,8 +159,20 @@ test("session lifecycle works over HTTP", async () => {
   });
 
   assert.equal(expiredMeResponse.status, 401);
-  assert.equal(expiredMeResponse.payload.success, false);
+  assertErrorEnvelope(expiredMeResponse.payload);
   assert.match(expiredMeResponse.payload.message, /登录态已失效/);
+});
+
+test("login readiness exposes current wechat and mock login capabilities over HTTP", async () => {
+  const response = await requestJson("/api/auth/login-readiness");
+
+  assert.equal(response.status, 200);
+  assertOkEnvelope(response.payload);
+  assert.equal(response.payload.data.wechatMiniProgram.enabled, true);
+  assert.equal(typeof response.payload.data.wechatMiniProgram.configured, "boolean");
+  assert.equal(typeof response.payload.data.mockWechat.enabled, "boolean");
+  assert.equal(response.payload.data.mobileCode.enabled, false);
+  assert.equal(response.payload.data.accountPassword.enabled, false);
 });
 
 test("checkout and order flow works over HTTP", async () => {
@@ -150,7 +185,7 @@ test("checkout and order flow works over HTTP", async () => {
   });
 
   assert.equal(checkoutResponse.status, 200);
-  assert.equal(checkoutResponse.payload.success, true);
+  assertOkEnvelope(checkoutResponse.payload);
   assert.equal(checkoutResponse.payload.data.address.id, "addr-1");
   assert.equal(checkoutResponse.payload.data.totalCount, 1);
   assert.equal(checkoutResponse.payload.data.payableAmount, "129.00");
@@ -166,7 +201,7 @@ test("checkout and order flow works over HTTP", async () => {
   });
 
   assert.equal(submitResponse.status, 200);
-  assert.equal(submitResponse.payload.success, true);
+  assertOkEnvelope(submitResponse.payload);
   assert.equal(submitResponse.payload.data.ok, true);
   assert.equal(submitResponse.payload.data.order.status, "pending");
   assert.equal(submitResponse.payload.data.order.remark, "node test order flow");
@@ -180,7 +215,7 @@ test("checkout and order flow works over HTTP", async () => {
   });
 
   assert.equal(ordersResponse.status, 200);
-  assert.ok(ordersResponse.payload.data.some((item) => item.id === orderId));
+  assert.ok(ordersResponse.payload.data.list.some((item) => item.id === orderId));
 
   const detailResponse = await requestJson(`/api/orders/${orderId}`, {
     headers: {
@@ -222,11 +257,11 @@ test("admin fulfillment and aftersale flow works over HTTP", async () => {
   assert.equal(submitResponse.status, 200);
 
   const orderId = submitResponse.payload.data.order.id;
-  const adminToken = await createAdminSession();
+  const adminCookie = await createAdminSession();
 
   const pendingOrdersResponse = await requestJson("/admin/v1/shipments/pending-orders", {
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     }
   });
 
@@ -236,7 +271,7 @@ test("admin fulfillment and aftersale flow works over HTTP", async () => {
   const shipResponse = await requestJson(`/admin/v1/orders/${orderId}/ship`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       companyCode: "SF",
@@ -270,14 +305,14 @@ test("admin fulfillment and aftersale flow works over HTTP", async () => {
   });
 
   assert.equal(createAfterSaleResponse.status, 201);
-  assert.equal(createAfterSaleResponse.payload.success, true);
+  assertOkEnvelope(createAfterSaleResponse.payload);
   assert.equal(createAfterSaleResponse.payload.data.status, "processing");
 
   const afterSaleId = createAfterSaleResponse.payload.data.id;
 
   const afterSalesResponse = await requestJson("/admin/v1/aftersales", {
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     }
   });
 
@@ -287,7 +322,7 @@ test("admin fulfillment and aftersale flow works over HTTP", async () => {
   const reviewResponse = await requestJson(`/admin/v1/aftersales/${afterSaleId}/review`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       action: "approve",
@@ -319,7 +354,7 @@ test("coupon claim, apply, clear, and restore flow works over HTTP", async () =>
   });
 
   assert.equal(couponPageBeforeClaim.status, 200);
-  assert.equal(couponPageBeforeClaim.payload.success, true);
+  assertOkEnvelope(couponPageBeforeClaim.payload);
 
   const template = couponPageBeforeClaim.payload.data.centerTemplates.find((item) => item.id === "tpl-3");
 
@@ -473,6 +508,7 @@ test("authorize and confirm receipt sync commission data over HTTP", async () =>
   assert.equal(distributionBefore.status, 200);
   assert.equal(commissionBefore.status, 200);
 
+  const previousNickname = distributionBefore.payload.data.user.nickname;
   const previousTotalCommission = distributionBefore.payload.data.distributor.totalCommission;
   const previousPendingCommission = distributionBefore.payload.data.distributor.pendingCommission;
   const previousCommissionCount = commissionBefore.payload.data.records.length;
@@ -481,12 +517,16 @@ test("authorize and confirm receipt sync commission data over HTTP", async () =>
     method: "POST",
     headers: {
       Authorization: `Bearer ${sessionToken}`
+    },
+    body: {
+      phoneNumber: "13812345678"
     }
   });
 
   assert.equal(authorizeResponse.status, 200);
   assert.equal(authorizeResponse.payload.data.isAuthorized, true);
-  assert.equal(authorizeResponse.payload.data.nickname, "微信用户");
+  assert.equal(authorizeResponse.payload.data.nickname, previousNickname);
+  assert.equal(authorizeResponse.payload.data.phone, "13812345678");
 
   const submitResponse = await requestJson("/api/orders/submit", {
     method: "POST",
@@ -501,12 +541,12 @@ test("authorize and confirm receipt sync commission data over HTTP", async () =>
   assert.equal(submitResponse.status, 200);
 
   const orderId = submitResponse.payload.data.order.id;
-  const adminToken = await createAdminSession();
+  const adminCookie = await createAdminSession();
 
   const shipResponse = await requestJson(`/admin/v1/orders/${orderId}/ship`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       companyCode: "SF",
@@ -553,44 +593,51 @@ test("admin permissions are enforced over HTTP", async () => {
   const unauthorizedResponse = await requestJson("/admin/v1/dashboard/summary");
 
   assert.equal(unauthorizedResponse.status, 401);
+  assertErrorEnvelope(unauthorizedResponse.payload);
   assert.equal(unauthorizedResponse.payload.code, 40101);
 
-  const orderAdminToken = await createAdminSession();
+  const orderAdminCookie = await createAdminSession();
   const forbiddenProductsResponse = await requestJson("/admin/v1/products", {
     headers: {
-      Authorization: `Bearer ${orderAdminToken}`
+      Cookie: orderAdminCookie
     }
   });
 
   assert.equal(forbiddenProductsResponse.status, 403);
+  assertErrorEnvelope(forbiddenProductsResponse.payload);
   assert.equal(forbiddenProductsResponse.payload.code, 40301);
 
-  const opsAdminToken = await createAdminSession({
+  const opsAdminCookie = await createAdminSession({
     username: "ops",
     password: "Ops@123456"
   });
   const allowedProductsResponse = await requestJson("/admin/v1/products", {
     headers: {
-      Authorization: `Bearer ${opsAdminToken}`
+      Cookie: opsAdminCookie
     }
   });
 
   assert.equal(allowedProductsResponse.status, 200);
-  assert.equal(allowedProductsResponse.payload.code, 0);
+  assertOkEnvelope(allowedProductsResponse.payload);
   assert.ok(Array.isArray(allowedProductsResponse.payload.data.list));
 });
 
 test("session creation validates login mode inputs over HTTP", async () => {
-  const unsupportedLoginTypeResponse = await requestJson("/api/auth/session", {
-    method: "POST",
-    body: {
-      loginType: "email_password"
-    }
-  });
+  const unsupportedLoginTypes = ["email_password", "mobile_code", "account_password"];
 
-  assert.equal(unsupportedLoginTypeResponse.status, 400);
-  assert.equal(unsupportedLoginTypeResponse.payload.success, false);
-  assert.match(unsupportedLoginTypeResponse.payload.message, /暂不支持当前登录方式/);
+  for (const loginType of unsupportedLoginTypes) {
+    // 线上只保留微信登录；其他登录类型都要被拒绝。
+    const response = await requestJson("/api/auth/session", {
+      method: "POST",
+      body: {
+        loginType
+      }
+    });
+
+    assert.equal(response.status, 400);
+    assertErrorEnvelope(response.payload);
+    assert.match(response.payload.message, /暂不支持当前登录方式/);
+  }
 
   const missingWechatCodeResponse = await requestJson("/api/auth/session", {
     method: "POST",
@@ -600,7 +647,7 @@ test("session creation validates login mode inputs over HTTP", async () => {
   });
 
   assert.equal(missingWechatCodeResponse.status, 400);
-  assert.equal(missingWechatCodeResponse.payload.success, false);
+  assertErrorEnvelope(missingWechatCodeResponse.payload);
   assert.match(missingWechatCodeResponse.payload.message, /缺少 wx\.login 返回的 code/);
 });
 
@@ -632,7 +679,7 @@ test("submitting order with empty cart is rejected over HTTP", async () => {
   });
 
   assert.equal(submitResponse.status, 200);
-  assert.equal(submitResponse.payload.success, true);
+  assertOkEnvelope(submitResponse.payload);
   assert.equal(submitResponse.payload.data.ok, false);
   assert.equal(submitResponse.payload.data.message, "购物车为空");
 });
@@ -652,7 +699,7 @@ test("coupon threshold validation is enforced over HTTP", async () => {
   });
 
   assert.equal(selectResponse.status, 200);
-  assert.equal(selectResponse.payload.success, true);
+  assertOkEnvelope(selectResponse.payload);
   assert.equal(selectResponse.payload.data.ok, false);
   assert.equal(selectResponse.payload.data.message, "当前金额还不能用这张券");
 });
@@ -685,14 +732,14 @@ test("aftersale preconditions and duplicate submission are enforced over HTTP", 
   });
 
   assert.equal(beforeShippingAfterSaleResponse.status, 400);
-  assert.equal(beforeShippingAfterSaleResponse.payload.success, false);
+  assertErrorEnvelope(beforeShippingAfterSaleResponse.payload);
   assert.match(beforeShippingAfterSaleResponse.payload.message, /当前订单暂不可售后/);
 
-  const adminToken = await createAdminSession();
+  const adminCookie = await createAdminSession();
   const shipResponse = await requestJson(`/admin/v1/orders/${orderId}/ship`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       companyCode: "SF",
@@ -728,7 +775,7 @@ test("aftersale preconditions and duplicate submission are enforced over HTTP", 
   });
 
   assert.equal(duplicateAfterSaleResponse.status, 409);
-  assert.equal(duplicateAfterSaleResponse.payload.success, false);
+  assertErrorEnvelope(duplicateAfterSaleResponse.payload);
   assert.match(duplicateAfterSaleResponse.payload.message, /该订单已提交售后/);
 });
 
@@ -757,14 +804,14 @@ test("order status validation returns client errors over HTTP", async () => {
   });
 
   assert.equal(missingStatusResponse.status, 400);
-  assert.equal(missingStatusResponse.payload.success, false);
+  assertErrorEnvelope(missingStatusResponse.payload);
   assert.match(missingStatusResponse.payload.message, /缺少订单状态/);
 
-  const adminToken = await createAdminSession();
+  const adminCookie = await createAdminSession();
   const shipResponse = await requestJson(`/admin/v1/orders/${orderId}/ship`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       companyCode: "SF",
@@ -786,7 +833,7 @@ test("order status validation returns client errors over HTTP", async () => {
   });
 
   assert.equal(invalidCancelResponse.status, 400);
-  assert.equal(invalidCancelResponse.payload.success, false);
+  assertErrorEnvelope(invalidCancelResponse.payload);
   assert.match(invalidCancelResponse.payload.message, /当前订单不能执行这个操作/);
 });
 
@@ -794,7 +841,8 @@ test("resource lookup and admin login failures return proper status codes over H
   const missingProductResponse = await requestJson("/api/products/not-found");
 
   assert.equal(missingProductResponse.status, 404);
-  assert.equal(missingProductResponse.payload.success, false);
+  assertErrorEnvelope(missingProductResponse.payload);
+  assert.equal(missingProductResponse.payload.code, 40402);
   assert.equal(missingProductResponse.payload.message, "商品不存在");
 
   const failedAdminLoginResponse = await requestJson("/admin/v1/auth/login", {
@@ -811,7 +859,7 @@ test("resource lookup and admin login failures return proper status codes over H
 });
 
 test("admin can manage categories, products, and skus over HTTP", async () => {
-  const adminToken = await createAdminSession({
+  const adminCookie = await createAdminSession({
     username: "admin",
     password: "Admin@123456"
   });
@@ -819,7 +867,7 @@ test("admin can manage categories, products, and skus over HTTP", async () => {
   const createCategoryResponse = await requestJson("/admin/v1/categories", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       name: "联调分类",
@@ -836,7 +884,7 @@ test("admin can manage categories, products, and skus over HTTP", async () => {
   const createProductResponse = await requestJson("/admin/v1/products", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       title: "后台新商品",
@@ -858,7 +906,7 @@ test("admin can manage categories, products, and skus over HTTP", async () => {
   const updateStatusResponse = await requestJson(`/admin/v1/products/${productId}/status`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       status: "on_sale"
@@ -871,7 +919,7 @@ test("admin can manage categories, products, and skus over HTTP", async () => {
   const saveSkuResponse = await requestJson(`/admin/v1/products/${productId}/skus`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     },
     body: {
       skus: [
@@ -902,7 +950,7 @@ test("admin can manage categories, products, and skus over HTTP", async () => {
 
   const productsResponse = await requestJson(`/admin/v1/products?categoryId=${encodeURIComponent(categoryId)}`, {
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     }
   });
 
@@ -911,7 +959,7 @@ test("admin can manage categories, products, and skus over HTTP", async () => {
 
   const skusResponse = await requestJson(`/admin/v1/products/${productId}/skus`, {
     headers: {
-      Authorization: `Bearer ${adminToken}`
+      Cookie: adminCookie
     }
   });
 

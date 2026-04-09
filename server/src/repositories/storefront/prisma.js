@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { banners, quickEntries } = require("../../shared/mock");
 const { getPrismaClient } = require("../../lib/prisma");
-const { exchangeMiniProgramCode } = require("../../lib/wechat-auth");
+const { exchangeMiniProgramCode, getWechatPhoneNumber } = require("../../lib/wechat-auth");
 const { createStorefrontPrismaAdminRepository } = require("./prisma-admin");
 const { createStorefrontPrismaCartModule } = require("./prisma-cart");
 const { createStorefrontPrismaCatalogModule } = require("./prisma-catalog");
@@ -195,6 +195,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
 
   const cartModule = createStorefrontPrismaCartModule({
     buildCartPageData,
+    createStorefrontError,
     getCurrentUserContext: sessionModule.helpers.getCurrentUserContext,
     mapAddress,
     toNumber
@@ -253,6 +254,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
     couponHelpers: couponModule.helpers,
     distributionHelpers: distributionModule.helpers,
     getCurrentUserContext: sessionModule.helpers.getCurrentUserContext,
+    getWechatPhoneNumber,
     mapAddress,
     mapUser: sessionModule.helpers.mapUser,
     mapUserCoupon
@@ -279,6 +281,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
       formatMoney,
       getPaginationQuery,
       getStatusText,
+      restoreOrderStock: orderModule.helpers.restoreOrderStock,
       restoreUsedCouponForOrder: couponModule.helpers.restoreUsedCouponForOrder,
       toNumber
     })

@@ -1,6 +1,8 @@
 const express = require("express");
 const { createStorefrontService } = require("./service");
 const { sendData, sendError, wrap } = require("../../shared/http");
+const { isWechatAuthConfigured } = require("../../lib/wechat-auth");
+const { isMockWechatLoginAllowed } = require("../../repositories/storefront/session-login");
 
 function readSessionToken(req) {
   const authorization = String((req.headers || {}).authorization || "").trim();
@@ -54,6 +56,26 @@ function createStorefrontRouter(options = {}) {
   router.post("/api/auth/session", wrap(async (req, res) => {
     sendData(res, await storefrontService.createSession(req.body || {}), {
       statusCode: 201,
+      requestId: req.requestId
+    });
+  }));
+
+  router.get("/api/auth/login-readiness", wrap(async (req, res) => {
+    sendData(res, {
+      wechatMiniProgram: {
+        enabled: true,
+        configured: isWechatAuthConfigured()
+      },
+      mockWechat: {
+        enabled: isMockWechatLoginAllowed()
+      },
+      mobileCode: {
+        enabled: false
+      },
+      accountPassword: {
+        enabled: false
+      }
+    }, {
       requestId: req.requestId
     });
   }));
@@ -268,7 +290,12 @@ function createStorefrontRouter(options = {}) {
   }));
 
   router.post("/api/auth/authorize", wrap(async (req, res) => {
-    sendData(res, await storefrontService.authorizeUser(readSessionToken(req)), {
+    sendData(res, await storefrontService.authorizeUser(readSessionToken(req), {
+      phoneCode: (req.body || {}).phoneCode,
+      phoneNumber: (req.body || {}).phoneNumber,
+      nickname: (req.body || {}).nickname,
+      avatarUrl: (req.body || {}).avatarUrl
+    }), {
       requestId: req.requestId
     });
   }));
