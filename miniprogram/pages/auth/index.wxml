@@ -1,42 +1,92 @@
-<view class="page-shell">
-  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
-    <text class="state-tag">账号授权</text>
-    <text class="state-title">授权信息加载中</text>
-    <text class="state-copy">正在同步当前账号的授权状态和手机号信息。</text>
-  </view>
-
-  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
-    <text class="state-tag">加载失败</text>
-    <text class="state-title">授权页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
-    <view class="state-actions">
-      <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
-      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+<view class="settings-shell">
+  <view class="page-block" wx:if="{{pageState === 'loading'}}">
+    <view class="state-card">
+      <text class="state-title">设置加载中</text>
+      <text class="state-copy">正在同步账号与设置项。</text>
     </view>
   </view>
 
-  <view wx:else>
-    <view class="panel auth-hero">
-      <text class="auth-kicker">{{sessionLoginModeTag}}</text>
-      <text class="auth-mode-title">{{sessionLoginModeTitle}}</text>
-      <text class="auth-mode-copy">{{sessionLoginModeCopy}}</text>
-      <text class="auth-title">{{user.isAuthorized ? '当前账号已完成授权' : '补上登录授权，让用户链路更完整'}}</text>
-      <text class="auth-copy">这里先把小程序内的授权流程接上，后面再替换成更完整的微信昵称、手机号和用户资料同步。</text>
+  <view class="page-block" wx:elif="{{pageState === 'error'}}">
+    <view class="state-card">
+      <text class="state-title">设置页暂时不可用</text>
+      <text class="state-copy">{{errorMessage || '请稍后再试。'}}</text>
+      <button class="retry-btn" bindtap="retryLoad">重新加载</button>
     </view>
+  </view>
 
-    <view class="panel auth-card">
-      <text class="auth-label">当前账号</text>
-      <text class="auth-value">{{user.nickname}}</text>
-      <text class="auth-phone">{{user.phone}}</text>
-
-      <view class="agreement-row" bindtap="toggleAgreement">
-        <text class="agreement-check">{{agreed ? '已勾选' : '未勾选'}}</text>
-        <text class="agreement-copy">我已阅读并同意《用户协议》和《隐私政策》</text>
+  <view class="page-block" wx:else>
+    <view class="user-card">
+      <view class="user-avatar">
+        <image
+          wx:if="{{displayAvatarUrl}}"
+          class="user-avatar-image"
+          src="{{displayAvatarUrl}}"
+          mode="aspectFill"
+        ></image>
+        <text wx:else class="user-avatar-label">{{displayAvatarLabel}}</text>
+      </view>
+      <view class="user-meta">
+        <text class="user-name">{{user.nickname || '微信用户'}}</text>
+        <text class="user-id">ID {{userIdLabel}}</text>
+        <text class="user-phone">{{phoneMasked}}</text>
       </view>
     </view>
 
-    <button class="primary-button auth-button" bindtap="authorize" loading="{{authorizing}}" disabled="{{authorizing}}">
-      {{authorizing ? '授权中...' : (user.isAuthorized ? '重新同步授权状态' : '一键同步授权状态')}}
+    <view class="menu-card">
+      <button
+        class="menu-row menu-row-button"
+        open-type="chooseAvatar"
+        bindchooseavatar="handleChooseAvatar"
+        loading="{{profileSaving}}"
+        disabled="{{profileSaving}}"
+      >
+        <text class="menu-label">头像</text>
+        <view class="menu-row-side">
+          <view class="menu-avatar-preview">
+            <image
+              wx:if="{{displayAvatarUrl}}"
+              class="menu-avatar-preview-image"
+              src="{{displayAvatarUrl}}"
+              mode="aspectFill"
+            ></image>
+            <text wx:else class="menu-avatar-preview-label">{{displayAvatarLabel}}</text>
+          </view>
+          <text class="menu-value">修改</text>
+          <text class="menu-arrow">›</text>
+        </view>
+      </button>
+
+      <view class="menu-row" bindtap="handleEditNicknameTap">
+        <text class="menu-label">昵称</text>
+        <view class="menu-row-side">
+          <text class="menu-value">{{nicknameDisplay}}</text>
+          <text class="menu-arrow">›</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="menu-card">
+      <view class="menu-row" bindtap="openAddressList">
+        <text class="menu-label">收货地址管理</text>
+        <text class="menu-value">去查看</text>
+      </view>
+      <view class="menu-row" bindtap="openPrivacyPolicy">
+        <text class="menu-label">隐私政策</text>
+        <text class="menu-value">查看</text>
+      </view>
+      <view class="menu-row" bindtap="openServiceTerms">
+        <text class="menu-label">服务条款</text>
+        <text class="menu-value">查看</text>
+      </view>
+    </view>
+
+    <button
+      class="logout-btn"
+      bindtap="handleLogout"
+      loading="{{logoutSubmitting}}"
+      disabled="{{logoutSubmitting}}"
+    >
+      {{logoutSubmitting ? '退出中...' : '退出登录'}}
     </button>
   </view>
 </view>

@@ -3,6 +3,7 @@ function createStorefrontPrismaProfileModule({
   couponHelpers,
   distributionHelpers,
   getCurrentUserContext,
+  getWechatPhoneNumber,
   mapAddress,
   mapUser,
   mapUserCoupon
@@ -47,14 +48,26 @@ function createStorefrontPrismaProfileModule({
           distributor
         };
       },
-      async authorizeUser(sessionToken) {
+      async authorizeUser(sessionToken, payload = {}) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
+        const nextNickname = String(payload.nickname || "").trim() || user.nickname || "微信用户";
+        const nextAvatarUrl = String(payload.avatarUrl || "").trim() || user.avatarUrl || null;
+        let nextMobile = user.mobile || null;
+
+        if (String(payload.phoneCode || "").trim()) {
+          const phoneInfo = await getWechatPhoneNumber(payload.phoneCode);
+
+          nextMobile = phoneInfo.phoneNumber || phoneInfo.purePhoneNumber || nextMobile;
+        }
+
         const updated = await prisma.user.update({
           where: {
             id: user.id
           },
           data: {
-            nickname: user.nickname || "微信用户",
+            nickname: nextNickname,
+            avatarUrl: nextAvatarUrl,
+            mobile: nextMobile,
             isAuthorized: true
           }
         });

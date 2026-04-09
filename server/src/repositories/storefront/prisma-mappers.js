@@ -166,6 +166,7 @@ function createStorefrontPrismaMapperModule({
     return {
       id: user.id || "",
       nickname: user.nickname || "微信用户",
+      avatarUrl: user.avatarUrl || "",
       level: "普通会员",
       phone: user.mobile || "未授权手机号",
       isAuthorized: !!user.isAuthorized
@@ -203,10 +204,22 @@ function createStorefrontPrismaMapperModule({
   }
 
   function mapProduct(product = {}) {
-    const specs = (product.skus || [])
-      .map((item) => item.specText)
-      .filter(Boolean);
-    const normalizedSpecs = specs.length ? specs : ["默认规格"];
+    const skuOptions = (product.skus || [])
+      .map((item) => {
+        const availableStock = Math.max(0, Number(item.stock || 0) - Number(item.lockStock || 0));
+
+        return {
+          skuId: item.id || "",
+          specText: item.specText || "默认规格",
+          price: toNumber(item.price || product.price),
+          displayPrice: formatMoney(item.price || product.price),
+          availableStock
+        };
+      })
+      .filter((item) => item.availableStock > 0);
+    const normalizedSpecs = skuOptions.length
+      ? skuOptions.map((item) => item.specText).filter(Boolean)
+      : ["默认规格"];
     const price = toNumber(product.price);
     const marketPrice = toNumber(product.marketPrice);
 
@@ -226,6 +239,8 @@ function createStorefrontPrismaMapperModule({
       salesText: `月销 ${toNumber(product.salesCount)}`,
       salesCount: toNumber(product.salesCount),
       specs: normalizedSpecs,
+      skuOptions,
+      availableStock: skuOptions.reduce((sum, item) => sum + Number(item.availableStock || 0), 0),
       highlights: buildHighlightTags(product),
       favoriteCount: toNumber(product.favoriteCount),
       productType: "general",
@@ -242,13 +257,18 @@ function createStorefrontPrismaMapperModule({
     const price = toNumber(item.price);
     const quantity = Number(item.quantity || 0);
     const productId = item.productId || (item.product || {}).id || "";
+    const availableStock = item.sku
+      ? Math.max(0, Number((item.sku || {}).stock || 0) - Number((item.sku || {}).lockStock || 0))
+      : null;
 
     return {
       id: productId,
+      skuId: item.skuId || (item.sku || {}).id || "",
       title: item.title,
       price,
       quantity,
       specText: item.specText || "",
+      availableStock,
       coverLabel: buildCoverLabel(item.title),
       accent: buildAccent(productId || item.title),
       cartKey: `${productId}-${item.specText || ""}`,

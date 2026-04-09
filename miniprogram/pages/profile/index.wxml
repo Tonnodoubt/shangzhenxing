@@ -1,58 +1,169 @@
-<view class="page-shell profile-shell">
-  <view class="panel state-card" wx:if="{{pageState === 'loading'}}">
-    <text class="state-tag">我的</text>
-    <text class="state-title">个人中心加载中</text>
-    <text class="state-copy">正在同步账号、订单和地址信息。</text>
-  </view>
+<view class="profile-shell">
+  <view class="profile-wave"></view>
 
-  <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
-    <text class="state-tag">加载失败</text>
-    <text class="state-title">个人中心暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
-    <view class="state-actions">
-      <button class="ghost-button state-button" bindtap="openHome">返回首页</button>
-      <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+  <view class="page-block" wx:if="{{pageState === 'loading'}}">
+    <view class="state-card">
+      <text class="state-tag">我的</text>
+      <text class="state-title">个人中心加载中</text>
+      <text class="state-copy">正在同步账号、订单和地址信息。</text>
     </view>
   </view>
 
-  <view wx:else>
-    <view class="profile-hero panel">
-      <view class="profile-hero-head">
-        <view class="profile-hero-main">
-          <text class="profile-kicker">MY N.E.K.O. SPACE</text>
-          <text class="profile-name">{{user.nickname || '微信用户'}}</text>
-          <text class="profile-phone">{{user.phone || '未授权手机号'}}</text>
-          <text class="profile-copy">订单、地址和账号信息都收在这里。</text>
-        </view>
-        <text class="profile-auth-chip" bindtap="openAuth">
-          {{user.isAuthorized ? '已授权' : '去授权'}}
-        </text>
+  <view class="page-block" wx:elif="{{pageState === 'error'}}">
+    <view class="state-card">
+      <text class="state-tag">加载失败</text>
+      <text class="state-title">个人中心暂时没打开</text>
+      <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+      <view class="state-actions">
+        <button class="ghost-button state-button" bindtap="openHome">返回首页</button>
+        <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="profile-main" wx:else>
+    <view class="page-block">
+      <view class="top-bar">
+        <text class="top-back" bindtap="handleTopBackTap">‹</text>
+        <text class="top-title">我的</text>
+        <view class="top-right-spacer"></view>
       </view>
 
-      <view class="profile-note">
-        <text class="profile-note-label">账户中心</text>
-        <text class="profile-note-copy">首页负责领券和分销，这里只保留你的个人服务。</text>
+      <view class="profile-header" bindtap="handleProfileHeaderTap">
+        <view class="profile-avatar" style="{{headerAvatarStyle}}">
+          <image
+            wx:if="{{isLoggedIn && headerAvatar}}"
+            class="profile-avatar-image"
+            src="{{headerAvatar}}"
+            mode="aspectFill"
+          ></image>
+          <text wx:else class="profile-avatar-label">{{headerAvatarLabel}}</text>
+        </view>
+
+        <view class="profile-meta">
+          <text class="profile-name">{{headerTitle}}</text>
+        </view>
+
+        <view class="profile-tools">
+          <view class="profile-tool" catchtap="handleHeaderActionTap" data-label="设置">
+            <view class="profile-tool-mark profile-tool-mark-setting"></view>
+            <text class="profile-tool-text">设置</text>
+          </view>
+          <view class="profile-tool" catchtap="handleHeaderActionTap" data-label="消息">
+            <view class="profile-tool-mark profile-tool-mark-message">
+              <view class="profile-tool-mark-dot"></view>
+            </view>
+            <text class="profile-tool-text">消息</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="partner-banner">
+        <view class="partner-banner-main">
+          <view class="partner-banner-icon"></view>
+          <text class="partner-banner-copy">开通会员，享合伙人特权</text>
+        </view>
+        <button class="partner-banner-btn" catchtap="handleWalletActionTap" data-label="会员权益">去解锁</button>
+      </view>
+
+      <view class="wallet-card">
+        <view class="wallet-grid">
+          <block wx:for="{{walletStats}}" wx:key="id">
+            <view class="wallet-item">
+              <text class="wallet-item-label">{{item.label}}</text>
+              <text class="wallet-item-value">{{item.value}}</text>
+            </view>
+          </block>
+        </view>
+
+        <view class="wallet-actions">
+          <button class="wallet-action-btn" catchtap="handleWalletActionTap" data-label="充值">充值</button>
+          <button class="wallet-action-btn" catchtap="handleWalletActionTap" data-label="提现">提现</button>
+        </view>
+      </view>
+
+      <view class="coupon-bar" catchtap="openCoupons">
+        <view class="coupon-badge">尊享礼遇卡</view>
+        <text class="coupon-copy">充值再购物 享受折上折</text>
+        <view class="coupon-action">{{couponHint}}</view>
+      </view>
+
+      <view class="feature-card">
+        <view class="feature-grid">
+          <block wx:for="{{featureEntries}}" wx:key="id">
+            <view
+              class="feature-item"
+              data-action="{{item.action}}"
+              data-label="{{item.label}}"
+              bindtap="handleFeatureTap"
+            >
+              <view class="feature-icon">
+                <image class="feature-icon-image" src="{{item.icon}}" mode="aspectFit"></image>
+              </view>
+              <text class="feature-label">{{item.label}}</text>
+              <text class="feature-tag" wx:if="{{item.value}}">{{item.value}}</text>
+            </view>
+          </block>
+        </view>
       </view>
     </view>
 
-    <view class="panel service-section">
-      <view class="profile-section-head">
-        <text class="section-title">常用服务</text>
-        <text class="section-subtitle">把订单、地址、售后和账号管理留在这里就够了。</text>
-      </view>
-
-      <block wx:for="{{serviceRows}}" wx:key="id">
-        <view class="service-row" data-action="{{item.action}}" data-label="{{item.label}}" bindtap="handleServiceTap">
-          <view class="service-row-main">
-            <text class="service-row-title">{{item.title}}</text>
-            <text class="service-row-copy">{{item.copy}}</text>
-          </view>
-          <view class="service-row-side">
-            <text class="service-row-value">{{item.value}}</text>
-            <text class="service-row-arrow">›</text>
-          </view>
+    <view class="login-overlay" wx:if="{{showLoginSheet}}">
+      <view class="login-overlay-mask" bindtap="closeLoginSheet"></view>
+      <view class="login-sheet" catchtap="preventSheetClose">
+        <view class="login-sheet-banner">
+          <text class="login-sheet-title">微信授权登录</text>
+          <text class="login-sheet-copy">用于同步你的账号信息、订单和收货地址</text>
+          <text class="login-sheet-close" bindtap="closeLoginSheet">×</text>
         </view>
-      </block>
+
+        <view class="login-sheet-body">
+          <button
+            wx:if="{{loginAgreed}}"
+            class="login-sheet-primary"
+            open-type="getPhoneNumber"
+            bindgetphonenumber="handleGetPhoneNumber"
+            loading="{{loginSubmitting}}"
+            disabled="{{loginSubmitting}}"
+          >
+            {{loginSubmitting ? '登录中...' : '微信一键登录'}}
+          </button>
+          <button
+            wx:else
+            class="login-sheet-primary login-sheet-primary-disabled"
+            bindtap="notifyAgreementRequired"
+          >
+            微信一键登录
+          </button>
+          <text class="login-sheet-tip">登录后可在个人信息页设置头像和昵称</text>
+
+          <view class="login-agreement">
+            <view
+              class="login-agreement-check {{loginAgreed ? 'login-agreement-check-active' : ''}}"
+              bindtap="toggleLoginAgreement"
+            >
+              <text class="login-agreement-mark">{{loginAgreed ? '✓' : ''}}</text>
+            </view>
+
+            <view class="login-agreement-copy">
+              <text class="login-agreement-text">我已阅读并同意</text>
+              <text
+                class="login-agreement-link"
+                data-type="service"
+                bindtap="handleAgreementLinkTap"
+              >《服务条款》</text>
+              <text class="login-agreement-text">和</text>
+              <text
+                class="login-agreement-link"
+                data-type="privacy"
+                bindtap="handleAgreementLinkTap"
+              >《隐私政策》</text>
+            </view>
+          </view>
+
+          <text class="login-sheet-error" wx:if="{{loginErrorMessage}}">{{loginErrorMessage}}</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>

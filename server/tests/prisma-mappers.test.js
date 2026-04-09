@@ -87,3 +87,87 @@ test("mapper helper rejects invalid order status transitions", () => {
     /当前订单不能执行这个操作/
   );
 });
+
+test("mapper helper maps user avatar url", () => {
+  const mapperModule = createMapperModule();
+
+  const result = mapperModule.helpers.mapUser({
+    id: "user-1",
+    nickname: "阿青",
+    avatarUrl: "https://example.com/avatar-1.png",
+    mobile: "13800000000",
+    isAuthorized: true
+  });
+
+  assert.deepEqual(result, {
+    id: "user-1",
+    nickname: "阿青",
+    avatarUrl: "https://example.com/avatar-1.png",
+    level: "普通会员",
+    phone: "13800000000",
+    isAuthorized: true
+  });
+});
+
+test("mapper helper exposes sellable sku options for product detail", () => {
+  const mapperModule = createMapperModule();
+
+  const result = mapperModule.helpers.mapProduct({
+    id: "product-1",
+    title: "坚果礼盒",
+    shortDesc: "今日现货",
+    price: 39.9,
+    marketPrice: 59.9,
+    status: "on_sale",
+    skus: [
+      {
+        id: "sku-1",
+        specText: "单盒",
+        price: 39.9,
+        stock: 2,
+        lockStock: 0
+      },
+      {
+        id: "sku-2",
+        specText: "双盒",
+        price: 69.9,
+        stock: 1,
+        lockStock: 1
+      }
+    ]
+  });
+
+  assert.deepEqual(result.specs, ["单盒"]);
+  assert.equal(result.availableStock, 2);
+  assert.deepEqual(result.skuOptions, [
+    {
+      skuId: "sku-1",
+      specText: "单盒",
+      price: 39.9,
+      displayPrice: "39.90",
+      availableStock: 2
+    }
+  ]);
+});
+
+test("mapper helper exposes available stock for cart items", () => {
+  const mapperModule = createMapperModule();
+
+  const result = mapperModule.helpers.mapCartItem({
+    productId: "product-1",
+    skuId: "sku-1",
+    title: "坚果礼盒",
+    price: 39.9,
+    quantity: 2,
+    specText: "单盒",
+    sku: {
+      id: "sku-1",
+      stock: 3,
+      lockStock: 1
+    }
+  });
+
+  assert.equal(result.skuId, "sku-1");
+  assert.equal(result.availableStock, 2);
+  assert.equal(result.displaySubtotal, "79.80");
+});

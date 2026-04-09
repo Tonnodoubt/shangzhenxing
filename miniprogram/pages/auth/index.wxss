@@ -1,127 +1,192 @@
-.state-card {
-  margin-top: 24rpx;
-  padding: 56rpx 32rpx;
-  text-align: center;
+page {
+  background: #f4f1eb;
 }
 
-.state-tag {
-  display: inline-block;
-  padding: 10rpx 22rpx;
-  border-radius: 999rpx;
-  background: #f5eee6;
-  color: #8d6e5a;
-  font-size: 22rpx;
+.settings-shell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8f5ef 0%, #f3f0e9 100%);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 28rpx);
+}
+
+.page-block {
+  padding: 24rpx;
+}
+
+.state-card {
+  margin-top: 24rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 36rpx 28rpx;
 }
 
 .state-title {
-  margin-top: 24rpx;
   display: block;
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #2d241d;
-}
-
-.state-copy {
-  margin-top: 18rpx;
-  display: block;
-  color: #7d7368;
-  line-height: 1.7;
-}
-
-.state-actions {
-  margin-top: 32rpx;
-  display: flex;
-  gap: 18rpx;
-}
-
-.state-button {
-  flex: 1;
-}
-
-.auth-hero {
-  padding: 34rpx;
-  background: linear-gradient(160deg, #efe1d6, #f8f3ea);
-}
-
-.auth-kicker {
-  color: #9f5e42;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.auth-mode-title {
-  margin-top: 12rpx;
-  display: block;
-  color: #5c4738;
-  font-size: 28rpx;
+  font-size: 34rpx;
+  color: #2f2f2f;
   font-weight: 600;
 }
 
-.auth-mode-copy {
-  margin-top: 12rpx;
+.state-copy {
+  margin-top: 14rpx;
   display: block;
-  color: #7b6b5e;
+  color: #7a7a7a;
   line-height: 1.7;
 }
 
-.auth-title {
-  margin-top: 14rpx;
-  display: block;
-  font-size: 42rpx;
-  font-weight: 700;
-  color: #2d241d;
+.retry-btn,
+.logout-btn {
+  margin: 28rpx 0 0;
+  border-radius: 999rpx;
 }
 
-.auth-copy {
-  margin-top: 18rpx;
-  display: block;
-  color: #73695e;
-  line-height: 1.7;
+.retry-btn::after,
+.logout-btn::after {
+  border: 0;
 }
 
-.auth-card {
-  margin-top: 24rpx;
-  padding: 28rpx;
+.retry-btn {
+  height: 84rpx;
+  line-height: 84rpx;
+  background: #fff4ee;
+  color: #bf6846;
 }
 
-.auth-label {
-  display: block;
-  color: #84796d;
-  font-size: 24rpx;
+.user-card {
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 26rpx;
+  display: flex;
+  align-items: center;
 }
 
-.auth-value {
+.user-avatar {
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f16f6a 0%, #dd5653 100%);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar-image {
+  width: 108rpx;
+  height: 108rpx;
   display: block;
-  margin-top: 14rpx;
-  color: #2d241d;
+}
+
+.user-avatar-label {
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 600;
+}
+
+.user-meta {
+  margin-left: 22rpx;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-name {
+  display: block;
+  color: #2d2d2d;
   font-size: 34rpx;
-  font-weight: 700;
+  font-weight: 600;
 }
 
-.auth-phone {
+.user-id,
+.user-phone {
   display: block;
-  margin-top: 12rpx;
-  color: #73695e;
+  margin-top: 8rpx;
+  color: #6b6b6b;
   font-size: 24rpx;
 }
 
-.agreement-row {
-  margin-top: 28rpx;
+.menu-card {
+  margin-top: 20rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 0 24rpx;
 }
 
-.agreement-check {
-  display: block;
-  color: #c96b48;
+.menu-row {
+  min-height: 98rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1rpx solid #f1ece3;
+}
+
+.menu-row-button {
+  margin: 0;
+  width: 100%;
+  background: transparent;
+  padding: 0;
+}
+
+.menu-row-button::after {
+  border: 0;
+}
+
+.menu-row:last-child {
+  border-bottom: 0;
+}
+
+.menu-label {
+  color: #2f2f2f;
+  font-size: 28rpx;
+}
+
+.menu-row-side {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.menu-value {
+  color: #a98d66;
   font-size: 24rpx;
+  max-width: 320rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.agreement-copy {
+.menu-arrow {
+  color: #b7aa96;
+  font-size: 30rpx;
+  line-height: 1;
+}
+
+.menu-avatar-preview {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #f16f6a 0%, #dd5653 100%);
+}
+
+.menu-avatar-preview-image {
+  width: 52rpx;
+  height: 52rpx;
   display: block;
-  margin-top: 10rpx;
-  color: #73695e;
-  line-height: 1.7;
 }
 
-.auth-button {
-  margin-top: 28rpx;
+.menu-avatar-preview-label {
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.logout-btn {
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #ca6f4b;
+  color: #ffffff;
+  font-size: 30rpx;
 }

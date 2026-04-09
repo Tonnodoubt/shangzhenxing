@@ -73,6 +73,7 @@ model User {
   openId             String?             @unique
   unionId            String?             @unique
   nickname           String
+  avatarUrl          String?
   mobile             String?
   isAuthorized       Boolean             @default(false)
   status             UserStatus          @default(active)

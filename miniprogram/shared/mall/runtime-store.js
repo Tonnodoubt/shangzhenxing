@@ -226,6 +226,7 @@ function createRuntimeStore(deps) {
       user: {
         id: "user-1",
         nickname: "访客用户",
+        avatarUrl: "",
         level: "普通会员",
         phone: "未授权手机号",
         isAuthorized: false

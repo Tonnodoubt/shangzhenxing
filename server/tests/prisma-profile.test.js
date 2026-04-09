@@ -19,6 +19,11 @@ function createProfileModule(overrides = {}) {
         }
       })
     },
+    getWechatPhoneNumber: async () => ({
+      phoneNumber: "13800000000",
+      purePhoneNumber: "13800000000",
+      countryCode: "86"
+    }),
     getCurrentUserContext: async () => ({
       prisma: {},
       user: {
@@ -30,6 +35,7 @@ function createProfileModule(overrides = {}) {
     mapUser: (user = {}) => ({
       id: user.id || "",
       nickname: user.nickname || "",
+      avatarUrl: user.avatarUrl || "",
       isAuthorized: !!user.isAuthorized
     }),
     mapUserCoupon: (coupon = {}) => ({
@@ -91,6 +97,7 @@ test("profile method aggregates address coupon cart and distributor data", async
       user: {
         id: "user-1",
         nickname: "阿青",
+        avatarUrl: "https://example.com/avatar-a.png",
         isAuthorized: true
       }
     })
@@ -103,6 +110,7 @@ test("profile method aggregates address coupon cart and distributor data", async
     user: {
       id: "user-1",
       nickname: "阿青",
+      avatarUrl: "https://example.com/avatar-a.png",
       isAuthorized: true
     },
     address: {
@@ -135,6 +143,7 @@ test("profile method authorizes current user with mapped payload", async () => {
             return {
               id: "user-2",
               nickname: "微信用户",
+              avatarUrl: "",
               isAuthorized: true
             };
           }
@@ -154,12 +163,125 @@ test("profile method authorizes current user with mapped payload", async () => {
     },
     data: {
       nickname: "微信用户",
+      avatarUrl: null,
+      mobile: null,
       isAuthorized: true
     }
   });
   assert.deepEqual(result, {
     id: "user-2",
     nickname: "微信用户",
+    avatarUrl: "",
+    isAuthorized: true
+  });
+});
+
+test("profile method exchanges phone code and stores verified mobile", async () => {
+  let receivedPhoneCode = "";
+  let updatedPayload = null;
+  const profileModule = createProfileModule({
+    getWechatPhoneNumber: async (phoneCode) => {
+      receivedPhoneCode = phoneCode;
+
+      return {
+        phoneNumber: "+8613800001234",
+        purePhoneNumber: "13800001234",
+        countryCode: "86"
+      };
+    },
+    getCurrentUserContext: async () => ({
+      prisma: {
+        user: {
+          update: async (payload) => {
+            updatedPayload = payload;
+
+            return {
+              id: "user-3",
+              nickname: "微信用户",
+              avatarUrl: "",
+              mobile: "+8613800001234",
+              isAuthorized: true
+            };
+          }
+        }
+      },
+      user: {
+        id: "user-3",
+        nickname: "",
+        mobile: null
+      }
+    })
+  });
+
+  const result = await profileModule.methods.authorizeUser("session-token", {
+    phoneCode: "phone-code-123"
+  });
+
+  assert.equal(receivedPhoneCode, "phone-code-123");
+  assert.deepEqual(updatedPayload, {
+    where: {
+      id: "user-3"
+    },
+    data: {
+      nickname: "微信用户",
+      avatarUrl: null,
+      mobile: "+8613800001234",
+      isAuthorized: true
+    }
+  });
+  assert.deepEqual(result, {
+    id: "user-3",
+    nickname: "微信用户",
+    avatarUrl: "",
+    isAuthorized: true
+  });
+});
+
+test("profile method stores avatar url when provided", async () => {
+  let updatedPayload = null;
+  const profileModule = createProfileModule({
+    getCurrentUserContext: async () => ({
+      prisma: {
+        user: {
+          update: async (payload) => {
+            updatedPayload = payload;
+
+            return {
+              id: "user-4",
+              nickname: "阿青",
+              avatarUrl: "https://example.com/avatar-4.png",
+              isAuthorized: true
+            };
+          }
+        }
+      },
+      user: {
+        id: "user-4",
+        nickname: "阿青",
+        avatarUrl: ""
+      }
+    })
+  });
+
+  const result = await profileModule.methods.authorizeUser("session-token", {
+    avatarUrl: "https://example.com/avatar-4.png"
+  });
+
+  assert.deepEqual(updatedPayload, {
+    where: {
+      id: "user-4"
+    },
+    data: {
+      nickname: "阿青",
+      avatarUrl: "https://example.com/avatar-4.png",
+      mobile: null,
+      isAuthorized: true
+    }
+  });
+  assert.deepEqual(result, {
+    id: "user-4",
+    nickname: "阿青",
+    avatarUrl: "https://example.com/avatar-4.png",
     isAuthorized: true
   });
 });
