@@ -53,7 +53,10 @@ function formatDateTime(date = new Date()) {
 }
 
 function generateId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const random = typeof crypto !== "undefined" && typeof crypto.randomBytes === "function"
+    ? crypto.randomBytes(4).toString("hex")
+    : Math.floor(Math.random() * 1000000).toString(36);
+  return `${prefix}-${Date.now()}-${random}`;
 }
 
 function requireString(value, fallback = "") {
@@ -79,6 +82,21 @@ function paginateList(list, options = {}) {
   };
 }
 
+function getShanghaiTodayRange() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const today = formatter.format(now);
+  return {
+    start: new Date(`${today}T00:00:00+08:00`),
+    end: new Date(`${today}T23:59:59.999+08:00`)
+  };
+}
+
 module.exports = {
   cloneData,
   stripHtml,
@@ -88,5 +106,6 @@ module.exports = {
   generateId,
   requireString,
   normalizePageOptions,
-  paginateList
+  paginateList,
+  getShanghaiTodayRange
 };

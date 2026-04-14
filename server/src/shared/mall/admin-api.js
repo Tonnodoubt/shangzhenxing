@@ -19,7 +19,10 @@ function createAdminApi(deps) {
   } = deps;
 
   function generateId(prefix) {
-    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const random = typeof crypto !== "undefined" && typeof crypto.randomBytes === "function"
+      ? crypto.randomBytes(4).toString("hex")
+      : Math.floor(Math.random() * 1000000).toString(36);
+    return `${prefix}-${Date.now()}-${random}`;
   }
 
   function normalizePageOptions(options = {}) {
@@ -227,21 +230,23 @@ function createAdminApi(deps) {
     const now = formatDateTime();
 
     if (categoryId) {
-      const current = categories.find((item) => item.id === categoryId);
+      const index = categories.findIndex((item) => item.id === categoryId);
 
-      if (!current) {
+      if (index === -1) {
         return null;
       }
 
-      Object.assign(current, {
+      const current = categories[index];
+      categories[index] = {
+        ...current,
         parentId: typeof payload.parentId === "undefined" ? current.parentId : Number(payload.parentId || 0),
         name: payload.name || current.name,
         sortOrder: typeof payload.sortOrder === "undefined" ? current.sortOrder : Number(payload.sortOrder || 0),
         status: payload.status || current.status || "enabled",
         updatedAt: now
-      });
+      };
 
-      return buildAdminCategoryRecord(current);
+      return buildAdminCategoryRecord(categories[index]);
     }
 
     const nextRecord = {
@@ -337,30 +342,32 @@ function createAdminApi(deps) {
     };
 
     if (productId) {
-      const current = products.find((item) => item.id === productId);
+      const index = products.findIndex((item) => item.id === productId);
 
-      if (!current) {
+      if (index === -1) {
         return null;
       }
 
+      const current = products[index];
+      const updated = { ...current };
       Object.keys(basePatch).forEach((key) => {
         if (typeof basePatch[key] !== "undefined") {
-          current[key] = basePatch[key];
+          updated[key] = basePatch[key];
         }
       });
-
-      current.updatedAt = now;
-      current.salesText = current.salesText || `月销 ${current.salesCount || 0}`;
+      updated.updatedAt = now;
+      updated.salesText = updated.salesText || `月销 ${updated.salesCount || 0}`;
+      products[index] = updated;
       ensureProductSeeds();
 
       if (specList) {
         withState((state) => {
-          syncProductSkusForSpecs(state, current);
+          syncProductSkusForSpecs(state, updated);
           return null;
         });
       }
 
-      return buildAdminProductDetail(current);
+      return buildAdminProductDetail(updated);
     }
 
     const nextProduct = {
@@ -686,17 +693,100 @@ function createAdminApi(deps) {
 
   function reviewAdminAfterSale(afterSaleId, action, remark = "") {
     return withState((state) => {
-      let target = null;
-      let orderId = "";
       const nextStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : "processing";
       const reviewedAt = formatDateTime();
+      const current = (state.afterSales || []).find((item) => item.id === afterSaleId);
 
+      if (!current) {
+        return null;
+      }
+
+      const orderId = current.orderId;
+
+      if (nextStatus === "approved") {
+        const normalizeAmount = (value) => {
+          const amount = Number(value || 0);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            return 0;
+          }
+
+          return Number(amount.toFixed(2));
+        };
+        const normalizeAmountCent = (value) => Math.round(normalizeAmount(value) * 100);
+        const orderCommissionRecords = (state.commissionRecords || []).filter((item) => item.orderNo === orderId && item.status !== "reversed");
+
+        orderCommissionRecords.forEach((item) => {
+          const status = String(item.status || "pending").trim() || "pending";
+          const amount = normalizeAmount(item.amount);
+          const amountCent = normalizeAmountCent(item.amount);
+
+          if (status === "withdrawing" || status === "withdrawn") {
+            throw new Error("该佣金已进入提现流程，需人工处理");
+          }
+
+          if (status !== "pending" && status !== "settled") {
+            throw new Error("当前佣金状态不可冲回，需人工处理");
+          }
+
+          if (amount > 0) {
+            state.distributor = {
+              ...(state.distributor || {}),
+              totalCommission: Number(Math.max(0, Number((state.distributor || {}).totalCommission || 0) - amount).toFixed(2)),
+              pendingCommission: status === "pending"
+                ? Number(Math.max(0, Number((state.distributor || {}).pendingCommission || 0) - amount).toFixed(2))
+                : Number(Number((state.distributor || {}).pendingCommission || 0).toFixed(2)),
+              settledCommission: status === "settled"
+                ? Number(Math.max(0, Number((state.distributor || {}).settledCommission || 0) - amount).toFixed(2))
+                : Number(Number((state.distributor || {}).settledCommission || 0).toFixed(2))
+            };
+
+            if (item.distributorId) {
+              state.distributorProfiles = (state.distributorProfiles || []).map((profile) => {
+                if (profile.id !== item.distributorId) {
+                  return profile;
+                }
+
+                const nextProfile = {
+                  ...profile,
+                  totalCommissionCent: Math.max(0, Number(profile.totalCommissionCent || 0) - amountCent)
+                };
+
+                if (status === "pending") {
+                  nextProfile.pendingCommissionCent = Math.max(0, Number(profile.pendingCommissionCent || 0) - amountCent);
+                } else if (typeof profile.settledCommissionCent !== "undefined") {
+                  nextProfile.settledCommissionCent = Math.max(0, Number(profile.settledCommissionCent || 0) - amountCent);
+                }
+
+                if (status === "settled" && typeof profile.withdrawableCommissionCent !== "undefined") {
+                  nextProfile.withdrawableCommissionCent = Math.max(0, Number(profile.withdrawableCommissionCent || 0) - amountCent);
+                }
+
+                return nextProfile;
+              });
+            }
+          }
+        });
+
+        state.commissionRecords = (state.commissionRecords || []).map((item) => {
+          if (item.orderNo !== orderId || item.status === "reversed") {
+            return item;
+          }
+
+          return {
+            ...item,
+            status: "reversed",
+            statusText: "已冲回"
+          };
+        });
+      }
+
+      let target = null;
       state.afterSales = (state.afterSales || []).map((item) => {
         if (item.id !== afterSaleId) {
           return item;
         }
 
-        orderId = item.orderId;
         target = {
           ...item,
           status: nextStatus,
@@ -776,13 +866,15 @@ function createAdminApi(deps) {
       const now = formatDateTime();
 
       if (templateId) {
-        const current = (state.couponCenterTemplates || []).find((item) => item.id === templateId);
+        const index = (state.couponCenterTemplates || []).findIndex((item) => item.id === templateId);
 
-        if (!current) {
+        if (index === -1) {
           return null;
         }
 
-        Object.assign(current, {
+        const current = state.couponCenterTemplates[index];
+        state.couponCenterTemplates[index] = {
+          ...current,
           title: payload.title || current.title,
           amount: typeof payload.amount === "undefined" ? current.amount : Number(payload.amount || payload.amountCent / 100 || 0),
           threshold: typeof payload.threshold === "undefined" ? current.threshold : Number(payload.threshold || payload.thresholdAmountCent / 100 || 0),
@@ -790,9 +882,9 @@ function createAdminApi(deps) {
           status: payload.status || current.status || "enabled",
           validDays: typeof payload.validDays === "undefined" ? current.validDays : Number(payload.validDays || 0),
           updatedAt: now
-        });
+        };
 
-        return buildAdminCouponTemplateRecord(current);
+        return buildAdminCouponTemplateRecord(state.couponCenterTemplates[index]);
       }
 
       const nextTemplate = {

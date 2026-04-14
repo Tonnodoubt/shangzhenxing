@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
+    "env:check": "node scripts/check-env.js",
+    "env:check:strict": "node scripts/check-env.js --strict",
     "admin:hash-password": "node scripts/hash-admin-password.js",
     "lint": "eslint \"src/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\"",
     "test": "node --test tests/api.test.js tests/prisma-admin.test.js tests/prisma-distribution.test.js tests/prisma-coupon.test.js tests/prisma-order.test.js tests/prisma-catalog.test.js tests/prisma-cart.test.js tests/prisma-session.test.js tests/prisma-profile.test.js tests/prisma-mappers.test.js tests/storefront-contract.test.js tests/session-login.test.js tests/wechat-auth.test.js",
@@ -32,10 +34,13 @@
     "@prisma/adapter-mariadb": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "bcryptjs": "^3.0.3",
+    "cos-nodejs-sdk-v5": "^2.15.4",
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
     "mariadb": "^3.5.2",
-    "prisma": "^7.6.0"
+    "multer": "^2.1.1",
+    "prisma": "^7.6.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "eslint": "^8.57.1"

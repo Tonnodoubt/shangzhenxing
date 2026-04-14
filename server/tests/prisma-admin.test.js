@@ -42,8 +42,8 @@ test("prisma repository exposes admin category queries through the extracted adm
         sortOrder: 10,
         status: "enabled",
         statusText: "启用",
-        createdAt: "2026-04-01 10:00",
-        updatedAt: "2026-04-01 10:00"
+        createdAt: "2026-04-01 10:00:00",
+        updatedAt: "2026-04-01 10:00:00"
       }
     ],
     page: 2,
@@ -130,7 +130,7 @@ test("prisma repository ships admin orders through the extracted admin module", 
   assert.equal(result.shipment.companyCode, "SF");
   assert.equal(result.shipment.companyName, "顺丰速运");
   assert.equal(result.shipment.trackingNo, "SF1234567890");
-  assert.equal(result.shipment.shippedAt, "2026-04-01 11:00");
+  assert.equal(result.shipment.shippedAt, "2026-04-01 11:00:00");
 });
 
 test("prisma repository reviews admin aftersales through the extracted admin module", async () => {
@@ -176,6 +176,12 @@ test("prisma repository reviews admin aftersales through the extracted admin mod
           reviewedBy: options.data.reviewedBy
         };
       }
+    },
+    commissionRecord: {
+      findMany: async (options) => {
+        assert.equal(options.where.orderNo, currentAfterSale.order.orderNo);
+        return [];
+      }
     }
   };
   const prisma = {
@@ -198,5 +204,192 @@ test("prisma repository reviews admin aftersales through the extracted admin mod
   assert.equal(result.orderStatus, "shipping");
   assert.equal(result.orderStatusText, "待收货");
   assert.equal(result.reviewedBy, "auditor");
-  assert.equal(result.reviewedAt, "2026-04-01 12:15");
+  assert.equal(result.reviewedAt, "2026-04-01 12:15:00");
+});
+
+test("prisma repository reverses level-one and level-two commissions when admin approves aftersale", async () => {
+  const createdAt = new Date("2026-04-02T09:30:00+08:00");
+  const reviewedAt = new Date("2026-04-02T12:15:00+08:00");
+  const currentAfterSale = {
+    id: "as-2",
+    userId: "user-1",
+    reason: "退款",
+    description: "不要了",
+    status: "processing",
+    reviewRemark: null,
+    reviewedAt: null,
+    reviewedBy: null,
+    createdAt,
+    user: {
+      nickname: "测试买家"
+    },
+    order: {
+      orderNo: "NO20260402001",
+      userId: "user-1",
+      status: "shipping",
+      address: {
+        receiver: "李四"
+      }
+    }
+  };
+  const profileById = {
+    "dist-1": {
+      id: "dist-1",
+      totalCommission: 100,
+      pendingCommission: 20,
+      settledCommission: 80,
+      withdrawableCommission: 80
+    },
+    "dist-2": {
+      id: "dist-2",
+      totalCommission: 50,
+      pendingCommission: 5,
+      settledCommission: 30,
+      withdrawableCommission: 28
+    }
+  };
+  const reversedRecordIds = [];
+  const tx = {
+    afterSale: {
+      findUnique: async (options) => {
+        assert.equal(options.where.id, currentAfterSale.id);
+        return currentAfterSale;
+      },
+      update: async (options) => {
+        assert.equal(options.data.status, "approved");
+
+        return {
+          ...currentAfterSale,
+          status: "approved",
+          reviewRemark: options.data.reviewRemark,
+          reviewedAt,
+          reviewedBy: options.data.reviewedBy
+        };
+      }
+    },
+    commissionRecord: {
+      findMany: async (options) => {
+        assert.equal(options.where.orderNo, currentAfterSale.order.orderNo);
+        return [
+          {
+            id: "cr-1",
+            distributorId: "dist-1",
+            amount: 10,
+            status: "pending"
+          },
+          {
+            id: "cr-2",
+            distributorId: "dist-2",
+            amount: 6,
+            status: "settled"
+          }
+        ];
+      },
+      update: async (options) => {
+        reversedRecordIds.push(options.where.id);
+        assert.equal(options.data.status, "reversed");
+      }
+    },
+    distributorProfile: {
+      findUnique: async (options) => {
+        const profile = profileById[options.where.id];
+
+        return profile ? { ...profile } : null;
+      },
+      update: async (options) => {
+        const current = profileById[options.where.id];
+
+        profileById[options.where.id] = {
+          ...current,
+          ...options.data
+        };
+
+        return profileById[options.where.id];
+      }
+    }
+  };
+  const prisma = {
+    $transaction: async (handler) => handler(tx)
+  };
+  const repository = createStorefrontPrismaRepository(() => prisma);
+
+  const result = await repository.reviewAdminAfterSale(
+    currentAfterSale.id,
+    "approve",
+    "同意退款",
+    {
+      username: "auditor"
+    }
+  );
+
+  assert.equal(result.status, "approved");
+  assert.deepEqual(reversedRecordIds, ["cr-1", "cr-2"]);
+  assert.equal(profileById["dist-1"].totalCommission, 90);
+  assert.equal(profileById["dist-1"].pendingCommission, 10);
+  assert.equal(profileById["dist-2"].totalCommission, 44);
+  assert.equal(profileById["dist-2"].settledCommission, 24);
+  assert.equal(profileById["dist-2"].withdrawableCommission, 22);
+});
+
+test("prisma repository blocks aftersale approval when commission is in withdrawal flow", async () => {
+  const createdAt = new Date("2026-04-03T09:30:00+08:00");
+  const currentAfterSale = {
+    id: "as-3",
+    userId: "user-1",
+    reason: "退款",
+    description: "",
+    status: "processing",
+    reviewRemark: null,
+    reviewedAt: null,
+    reviewedBy: null,
+    createdAt,
+    user: {
+      nickname: "测试买家"
+    },
+    order: {
+      orderNo: "NO20260403001",
+      userId: "user-1",
+      status: "shipping",
+      address: {
+        receiver: "李四"
+      }
+    }
+  };
+  let afterSaleUpdated = false;
+  const tx = {
+    afterSale: {
+      findUnique: async () => currentAfterSale,
+      update: async () => {
+        afterSaleUpdated = true;
+        return currentAfterSale;
+      }
+    },
+    commissionRecord: {
+      findMany: async () => [
+        {
+          id: "cr-wd-1",
+          distributorId: "dist-1",
+          amount: 5,
+          status: "withdrawing"
+        }
+      ]
+    }
+  };
+  const prisma = {
+    $transaction: async (handler) => handler(tx)
+  };
+  const repository = createStorefrontPrismaRepository(() => prisma);
+
+  await assert.rejects(
+    repository.reviewAdminAfterSale(currentAfterSale.id, "approve", "同意退款", {
+      username: "auditor"
+    }),
+    (error) => {
+      assert.equal(error.code, "COMMISSION_REVERSAL_MANUAL_REQUIRED");
+      assert.equal(error.statusCode, 409);
+      return true;
+    }
+  );
+
+  assert.equal(afterSaleUpdated, false);
 });

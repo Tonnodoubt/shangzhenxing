@@ -1,5 +1,5 @@
 const { createStorefrontError } = require("../../modules/storefront/errors");
-const { normalizeDetailContent } = require("../../../shared/utils");
+const { normalizeDetailContent, getShanghaiTodayRange } = require("../../../shared/utils");
 
 function createStorefrontPrismaAdminRepository({
   getPrisma,
@@ -202,6 +202,89 @@ function createStorefrontPrismaAdminRepository({
       orderStatusText: sourceOrder.status ? getStatusText(sourceOrder.status) : "",
       createdAt: formatDateTime(record.createdAt)
     };
+  }
+
+  function assertCommissionReversalStatus(status) {
+    if (status === "pending" || status === "settled") {
+      return;
+    }
+
+    if (status === "withdrawing" || status === "withdrawn") {
+      throw createStorefrontError("该佣金已进入提现流程，需人工处理", 409, "COMMISSION_REVERSAL_MANUAL_REQUIRED");
+    }
+
+    throw createStorefrontError("当前佣金状态不可冲回，需人工处理", 409, "COMMISSION_REVERSAL_STATUS_INVALID");
+  }
+
+  function buildDistributorBalancePatchForCommissionReversal(profile = {}, status, amount) {
+    const normalizedAmount = Number(Math.max(0, toNumber(amount)).toFixed(2));
+    const currentTotal = toNumber(profile.totalCommission);
+    const currentPending = toNumber(profile.pendingCommission);
+    const currentSettled = toNumber(profile.settledCommission);
+    const currentWithdrawable = toNumber(profile.withdrawableCommission);
+    const patch = {
+      totalCommission: Number(Math.max(currentTotal - normalizedAmount, 0).toFixed(2))
+    };
+
+    if (status === "pending") {
+      patch.pendingCommission = Number(Math.max(currentPending - normalizedAmount, 0).toFixed(2));
+    } else if (status === "settled") {
+      patch.settledCommission = Number(Math.max(currentSettled - normalizedAmount, 0).toFixed(2));
+      patch.withdrawableCommission = Number(Math.max(currentWithdrawable - normalizedAmount, 0).toFixed(2));
+    }
+
+    return patch;
+  }
+
+  async function reverseOrderCommissionRecords(tx, orderNo) {
+    const normalizedOrderNo = String(orderNo || "").trim();
+
+    if (!normalizedOrderNo) {
+      return;
+    }
+
+    const records = await tx.commissionRecord.findMany({
+      where: {
+        orderNo: normalizedOrderNo,
+        status: {
+          not: "reversed"
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    for (const record of records) {
+      const status = String(record.status || "pending").trim() || "pending";
+
+      assertCommissionReversalStatus(status);
+
+      const amount = Number(Math.max(0, toNumber(record.amount)).toFixed(2));
+      const profile = await tx.distributorProfile.findUnique({
+        where: {
+          id: record.distributorId
+        }
+      });
+
+      if (profile && amount > 0) {
+        await tx.distributorProfile.update({
+          where: {
+            id: profile.id
+          },
+          data: buildDistributorBalancePatchForCommissionReversal(profile, status, amount)
+        });
+      }
+
+      await tx.commissionRecord.update({
+        where: {
+          id: record.id
+        },
+        data: {
+          status: "reversed"
+        }
+      });
+    }
   }
 
   function buildAdminOrderListItem(order = {}) {
@@ -908,9 +991,7 @@ function createStorefrontPrismaAdminRepository({
     },
     async getAdminDashboardSummary() {
       const prisma = await getPrisma();
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+      const { start: todayStart, end: tomorrowStart } = getShanghaiTodayRange();
       const [todayOrderCount, todayPaidAmount, newUserCount, newDistributorCount, pendingShipmentCount, shippingOrderCount, pendingAftersaleCount, processedAftersaleCount] = await Promise.all([
         prisma.order.count({
           where: {
@@ -1257,6 +1338,10 @@ function createStorefrontPrismaAdminRepository({
           }
 
           throw createStorefrontError("售后单已处理，请勿重复操作", 409, "AFTERSALE_ALREADY_REVIEWED");
+        }
+
+        if (nextStatus === "approved") {
+          await reverseOrderCommissionRecords(tx, ((current.order || {}).orderNo) || "");
         }
 
         return tx.afterSale.update({

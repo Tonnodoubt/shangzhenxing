@@ -66,29 +66,49 @@ enum DistributorStatus {
 enum CommissionStatus {
   pending
   settled
+  withdrawing
+  withdrawn
+  reversed
+}
+
+enum WithdrawalStatus {
+  submitted
+  approved
+  rejected
+  paying
+  paid
+  pay_failed
+  cancelled
+}
+
+enum DistributionRuleVersionStatus {
+  draft
+  published
+  archived
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  openId             String?             @unique
-  unionId            String?             @unique
-  nickname           String
-  avatarUrl          String?
-  mobile             String?
-  isAuthorized       Boolean             @default(false)
-  status             UserStatus          @default(active)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  sessions           UserSession[]
-  addresses          Address[]
-  cart               Cart?
-  orders             Order[]
-  coupons            UserCoupon[]
-  afterSales         AfterSale[]
-  distributorProfile DistributorProfile?
-  sentReferrals      ReferralBinding[]   @relation("UserSentReferrals")
-  receivedReferral   ReferralBinding?    @relation("UserReceivedReferral")
-  invitedOrders      Order[]             @relation("OrderInviter")
+  id                    String              @id @default(cuid())
+  openId                String?             @unique
+  unionId               String?             @unique
+  nickname              String
+  avatarUrl             String?
+  mobile                String?
+  isAuthorized          Boolean             @default(false)
+  status                UserStatus          @default(active)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  sessions              UserSession[]
+  addresses             Address[]
+  cart                  Cart?
+  orders                Order[]
+  coupons               UserCoupon[]
+  afterSales            AfterSale[]
+  distributorProfile    DistributorProfile?
+  sentReferrals         ReferralBinding[]   @relation("UserSentReferrals")
+  receivedReferral      ReferralBinding?    @relation("UserReceivedReferral")
+  invitedOrders         Order[]             @relation("OrderInviter")
+  invitedOrdersLevelTwo Order[]             @relation("OrderLevelTwoInviter")
 }
 
 model UserSession {
@@ -214,42 +234,50 @@ model CartItem {
 }
 
 model Order {
-  id                   String           @id @default(cuid())
-  orderNo              String           @unique
-  userId               String
-  addressId            String?
-  referralBindingId    String?
-  inviterUserId        String?
-  status               OrderStatus      @default(pending)
-  sourceScene          String?
-  goodsAmount          Decimal          @db.Decimal(10, 2)
-  discountAmount       Decimal          @default(0.00) @db.Decimal(10, 2)
-  payableAmount        Decimal          @db.Decimal(10, 2)
-  commissionBaseAmount Decimal          @default(0.00) @db.Decimal(10, 2)
-  commissionRate       Decimal          @default(0.0000) @db.Decimal(5, 4)
-  commissionAmount     Decimal          @default(0.00) @db.Decimal(10, 2)
-  couponTitle          String?
-  remark               String?
+  id                       String                   @id @default(cuid())
+  orderNo                  String                   @unique
+  userId                   String
+  addressId                String?
+  referralBindingId        String?
+  inviterUserId            String?
+  levelTwoInviterUserId    String?
+  status                   OrderStatus              @default(pending)
+  sourceScene              String?
+  ruleVersionId            String?
+  goodsAmount              Decimal                  @db.Decimal(10, 2)
+  discountAmount           Decimal                  @default(0.00) @db.Decimal(10, 2)
+  payableAmount            Decimal                  @db.Decimal(10, 2)
+  commissionBaseAmount     Decimal                  @default(0.00) @db.Decimal(10, 2)
+  commissionRate           Decimal                  @default(0.0000) @db.Decimal(5, 4)
+  commissionAmount         Decimal                  @default(0.00) @db.Decimal(10, 2)
+  levelTwoCommissionRate   Decimal                  @default(0.0000) @db.Decimal(5, 4)
+  levelTwoCommissionAmount Decimal                  @default(0.00) @db.Decimal(10, 2)
+  couponTitle              String?
+  remark                   String?
   // 地址快照
-  snapReceiver         String?
-  snapPhone            String?
-  snapAddress          String?
-  shipmentCompanyCode  String?
-  shipmentCompanyName  String?
-  shipmentTrackingNo   String?
-  shippedAt            DateTime?
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
-  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  address              Address?         @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  inviter              User?            @relation("OrderInviter", fields: [inviterUserId], references: [id], onDelete: SetNull)
-  referralBinding      ReferralBinding? @relation(fields: [referralBindingId], references: [id], onDelete: SetNull)
-  items                OrderItem[]
-  usedCoupon           UserCoupon?      @relation("OrderUsedCoupon")
-  afterSale            AfterSale?
+  snapReceiver             String?
+  snapPhone                String?
+  snapAddress              String?
+  shipmentCompanyCode      String?
+  shipmentCompanyName      String?
+  shipmentTrackingNo       String?
+  shippedAt                DateTime?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  user                     User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address                  Address?                 @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  inviter                  User?                    @relation("OrderInviter", fields: [inviterUserId], references: [id], onDelete: SetNull)
+  levelTwoInviter          User?                    @relation("OrderLevelTwoInviter", fields: [levelTwoInviterUserId], references: [id], onDelete: SetNull)
+  referralBinding          ReferralBinding?         @relation(fields: [referralBindingId], references: [id], onDelete: SetNull)
+  ruleVersion              DistributionRuleVersion? @relation("OrderRuleVersion", fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  items                    OrderItem[]
+  usedCoupon               UserCoupon?              @relation("OrderUsedCoupon")
+  afterSale                AfterSale?
 
   @@index([userId, status, createdAt])
   @@index([inviterUserId, createdAt])
+  @@index([levelTwoInviterUserId, createdAt])
+  @@index([ruleVersionId, createdAt])
 }
 
 model OrderItem {
@@ -346,21 +374,25 @@ model ReferralBinding {
 }
 
 model DistributorProfile {
-  id                String             @id @default(cuid())
-  userId            String             @unique
-  level             String             @default("普通分销员")
-  status            DistributorStatus  @default(active)
-  totalCommission   Decimal            @default(0.00) @db.Decimal(10, 2)
-  pendingCommission Decimal            @default(0.00) @db.Decimal(10, 2)
-  settledCommission Decimal            @default(0.00) @db.Decimal(10, 2)
-  teamCount         Int                @default(0)
-  todayInviteCount  Int                @default(0)
-  joinedAt          DateTime           @default(now())
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamMembers       TeamMember[]
-  commissionRecords CommissionRecord[]
+  id                     String              @id @default(cuid())
+  userId                 String              @unique
+  level                  String              @default("普通分销员")
+  status                 DistributorStatus   @default(active)
+  totalCommission        Decimal             @default(0.00) @db.Decimal(10, 2)
+  pendingCommission      Decimal             @default(0.00) @db.Decimal(10, 2)
+  settledCommission      Decimal             @default(0.00) @db.Decimal(10, 2)
+  withdrawableCommission Decimal             @default(0.00) @db.Decimal(10, 2)
+  withdrawingCommission  Decimal             @default(0.00) @db.Decimal(10, 2)
+  withdrawnCommission    Decimal             @default(0.00) @db.Decimal(10, 2)
+  teamCount              Int                 @default(0)
+  todayInviteCount       Int                 @default(0)
+  joinedAt               DateTime            @default(now())
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamMembers            TeamMember[]
+  commissionRecords      CommissionRecord[]
+  withdrawalRequests     WithdrawalRequest[]
 
   @@index([status, createdAt])
 }
@@ -379,18 +411,171 @@ model TeamMember {
   @@index([distributorId, joinedAt])
 }
 
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  imageUrl  String?
+  linkType  String   @default("none")
+  linkValue String?
+  sortOrder Int      @default(0)
+  status    String   @default("enabled")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model PageSection {
+  id         String   @id @default(cuid())
+  sectionKey String   @unique
+  sortOrder  Int      @default(0)
+  visible    Boolean  @default(true)
+  config     String?  @db.MediumText
+  updatedAt  DateTime @updatedAt
+}
+
+model StoreTheme {
+  id         String   @id @default(cuid())
+  themeKey   String   @unique
+  themeValue String
+  updatedAt  DateTime @updatedAt
+}
+
+model PaymentOrder {
+  id                 String    @id @default(cuid())
+  orderId            String    @unique
+  orderNo            String    @unique
+  userId             String
+  provider           String    @default("mock")
+  status             String    @default("prepared")
+  amount             Decimal   @db.Decimal(10, 2)
+  currency           String    @default("CNY")
+  paymentNo          String?
+  mockToken          String?
+  preparedAt         DateTime?
+  paidAt             DateTime?
+  expiresAt          DateTime?
+  requestPayloadJson String?   @db.MediumText
+  resultPayloadJson  String?   @db.MediumText
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([orderNo, createdAt])
+}
+
 model CommissionRecord {
-  id            String             @id @default(cuid())
-  distributorId String
-  title         String
-  fromUser      String
-  orderNo       String
-  amount        Decimal            @db.Decimal(10, 2)
-  levelText     String
-  status        CommissionStatus   @default(pending)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  distributor   DistributorProfile @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  id              String                   @id @default(cuid())
+  distributorId   String
+  ruleVersionId   String?
+  title           String
+  fromUser        String
+  orderNo         String
+  amount          Decimal                  @db.Decimal(10, 2)
+  levelText       String
+  status          CommissionStatus         @default(pending)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  distributor     DistributorProfile       @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  ruleVersion     DistributionRuleVersion? @relation("CommissionRuleVersion", fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  withdrawalItems WithdrawalRequestItem[]
 
   @@index([distributorId, status, createdAt])
+  @@index([ruleVersionId, createdAt])
+}
+
+model WithdrawalRequest {
+  id            String                  @id @default(cuid())
+  requestNo     String                  @unique
+  distributorId String
+  status        WithdrawalStatus        @default(submitted)
+  amount        Decimal                 @db.Decimal(10, 2)
+  serviceFee    Decimal                 @default(0.00) @db.Decimal(10, 2)
+  netAmount     Decimal                 @db.Decimal(10, 2)
+  channel       String                  @default("manual_bank")
+  accountName   String?
+  accountNoMask String?
+  remark        String?                 @db.LongText
+  reviewRemark  String?                 @db.LongText
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  distributor   DistributorProfile      @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  items         WithdrawalRequestItem[]
+  payouts       WithdrawalPayout[]
+
+  @@index([distributorId, status, createdAt])
+}
+
+model WithdrawalRequestItem {
+  id                  String            @id @default(cuid())
+  withdrawalRequestId String
+  commissionRecordId  String            @unique
+  amount              Decimal           @db.Decimal(10, 2)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  withdrawalRequest   WithdrawalRequest @relation(fields: [withdrawalRequestId], references: [id], onDelete: Cascade)
+  commissionRecord    CommissionRecord  @relation(fields: [commissionRecordId], references: [id], onDelete: Restrict)
+
+  @@index([withdrawalRequestId, createdAt])
+}
+
+model WithdrawalPayout {
+  id                  String            @id @default(cuid())
+  withdrawalRequestId String
+  channel             String            @default("manual_bank")
+  channelBillNo       String?
+  status              String            @default("paid")
+  remark              String?           @db.LongText
+  paidBy              String?
+  paidAt              DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  withdrawalRequest   WithdrawalRequest @relation(fields: [withdrawalRequestId], references: [id], onDelete: Cascade)
+
+  @@index([withdrawalRequestId, createdAt])
+  @@index([channelBillNo])
+}
+
+model DistributionRuleVersion {
+  id                  String                        @id @default(cuid())
+  versionNo           String                        @unique
+  enabled             Boolean                       @default(true)
+  levelOneRate        Decimal                       @default(8.00) @db.Decimal(5, 2)
+  levelTwoRate        Decimal                       @default(3.00) @db.Decimal(5, 2)
+  bindDays            Int                           @default(15)
+  minWithdrawalAmount Decimal                       @default(0.00) @db.Decimal(10, 2)
+  serviceFeeRate      Decimal                       @default(0.0000) @db.Decimal(6, 4)
+  serviceFeeFixed     Decimal                       @default(0.00) @db.Decimal(10, 2)
+  ruleDesc            String?                       @db.LongText
+  status              DistributionRuleVersionStatus @default(draft)
+  effectiveAt         DateTime?
+  publishedAt         DateTime?
+  publishedBy         String?
+  createdBy           String?
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+  orders              Order[]                       @relation("OrderRuleVersion")
+  commissionRecords   CommissionRecord[]            @relation("CommissionRuleVersion")
+  changeLogs          DistributionRuleChangeLog[]
+
+  @@index([status, createdAt])
+}
+
+model DistributionRuleChangeLog {
+  id            String                   @id @default(cuid())
+  ruleVersionId String?
+  action        String
+  summary       String?
+  payloadJson   String?                  @db.MediumText
+  actorId       String?
+  actorName     String?
+  createdAt     DateTime                 @default(now())
+  ruleVersion   DistributionRuleVersion? @relation(fields: [ruleVersionId], references: [id], onDelete: SetNull)
+
+  @@index([ruleVersionId, createdAt])
+  @@index([action, createdAt])
 }

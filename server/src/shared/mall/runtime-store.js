@@ -475,6 +475,17 @@ function createRuntimeStore(deps) {
     syncAppGlobalData();
   }
 
+  function dumpState() {
+    return cloneData(getState());
+  }
+
+  function loadState(data) {
+    if (data && typeof data === "object") {
+      runtimeState = cloneData(data);
+      syncAddressState(runtimeState);
+    }
+  }
+
   return {
     ensureCategorySeeds,
     ensureProductSeeds,
@@ -484,7 +495,9 @@ function createRuntimeStore(deps) {
     resolveSelectedAddress,
     syncAddressState,
     withState,
-    bootstrap
+    bootstrap,
+    dumpState,
+    loadState
   };
 }
 

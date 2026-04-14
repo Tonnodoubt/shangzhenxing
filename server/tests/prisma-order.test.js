@@ -49,12 +49,29 @@ function createOrderModule(overrides = {}) {
       buildOrderReferralSnapshot: async () => ({
         referralBindingId: null,
         inviterUserId: null,
+        levelTwoInviterUserId: null,
+        ruleVersionId: null,
         sourceScene: "direct",
         commissionBaseAmount: 0,
         commissionRate: 0,
-        commissionAmount: 0
+        commissionAmount: 0,
+        levelTwoCommissionRate: 0,
+        levelTwoCommissionAmount: 0
       }),
       syncDistributionAfterOrderDone: async () => null
+    },
+    formatDateTime: (value) => {
+      if (!value) {
+        return "";
+      }
+
+      const date = new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+
+      return date.toISOString();
     },
     getPaginationQuery: (options = {}) => {
       const page = Math.max(1, Number(options.page || 1));
@@ -128,6 +145,7 @@ test("order method submits order with coupon and referral snapshots", async () =
   let usedCouponUpdate = null;
   let cartSelectionCleared = false;
   let cartItemsCleared = false;
+  let createdOrderPayload = null;
   const decrementedSkuIds = [];
   const selectedCoupon = {
     id: "coupon-1",
@@ -156,10 +174,14 @@ test("order method submits order with coupon and referral snapshots", async () =
       buildOrderReferralSnapshot: async () => ({
         referralBindingId: "binding-1",
         inviterUserId: "inviter-1",
+        levelTwoInviterUserId: "inviter-2",
+        ruleVersionId: "drv-1",
         sourceScene: "share",
         commissionBaseAmount: 120,
         commissionRate: 0.05,
-        commissionAmount: 6
+        commissionAmount: 6,
+        levelTwoCommissionRate: 0.02,
+        levelTwoCommissionAmount: 2.4
       }),
       syncDistributionAfterOrderDone: async () => null
     },
@@ -188,10 +210,13 @@ test("order method submits order with coupon and referral snapshots", async () =
   const createdOrderItems = [];
   const tx = {
     order: {
-      create: async ({ data }) => ({
+      create: async ({ data }) => {
+        createdOrderPayload = data;
+        return {
         id: "order-1",
         ...data
-      }),
+        };
+      },
       findUnique: async () => ({
         id: "order-1",
         orderNo: "NO20260402001",
@@ -206,9 +231,11 @@ test("order method submits order with coupon and referral snapshots", async () =
       }
     },
     orderItem: {
-      create: async ({ data }) => {
-        createdOrderItems.push(data);
-        return data;
+      createMany: async ({ data }) => {
+        createdOrderItems.push(...(data || []));
+        return {
+          count: (data || []).length
+        };
       }
     },
     product: {
@@ -263,6 +290,10 @@ test("order method submits order with coupon and referral snapshots", async () =
   assert.equal(createdOrderItems.length, 1);
   assert.equal(createdOrderItems[0].orderId, "order-1");
   assert.equal(createdOrderItems[0].skuId, "sku-1");
+  assert.equal(createdOrderPayload.ruleVersionId, "drv-1");
+  assert.equal(createdOrderPayload.levelTwoInviterUserId, "inviter-2");
+  assert.equal(createdOrderPayload.levelTwoCommissionRate, 0.02);
+  assert.equal(createdOrderPayload.levelTwoCommissionAmount, 2.4);
   assert.deepEqual(decrementedSkuIds, ["sku-1"]);
   assert.equal(usedCouponUpdate.data.status, "used");
   assert.equal(cartSelectionCleared, true);
@@ -522,4 +553,378 @@ test("order method paginates orders by status", async () => {
     pageSize: 1,
     total: 3
   });
+});
+
+test("order payment prepare creates mock payment payload", async () => {
+  let createdPaymentPayload = null;
+  const orderModule = createOrderModule({
+    getCurrentUserContext: async () => ({
+      prisma: {
+        $transaction: async (handler) => handler(tx)
+      },
+      user: {
+        id: "user-1"
+      }
+    }),
+    mapOrder: (order = {}) => ({
+      id: order.orderNo || "",
+      status: order.status || ""
+    })
+  });
+  const tx = {
+    order: {
+      findFirst: async () => ({
+        id: "order-pay-1",
+        orderNo: "NO20260402088",
+        userId: "user-1",
+        status: "pending",
+        payableAmount: 88,
+        address: null,
+        afterSale: null,
+        items: []
+      })
+    },
+    paymentOrder: {
+      findUnique: async () => null,
+      create: async ({ data }) => {
+        createdPaymentPayload = data;
+        return {
+          id: "pay-1",
+          ...data
+        };
+      }
+    }
+  };
+
+  const result = await orderModule.methods.prepareOrderPayment("session-token", "NO20260402088", {
+    scene: "checkout"
+  });
+
+  assert.equal(createdPaymentPayload.orderId, "order-pay-1");
+  assert.equal(createdPaymentPayload.provider, "mock");
+  assert.equal(createdPaymentPayload.status, "prepared");
+  assert.equal(createdPaymentPayload.amount, 88);
+  assert.equal(result.orderId, "NO20260402088");
+  assert.equal(result.mockFlow, true);
+  assert.equal(result.status, "prepared");
+  assert.equal(result.order.id, "NO20260402088");
+});
+
+test("order payment mock confirm updates payment status to paid", async () => {
+  let updatedPaymentPayload = null;
+  const orderModule = createOrderModule({
+    getCurrentUserContext: async () => ({
+      prisma: {
+        $transaction: async (handler) => handler(tx)
+      },
+      user: {
+        id: "user-1"
+      }
+    }),
+    mapOrder: (order = {}) => ({
+      id: order.orderNo || "",
+      status: order.status || ""
+    })
+  });
+  const tx = {
+    order: {
+      findFirst: async () => ({
+        id: "order-pay-2",
+        orderNo: "NO20260402099",
+        userId: "user-1",
+        status: "pending",
+        payableAmount: 99,
+        address: null,
+        afterSale: null,
+        items: []
+      })
+    },
+    paymentOrder: {
+      findUnique: async () => ({
+        id: "pay-2",
+        orderId: "order-pay-2",
+        orderNo: "NO20260402099",
+        userId: "user-1",
+        provider: "mock",
+        status: "prepared",
+        amount: 99,
+        currency: "CNY",
+        paymentNo: "MP20260402099",
+        mockToken: "mock_token_001",
+        preparedAt: new Date("2026-04-02T10:00:00Z"),
+        paidAt: null,
+        expiresAt: new Date("2026-04-02T10:15:00Z")
+      }),
+      update: async ({ data }) => {
+        updatedPaymentPayload = data;
+        return {
+          id: "pay-2",
+          orderId: "order-pay-2",
+          orderNo: "NO20260402099",
+          userId: "user-1",
+          provider: "mock",
+          status: data.status,
+          amount: 99,
+          currency: "CNY",
+          paymentNo: "MP20260402099",
+          mockToken: "mock_token_001",
+          preparedAt: new Date("2026-04-02T10:00:00Z"),
+          paidAt: new Date("2026-04-02T10:06:00Z"),
+          expiresAt: new Date("2026-04-02T10:15:00Z")
+        };
+      }
+    }
+  };
+
+  const result = await orderModule.methods.confirmMockOrderPayment("session-token", "NO20260402099", {
+    mockToken: "mock_token_001",
+    scene: "checkout"
+  });
+
+  assert.equal(updatedPaymentPayload.status, "paid");
+  assert.equal(result.status, "paid");
+  assert.equal(result.statusText, "支付成功");
+  assert.equal(result.order.id, "NO20260402099");
+});
+
+test("order payment prepare uses wechat_jsapi and persists requestPayment payload", async () => {
+  const previousPaymentProvider = process.env.PAYMENT_PROVIDER;
+  let prepareWechatPayload = null;
+  let createdPaymentPayload = null;
+
+  process.env.PAYMENT_PROVIDER = "wechat_jsapi";
+
+  try {
+    const orderModule = createOrderModule({
+      prepareWechatJsapiPaymentFn: async (input = {}) => {
+        prepareWechatPayload = input;
+        return {
+          provider: "wechat_jsapi",
+          prepayId: "wx_prepay_001",
+          requestPayment: {
+            timeStamp: "1713000000",
+            nonceStr: "nonce_001",
+            package: "prepay_id=wx_prepay_001",
+            signType: "RSA",
+            paySign: "SIGN_001"
+          }
+        };
+      },
+      getCurrentUserContext: async () => ({
+        prisma: {
+          $transaction: async (handler) => handler(tx)
+        },
+        user: {
+          id: "user-1"
+        }
+      }),
+      mapOrder: (order = {}) => ({
+        id: order.orderNo || "",
+        status: order.status || ""
+      })
+    });
+    const tx = {
+      order: {
+        findFirst: async () => ({
+          id: "order-pay-3",
+          orderNo: "NO20260402111",
+          userId: "user-1",
+          status: "pending",
+          payableAmount: 120.5,
+          user: {
+            openId: "wx_openid_001"
+          },
+          address: null,
+          afterSale: null,
+          items: []
+        })
+      },
+      paymentOrder: {
+        findUnique: async () => null,
+        create: async ({ data }) => {
+          createdPaymentPayload = data;
+          return {
+            id: "pay-3",
+            ...data
+          };
+        }
+      }
+    };
+
+    const result = await orderModule.methods.prepareOrderPayment("session-token", "NO20260402111", {
+      scene: "checkout"
+    });
+
+    assert.equal(prepareWechatPayload.outTradeNo, "NO20260402111");
+    assert.equal(prepareWechatPayload.totalAmountFen, 12050);
+    assert.equal(prepareWechatPayload.payerOpenId, "wx_openid_001");
+    assert.equal(createdPaymentPayload.provider, "wechat_jsapi");
+    assert.equal(createdPaymentPayload.paymentNo, "wx_prepay_001");
+    assert.equal(result.provider, "wechat_jsapi");
+    assert.equal(result.requestPayment.package, "prepay_id=wx_prepay_001");
+  } finally {
+    if (typeof previousPaymentProvider === "undefined") {
+      delete process.env.PAYMENT_PROVIDER;
+    } else {
+      process.env.PAYMENT_PROVIDER = previousPaymentProvider;
+    }
+  }
+});
+
+test("order payment prepare returns PAYMENT_OPENID_REQUIRED when wechat openId is missing", async () => {
+  const previousPaymentProvider = process.env.PAYMENT_PROVIDER;
+
+  process.env.PAYMENT_PROVIDER = "wechat_jsapi";
+
+  try {
+    const orderModule = createOrderModule({
+      prepareWechatJsapiPaymentFn: async (input = {}) => {
+        if (!String(input.payerOpenId || "").trim()) {
+          const error = new Error("当前账号缺少微信 openId，请重新登录后重试");
+          error.statusCode = 409;
+          error.code = "PAYMENT_OPENID_REQUIRED";
+          throw error;
+        }
+
+        return {
+          prepayId: "wx_prepay_unused",
+          requestPayment: {}
+        };
+      },
+      getCurrentUserContext: async () => ({
+        prisma: {
+          $transaction: async (handler) => handler(tx)
+        },
+        user: {
+          id: "user-1"
+        }
+      })
+    });
+    const tx = {
+      order: {
+        findFirst: async () => ({
+          id: "order-pay-4",
+          orderNo: "NO20260402112",
+          userId: "user-1",
+          status: "pending",
+          payableAmount: 88,
+          user: {
+            openId: ""
+          },
+          address: null,
+          afterSale: null,
+          items: []
+        })
+      },
+      paymentOrder: {
+        findUnique: async () => null
+      }
+    };
+
+    await assert.rejects(
+      () => orderModule.methods.prepareOrderPayment("session-token", "NO20260402112", {
+        scene: "checkout"
+      }),
+      (error) => {
+        assert.equal(error && error.code, "PAYMENT_OPENID_REQUIRED");
+        return true;
+      }
+    );
+  } finally {
+    if (typeof previousPaymentProvider === "undefined") {
+      delete process.env.PAYMENT_PROVIDER;
+    } else {
+      process.env.PAYMENT_PROVIDER = previousPaymentProvider;
+    }
+  }
+});
+
+test("wechat pay notify marks prepared payment as paid", async () => {
+  let updatedPaymentPayload = null;
+  const tx = {
+    order: {
+      findUnique: async () => ({
+        id: "order-pay-5",
+        orderNo: "NO20260402113",
+        userId: "user-1",
+        status: "pending",
+        payableAmount: 66,
+        user: {
+          openId: "wx_openid_001"
+        },
+        address: null,
+        afterSale: null,
+        items: []
+      })
+    },
+    paymentOrder: {
+      findUnique: async () => ({
+        id: "pay-5",
+        orderId: "order-pay-5",
+        orderNo: "NO20260402113",
+        userId: "user-1",
+        provider: "wechat_jsapi",
+        status: "prepared",
+        amount: 66,
+        currency: "CNY",
+        paymentNo: "wx_prepay_002",
+        mockToken: null,
+        preparedAt: new Date("2026-04-02T10:00:00Z"),
+        paidAt: null,
+        expiresAt: new Date("2026-04-02T10:15:00Z")
+      }),
+      update: async ({ data }) => {
+        updatedPaymentPayload = data;
+        return {
+          id: "pay-5",
+          orderId: "order-pay-5",
+          orderNo: "NO20260402113",
+          userId: "user-1",
+          provider: data.provider,
+          status: data.status,
+          amount: data.amount,
+          currency: data.currency,
+          paymentNo: data.paymentNo,
+          mockToken: null,
+          preparedAt: data.preparedAt || new Date("2026-04-02T10:00:00Z"),
+          paidAt: data.paidAt,
+          expiresAt: new Date("2026-04-02T10:15:00Z"),
+          resultPayloadJson: data.resultPayloadJson
+        };
+      }
+    }
+  };
+  const orderModule = createOrderModule({
+    getPrisma: async () => ({
+      $transaction: async (handler) => handler(tx)
+    }),
+    parseWechatPayNotificationFn: () => ({
+      notifyId: "notify_001",
+      eventType: "TRANSACTION.SUCCESS",
+      summary: "支付成功",
+      outTradeNo: "NO20260402113",
+      tradeState: "SUCCESS",
+      transactionId: "wx_txn_001",
+      successTime: "2026-04-02T10:06:00+08:00",
+      transaction: {
+        out_trade_no: "NO20260402113",
+        trade_state: "SUCCESS"
+      }
+    }),
+    mapOrder: (order = {}) => ({
+      id: order.orderNo || "",
+      status: order.status || ""
+    })
+  });
+
+  const result = await orderModule.methods.handleWechatPayNotify({
+    rawBody: "{}",
+    body: {}
+  });
+
+  assert.equal(updatedPaymentPayload.provider, "wechat_jsapi");
+  assert.equal(updatedPaymentPayload.status, "paid");
+  assert.equal(updatedPaymentPayload.paymentNo, "wx_txn_001");
+  assert.equal(result.status, "paid");
+  assert.equal(result.order.id, "NO20260402113");
 });

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { sendAdminError } = require("./http");
+const { formatDateTime } = require("../../shared/utils");
 
 const ROLE_PRESETS = {
   super_admin: {
@@ -27,7 +28,16 @@ const ROLE_PRESETS = {
       "coupon.status",
       "order.page",
       "order.view",
-      "order.detail"
+      "order.detail",
+      "banner.view",
+      "banner.create",
+      "banner.edit",
+      "banner.delete",
+      "page_decoration.view",
+      "page_decoration.edit",
+      "theme.view",
+      "theme.edit",
+      "upload.image"
     ],
     dataScopes: {
       product: "all",
@@ -51,7 +61,16 @@ const ROLE_PRESETS = {
       "sku.page",
       "sku.view",
       "sku.edit",
-      "stock.adjust"
+      "stock.adjust",
+      "banner.view",
+      "banner.create",
+      "banner.edit",
+      "banner.delete",
+      "page_decoration.view",
+      "page_decoration.edit",
+      "theme.view",
+      "theme.edit",
+      "upload.image"
     ],
     dataScopes: {
       product: "all"
@@ -148,7 +167,10 @@ const ROLE_PRESETS = {
       "distribution.rule.page",
       "distribution.rule.view",
       "distribution.distributor.page",
-      "distribution.distributor.view"
+      "distribution.distributor.view",
+      "banner.view",
+      "page_decoration.view",
+      "theme.view"
     ],
     dataScopes: {
       product: "readonly_all",
@@ -203,7 +225,7 @@ function loadAdminUsers() {
     }
   }
 
-  // 开发环境回退：使用 bcrypt hash 代替明文
+  // 开发环境回退：使用预计算的 bcrypt hash 代替运行时 hashSync
   if (process.env.NODE_ENV === "production") {
     console.error("[auth] 生产环境必须设置 ADMIN_USERS 环境变量");
     process.exit(1);
@@ -246,6 +268,19 @@ function loadAdminUsers() {
 
 const adminUsers = loadAdminUsers();
 const sessions = new Map();
+
+// 定期清理过期会话，防止无界内存增长
+const sessionCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of sessions) {
+    if (session.expiresAt && now > session.expiresAt) {
+      sessions.delete(token);
+    }
+  }
+}, 60 * 60 * 1000);
+if (typeof sessionCleanupTimer.unref === "function") {
+  sessionCleanupTimer.unref();
+}
 
 function formatAdminUser(user) {
   return {
@@ -292,11 +327,13 @@ function mergeDataScopes(roleCodes) {
 
 function buildSession(user) {
   const roleCodes = user.roleCodes || [];
+  const permissions = mergePermissions(roleCodes);
 
   return {
     adminUser: formatAdminUser(user),
     roleCodes,
-    permissions: mergePermissions(roleCodes),
+    permissions,
+    _permissionSet: new Set(permissions),
     dataScopes: mergeDataScopes(roleCodes)
   };
 }
@@ -305,10 +342,19 @@ function createSessionToken() {
   return crypto.randomBytes(16).toString("hex");
 }
 
-function loginAdmin(username, password) {
+async function loginAdmin(username, password) {
   const user = adminUsers.find((item) => item.username === username);
 
-  if (!user || !bcrypt.compareSync(String(password || ""), user.passwordHash)) {
+  if (!user) {
+    return {
+      ok: false,
+      message: "账号或密码错误"
+    };
+  }
+
+  const isPasswordValid = await bcrypt.compare(String(password || ""), user.passwordHash);
+
+  if (!isPasswordValid) {
     return {
       ok: false,
       message: "账号或密码错误"
@@ -322,7 +368,7 @@ function loginAdmin(username, password) {
     };
   }
 
-  user.lastLoginAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+  user.lastLoginAt = formatDateTime();
 
   const sessionToken = createSessionToken();
   const session = buildSession(user);
@@ -374,26 +420,13 @@ function logoutAdmin(token) {
   };
 }
 
-function parseCookieHeader(header) {
-  const result = {};
-
-  String(header || "").split(";").forEach((pair) => {
-    const idx = pair.indexOf("=");
-
-    if (idx > 0) {
-      result[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
-    }
-  });
-
-  return result;
-}
-
 function readAdminToken(req) {
-  // 优先从 httpOnly cookie 读取（防 XSS）
-  const cookies = parseCookieHeader(req.headers.cookie);
+  // 优先从 httpOnly cookie 读取（防 XSS）- 正则直接提取，避免构建完整 cookie 对象
+  const cookieHeader = String(req.headers.cookie || "");
+  const match = cookieHeader.match(/(?:^|;\s*)admin_token=([^;]*)/);
 
-  if (cookies.admin_token) {
-    return cookies.admin_token;
+  if (match) {
+    return match[1].trim();
   }
 
   // 兼容 Authorization header（API 调用场景）
@@ -409,11 +442,11 @@ function readAdminToken(req) {
 function setAdminTokenCookie(res, token) {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
 
-  res.setHeader("Set-Cookie", `admin_token=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${maxAge}`);
+  res.setHeader("Set-Cookie", `admin_token=${token}; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=${maxAge}`);
 }
 
 function clearAdminTokenCookie(res) {
-  res.setHeader("Set-Cookie", "admin_token=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0");
+  res.setHeader("Set-Cookie", "admin_token=; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=0");
 }
 
 function adminAuth(req, res, next) {
@@ -434,11 +467,11 @@ function adminAuth(req, res, next) {
 }
 
 function hasPermission(session, permission) {
-  if (!session) {
+  if (!session || !session._permissionSet) {
     return false;
   }
 
-  return session.permissions.includes("*") || session.permissions.includes(permission);
+  return session._permissionSet.has("*") || session._permissionSet.has(permission);
 }
 
 function requirePermission(permission) {

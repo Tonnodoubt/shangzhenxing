@@ -2,6 +2,10 @@ const path = require("path");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const dotenv = require("dotenv");
+const {
+  readRuntimeEnv,
+  assertRuntimeEnv
+} = require("../src/config/env");
 
 dotenv.config({
   path: path.resolve(__dirname, "../.env")
@@ -9,10 +13,6 @@ dotenv.config({
 
 const SERVER_DIR = path.resolve(__dirname, "..");
 const NPM_COMMAND = process.platform === "win32" ? "npm.cmd" : "npm";
-const DATABASE_TCP_PROBE_TIMEOUT_MS = Math.max(
-  500,
-  Number(process.env.DATABASE_TCP_PROBE_TIMEOUT_MS || 2000)
-);
 let activeServer = null;
 
 function normalizeDatabaseUrl(value) {
@@ -20,12 +20,6 @@ function normalizeDatabaseUrl(value) {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .trim()
     .replace(/^[\s"'`“”‘’]+|[\s"'`“”‘’]+$/g, "");
-}
-
-function resolveStorefrontMode() {
-  const requestedMode = String(process.env.STOREFRONT_DATA_SOURCE || "memory").trim().toLowerCase();
-
-  return requestedMode === "prisma" ? "prisma" : "memory";
 }
 
 function readDatabaseTarget(databaseUrl) {
@@ -52,7 +46,7 @@ function summarizeDatabaseTarget(databaseUrl) {
   return `${target.host}:${target.port}/${target.database}`;
 }
 
-function probeDatabaseTcp(target, timeoutMs = DATABASE_TCP_PROBE_TIMEOUT_MS) {
+function probeDatabaseTcp(target, timeoutMs) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     const socket = net.createConnection({
@@ -124,8 +118,15 @@ function runCommand(command, args) {
 }
 
 async function main() {
-  const storefrontMode = resolveStorefrontMode();
-  const serverPort = Number(process.env.PORT || 3000);
+  const runtimeEnv = readRuntimeEnv(process.env);
+  const { config } = assertRuntimeEnv({
+    config: runtimeEnv,
+    strict: true,
+    context: "cloud-start"
+  });
+  const storefrontMode = config.storefrontDataSource;
+  const serverPort = config.port;
+  const databaseTcpProbeTimeoutMs = Math.max(500, Number(config.databaseTcpProbeTimeoutMs || 2000));
 
   console.log(`[cloud-start] storefront mode: ${storefrontMode}`);
 
@@ -142,7 +143,7 @@ async function main() {
   activeServer = startServer(serverPort);
 
   if (storefrontMode === "prisma") {
-    const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+    const databaseUrl = normalizeDatabaseUrl(config.databaseUrl);
     const startedAt = Date.now();
 
     if (!databaseUrl) {
@@ -159,10 +160,10 @@ async function main() {
 
     console.log(
       `[cloud-start] probing database tcp ${databaseTarget.host}:${databaseTarget.port}`
-      + ` timeout=${DATABASE_TCP_PROBE_TIMEOUT_MS}ms`
+      + ` timeout=${databaseTcpProbeTimeoutMs}ms`
     );
 
-    const probeResult = await probeDatabaseTcp(databaseTarget);
+    const probeResult = await probeDatabaseTcp(databaseTarget, databaseTcpProbeTimeoutMs);
 
     if (!probeResult.ok) {
       throw new Error(

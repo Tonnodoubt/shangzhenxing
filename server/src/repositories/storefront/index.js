@@ -1,5 +1,6 @@
 const { createStorefrontMemoryRepository } = require("./memory");
 const { createStorefrontPrismaRepository } = require("./prisma");
+const { createMockStorefrontSource } = require("../../mock");
 
 function resolveStorefrontRepositoryMode() {
   const requestedMode = String(process.env.STOREFRONT_DATA_SOURCE || "memory").trim().toLowerCase();
@@ -18,7 +19,7 @@ function createStorefrontRepository() {
     return createStorefrontPrismaRepository();
   }
 
-  return createStorefrontMemoryRepository();
+  return createStorefrontMemoryRepository(createMockStorefrontSource());
 }
 
 module.exports = {

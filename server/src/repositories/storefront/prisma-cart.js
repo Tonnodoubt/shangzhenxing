@@ -1,3 +1,5 @@
+const { getSellableStock } = require("./prisma-utils");
+
 function createStorefrontPrismaCartModule({
   buildCartPageData,
   createStorefrontError,
@@ -5,9 +7,6 @@ function createStorefrontPrismaCartModule({
   mapAddress,
   toNumber
 }) {
-  function getSellableStock(sku = {}) {
-    return Math.max(0, Number(sku.stock || 0) - Number(sku.lockStock || 0));
-  }
 
   async function resolveCartProductSnapshot(prisma, productId, specText = "", skuId = "") {
     const product = await prisma.product.findUnique({
@@ -295,7 +294,12 @@ function createStorefrontPrismaCartModule({
           }
         });
 
-        return getAddressListData(sessionToken);
+        const addresses = await getAddresses(prisma, user.id);
+        const selectedAddress = addresses.find((item) => item.isDefault) || addresses[0] || null;
+        return {
+          addresses: addresses.map((item) => mapAddress(item)),
+          selectedAddressId: selectedAddress ? selectedAddress.id : ""
+        };
       },
       async setSelectedAddress(sessionToken, addressId) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
@@ -322,13 +326,14 @@ function createStorefrontPrismaCartModule({
         });
 
         const selected = await getSelectedAddress(prisma, user.id);
-
         return mapAddress(selected);
       },
       getCartPageData,
       async setCartItems(sessionToken, cartItems = []) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
         const cart = await ensureCart(prisma, user.id);
+
+        const resolvedItems = [];
 
         await prisma.$transaction(async (tx) => {
           await tx.cartItem.deleteMany({
@@ -347,18 +352,18 @@ function createStorefrontPrismaCartModule({
 
             assertCartItemStock(product, sku, quantity);
 
-            await tx.cartItem.create({
-              data: {
-                cartId: cart.id,
-                productId: item.id,
-                skuId: sku.id,
-                title: product.title || "",
-                specText,
-                price: toNumber(sku.price || product.price),
-                quantity
-              }
+            resolvedItems.push({
+              cartId: cart.id,
+              productId: item.id,
+              skuId: sku.id,
+              title: product.title || "",
+              specText,
+              price: toNumber(sku.price || product.price),
+              quantity
             });
           }
+
+          await tx.cartItem.createMany({ data: resolvedItems });
         });
 
         return getCartPageData(sessionToken);
@@ -416,7 +421,7 @@ function createStorefrontPrismaCartModule({
           });
         }
 
-        return getCartPageData(sessionToken);
+        return buildCartPageData(await getCartItems(prisma, user.id));
       },
       async increaseCartItem(sessionToken, productId, specText) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
@@ -454,7 +459,7 @@ function createStorefrontPrismaCartModule({
           });
         }
 
-        return getCartPageData(sessionToken);
+        return buildCartPageData(await getCartItems(prisma, user.id));
       },
       async decreaseCartItem(sessionToken, productId, specText) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
@@ -488,7 +493,7 @@ function createStorefrontPrismaCartModule({
           }
         }
 
-        return getCartPageData(sessionToken);
+        return buildCartPageData(await getCartItems(prisma, user.id));
       },
       async removeCartItem(sessionToken, productId, specText) {
         const { prisma, user } = await getCurrentUserContext(sessionToken);
@@ -502,7 +507,7 @@ function createStorefrontPrismaCartModule({
           }
         });
 
-        return getCartPageData(sessionToken);
+        return buildCartPageData(await getCartItems(prisma, user.id));
       }
     }
   };

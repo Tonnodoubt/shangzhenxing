@@ -159,21 +159,23 @@ function createAdminApi(deps) {
     const now = formatDateTime();
 
     if (categoryId) {
-      const current = categories.find((item) => item.id === categoryId);
+      const index = categories.findIndex((item) => item.id === categoryId);
 
-      if (!current) {
+      if (index === -1) {
         return null;
       }
 
-      Object.assign(current, {
+      const current = categories[index];
+      categories[index] = {
+        ...current,
         parentId: typeof payload.parentId === "undefined" ? current.parentId : Number(payload.parentId || 0),
         name: payload.name || current.name,
         sortOrder: typeof payload.sortOrder === "undefined" ? current.sortOrder : Number(payload.sortOrder || 0),
         status: payload.status || current.status || "enabled",
         updatedAt: now
-      });
+      };
 
-      return buildAdminCategoryRecord(current);
+      return buildAdminCategoryRecord(categories[index]);
     }
 
     const nextRecord = {
@@ -626,17 +628,100 @@ function createAdminApi(deps) {
 
   function reviewAdminAfterSale(afterSaleId, action, remark = "") {
     return withState((state) => {
-      let target = null;
-      let orderId = "";
       const nextStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : "processing";
       const reviewedAt = formatDateTime();
+      const current = (state.afterSales || []).find((item) => item.id === afterSaleId);
 
+      if (!current) {
+        return null;
+      }
+
+      const orderId = current.orderId;
+
+      if (nextStatus === "approved") {
+        const normalizeAmount = (value) => {
+          const amount = Number(value || 0);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            return 0;
+          }
+
+          return Number(amount.toFixed(2));
+        };
+        const normalizeAmountCent = (value) => Math.round(normalizeAmount(value) * 100);
+        const orderCommissionRecords = (state.commissionRecords || []).filter((item) => item.orderNo === orderId && item.status !== "reversed");
+
+        orderCommissionRecords.forEach((item) => {
+          const status = String(item.status || "pending").trim() || "pending";
+          const amount = normalizeAmount(item.amount);
+          const amountCent = normalizeAmountCent(item.amount);
+
+          if (status === "withdrawing" || status === "withdrawn") {
+            throw new Error("该佣金已进入提现流程，需人工处理");
+          }
+
+          if (status !== "pending" && status !== "settled") {
+            throw new Error("当前佣金状态不可冲回，需人工处理");
+          }
+
+          if (amount > 0) {
+            state.distributor = {
+              ...(state.distributor || {}),
+              totalCommission: Number(Math.max(0, Number((state.distributor || {}).totalCommission || 0) - amount).toFixed(2)),
+              pendingCommission: status === "pending"
+                ? Number(Math.max(0, Number((state.distributor || {}).pendingCommission || 0) - amount).toFixed(2))
+                : Number(Number((state.distributor || {}).pendingCommission || 0).toFixed(2)),
+              settledCommission: status === "settled"
+                ? Number(Math.max(0, Number((state.distributor || {}).settledCommission || 0) - amount).toFixed(2))
+                : Number(Number((state.distributor || {}).settledCommission || 0).toFixed(2))
+            };
+
+            if (item.distributorId) {
+              state.distributorProfiles = (state.distributorProfiles || []).map((profile) => {
+                if (profile.id !== item.distributorId) {
+                  return profile;
+                }
+
+                const nextProfile = {
+                  ...profile,
+                  totalCommissionCent: Math.max(0, Number(profile.totalCommissionCent || 0) - amountCent)
+                };
+
+                if (status === "pending") {
+                  nextProfile.pendingCommissionCent = Math.max(0, Number(profile.pendingCommissionCent || 0) - amountCent);
+                } else if (typeof profile.settledCommissionCent !== "undefined") {
+                  nextProfile.settledCommissionCent = Math.max(0, Number(profile.settledCommissionCent || 0) - amountCent);
+                }
+
+                if (status === "settled" && typeof profile.withdrawableCommissionCent !== "undefined") {
+                  nextProfile.withdrawableCommissionCent = Math.max(0, Number(profile.withdrawableCommissionCent || 0) - amountCent);
+                }
+
+                return nextProfile;
+              });
+            }
+          }
+        });
+
+        state.commissionRecords = (state.commissionRecords || []).map((item) => {
+          if (item.orderNo !== orderId || item.status === "reversed") {
+            return item;
+          }
+
+          return {
+            ...item,
+            status: "reversed",
+            statusText: "已冲回"
+          };
+        });
+      }
+
+      let target = null;
       state.afterSales = (state.afterSales || []).map((item) => {
         if (item.id !== afterSaleId) {
           return item;
         }
 
-        orderId = item.orderId;
         target = {
           ...item,
           status: nextStatus,
@@ -718,13 +803,15 @@ function createAdminApi(deps) {
       const now = formatDateTime();
 
       if (templateId) {
-        const current = (state.couponCenterTemplates || []).find((item) => item.id === templateId);
+        const index = (state.couponCenterTemplates || []).findIndex((item) => item.id === templateId);
 
-        if (!current) {
+        if (index === -1) {
           return null;
         }
 
-        Object.assign(current, {
+        const current = state.couponCenterTemplates[index];
+        state.couponCenterTemplates[index] = {
+          ...current,
           title: payload.title || current.title,
           amount: typeof payload.amount === "undefined" ? current.amount : Number(payload.amount || payload.amountCent / 100 || 0),
           threshold: typeof payload.threshold === "undefined" ? current.threshold : Number(payload.threshold || payload.thresholdAmountCent / 100 || 0),
@@ -732,9 +819,9 @@ function createAdminApi(deps) {
           status: payload.status || current.status || "enabled",
           validDays: typeof payload.validDays === "undefined" ? current.validDays : Number(payload.validDays || 0),
           updatedAt: now
-        });
+        };
 
-        return buildAdminCouponTemplateRecord(current);
+        return buildAdminCouponTemplateRecord(state.couponCenterTemplates[index]);
       }
 
       const nextTemplate = {
@@ -778,25 +865,440 @@ function createAdminApi(deps) {
 
   // ── 分销管理 ──
 
+  function normalizeRuleVersionStatus(status, fallback = "draft") {
+    const normalized = String(status || fallback).trim();
+
+    if (normalized === "published" || normalized === "archived" || normalized === "draft") {
+      return normalized;
+    }
+
+    return fallback;
+  }
+
+  function getRuleVersionStatusText(status) {
+    if (status === "published") {
+      return "已发布";
+    }
+
+    if (status === "archived") {
+      return "已归档";
+    }
+
+    return "草稿";
+  }
+
+  function buildRuleVersionNo() {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      fractionalSecondDigits: 3,
+      hour12: false
+    }).formatToParts(now);
+    const get = (type) => (parts.find((item) => item.type === type) || {}).value || "00";
+
+    return [
+      "DRV",
+      get("year"),
+      get("month"),
+      get("day"),
+      get("hour"),
+      get("minute"),
+      get("second"),
+      get("fractionalSecond").padEnd(3, "0")
+    ].join("");
+  }
+
+  function normalizeRulePayload(payload = {}, fallback = {}) {
+    const levelOneRate = typeof payload.levelOneRate === "undefined" ? Number(fallback.levelOneRate || 8) : Number(payload.levelOneRate || 0);
+    const levelTwoRate = typeof payload.levelTwoRate === "undefined" ? Number(fallback.levelTwoRate || 3) : Number(payload.levelTwoRate || 0);
+    const bindDays = typeof payload.bindDays === "undefined" ? Number(fallback.bindDays || 15) : Number(payload.bindDays || 0);
+    const minWithdrawalAmount = typeof payload.minWithdrawalAmount === "undefined"
+      ? Number(fallback.minWithdrawalAmount || 0)
+      : Number(payload.minWithdrawalAmount || 0);
+    const serviceFeeRate = typeof payload.serviceFeeRate === "undefined"
+      ? Number(fallback.serviceFeeRate || 0)
+      : Number(payload.serviceFeeRate || 0);
+    const serviceFeeFixed = typeof payload.serviceFeeFixed === "undefined"
+      ? Number(fallback.serviceFeeFixed || 0)
+      : Number(payload.serviceFeeFixed || 0);
+
+    return {
+      enabled: typeof payload.enabled === "undefined" ? fallback.enabled !== false : !!payload.enabled,
+      levelOneRate: Number(Math.max(0, levelOneRate).toFixed(2)),
+      levelTwoRate: Number(Math.max(0, levelTwoRate).toFixed(2)),
+      bindDays: Math.max(1, Math.round(Number.isFinite(bindDays) ? bindDays : 15)),
+      minWithdrawalAmount: Number(Math.max(0, minWithdrawalAmount).toFixed(2)),
+      serviceFeeRate: Number(Math.max(0, serviceFeeRate).toFixed(4)),
+      serviceFeeFixed: Number(Math.max(0, serviceFeeFixed).toFixed(2)),
+      ruleDesc: String(payload.ruleDesc || fallback.ruleDesc || "").trim()
+    };
+  }
+
+  function mapRuleVersionRecord(record = {}) {
+    return {
+      versionId: record.id || "",
+      versionNo: record.versionNo || "",
+      status: normalizeRuleVersionStatus(record.status, "draft"),
+      statusText: getRuleVersionStatusText(record.status),
+      enabled: record.enabled !== false,
+      levelOneRate: Number(record.levelOneRate || 0),
+      levelTwoRate: Number(record.levelTwoRate || 0),
+      bindDays: Number(record.bindDays || 0),
+      minWithdrawalAmount: Number(record.minWithdrawalAmount || 0),
+      serviceFeeRate: Number(record.serviceFeeRate || 0),
+      serviceFeeFixed: Number(record.serviceFeeFixed || 0),
+      ruleDesc: record.ruleDesc || "",
+      effectiveAt: record.effectiveAt || "",
+      publishedAt: record.publishedAt || "",
+      publishedBy: record.publishedBy || "",
+      createdBy: record.createdBy || "",
+      createdAt: record.createdAt || "",
+      updatedAt: record.updatedAt || ""
+    };
+  }
+
+  function mapRuleSummaryFromVersion(record = null) {
+    if (!record) {
+      return {
+        enabled: true,
+        levelOneRate: 8,
+        levelTwoRate: 3,
+        bindDays: 15,
+        minWithdrawalAmount: 0,
+        serviceFeeRate: 0,
+        serviceFeeFixed: 0,
+        ruleDesc: "",
+        updatedAt: "",
+        updatedBy: {
+          adminUserId: "",
+          realName: ""
+        },
+        activeVersionId: "",
+        activeVersionNo: "",
+        status: "draft",
+        publishedAt: "",
+        effectiveAt: ""
+      };
+    }
+
+    const mapped = mapRuleVersionRecord(record);
+
+    return {
+      enabled: mapped.enabled,
+      levelOneRate: mapped.levelOneRate,
+      levelTwoRate: mapped.levelTwoRate,
+      bindDays: mapped.bindDays,
+      minWithdrawalAmount: mapped.minWithdrawalAmount,
+      serviceFeeRate: mapped.serviceFeeRate,
+      serviceFeeFixed: mapped.serviceFeeFixed,
+      ruleDesc: mapped.ruleDesc,
+      updatedAt: mapped.updatedAt,
+      updatedBy: {
+        adminUserId: "",
+        realName: mapped.publishedBy || mapped.createdBy || ""
+      },
+      activeVersionId: mapped.versionId,
+      activeVersionNo: mapped.versionNo,
+      status: mapped.status,
+      publishedAt: mapped.publishedAt,
+      effectiveAt: mapped.effectiveAt
+    };
+  }
+
+  function buildRuleLogRecord({
+    state,
+    ruleVersionId = "",
+    action = "",
+    summary = "",
+    payload = null,
+    actor = {}
+  }) {
+    const now = formatDateTime();
+    const actorName = String(actor.realName || actor.username || "系统管理员").trim() || "系统管理员";
+    const actorId = String(actor.adminUserId || actor.id || "").trim() || "";
+    const payloadJson = payload ? JSON.stringify(payload) : "";
+    const log = {
+      id: generateId("drl"),
+      ruleVersionId,
+      action,
+      summary,
+      payloadJson,
+      actorId,
+      actorName,
+      createdAt: now
+    };
+
+    state.distributionRuleChangeLogs = [log].concat(state.distributionRuleChangeLogs || []);
+    return log;
+  }
+
+  function ensureDistributionRuleVersionState(state) {
+    if (Array.isArray(state.distributionRuleVersions) && Array.isArray(state.distributionRuleChangeLogs)) {
+      if (!state.distributionRuleActiveVersionId) {
+        const active = state.distributionRuleVersions.find((item) => item.status === "published");
+        state.distributionRuleActiveVersionId = active ? active.id : "";
+      }
+      return;
+    }
+
+    const legacyRule = state.distributionRules || {
+      enabled: true,
+      levelOneRate: 8,
+      levelTwoRate: 3,
+      bindDays: 15,
+      ruleDesc: ""
+    };
+    const now = legacyRule.updatedAt || formatDateTime();
+    const initialVersionId = generateId("drv");
+
+    state.distributionRuleVersions = [
+      {
+        id: initialVersionId,
+        versionNo: buildRuleVersionNo(),
+        enabled: legacyRule.enabled !== false,
+        levelOneRate: Number(legacyRule.levelOneRate || 8),
+        levelTwoRate: Number(legacyRule.levelTwoRate || 3),
+        bindDays: Number(legacyRule.bindDays || 15),
+        minWithdrawalAmount: Number(legacyRule.minWithdrawalAmount || 0),
+        serviceFeeRate: Number(legacyRule.serviceFeeRate || 0),
+        serviceFeeFixed: Number(legacyRule.serviceFeeFixed || 0),
+        ruleDesc: legacyRule.ruleDesc || "",
+        status: "published",
+        effectiveAt: now,
+        publishedAt: now,
+        publishedBy: ((legacyRule.updatedBy || {}).realName) || "系统管理员",
+        createdBy: ((legacyRule.updatedBy || {}).realName) || "系统管理员",
+        createdAt: now,
+        updatedAt: now
+      }
+    ];
+    state.distributionRuleChangeLogs = [];
+    state.distributionRuleActiveVersionId = initialVersionId;
+  }
+
+  function getActiveRuleVersion(state) {
+    ensureDistributionRuleVersionState(state);
+
+    const activeId = String(state.distributionRuleActiveVersionId || "").trim();
+    let active = (state.distributionRuleVersions || []).find((item) => item.id === activeId);
+
+    if (!active) {
+      active = (state.distributionRuleVersions || []).find((item) => item.status === "published")
+        || (state.distributionRuleVersions || [])[0]
+        || null;
+      state.distributionRuleActiveVersionId = active ? active.id : "";
+    }
+
+    return active || null;
+  }
+
+  function refreshLegacyDistributionRuleState(state) {
+    const active = getActiveRuleVersion(state);
+    state.distributionRules = mapRuleSummaryFromVersion(active);
+  }
+
   function getAdminDistributionRules() {
-    return cloneData(getState().distributionRules || {});
+    const state = getState();
+    const active = getActiveRuleVersion(state);
+
+    return cloneData(mapRuleSummaryFromVersion(active));
+  }
+
+  function getAdminDistributionRuleVersions(options = {}) {
+    const state = getState();
+    const active = getActiveRuleVersion(state);
+    const keyword = String(options.keyword || "").trim().toLowerCase();
+    const status = String(options.status || "").trim();
+    const list = (state.distributionRuleVersions || [])
+      .filter((item) => {
+        if (status && normalizeRuleVersionStatus(item.status, "draft") !== status) {
+          return false;
+        }
+
+        if (!keyword) {
+          return true;
+        }
+
+        const text = [
+          item.versionNo,
+          item.ruleDesc
+        ].map((field) => String(field || "").toLowerCase()).join("|");
+
+        return text.includes(keyword);
+      })
+      .map((item) => ({
+        ...mapRuleVersionRecord(item),
+        isActive: !!(active && active.id === item.id)
+      }));
+
+    return {
+      ...paginateList(list, options),
+      activeVersionId: active ? active.id : ""
+    };
+  }
+
+  function createAdminDistributionRuleVersion(payload = {}, actor = {}) {
+    return withState((state) => {
+      const active = getActiveRuleVersion(state);
+      const normalized = normalizeRulePayload(payload, active || {});
+      const now = formatDateTime();
+      const actorName = String(actor.realName || actor.username || "系统管理员").trim() || "系统管理员";
+      const nextVersion = {
+        id: generateId("drv"),
+        versionNo: buildRuleVersionNo(),
+        ...normalized,
+        status: "draft",
+        effectiveAt: "",
+        publishedAt: "",
+        publishedBy: "",
+        createdBy: actorName,
+        createdAt: now,
+        updatedAt: now
+      };
+
+      state.distributionRuleVersions = [nextVersion].concat(state.distributionRuleVersions || []);
+      buildRuleLogRecord({
+        state,
+        ruleVersionId: nextVersion.id,
+        action: "created_draft",
+        summary: "创建分销规则草稿",
+        payload: normalized,
+        actor
+      });
+      refreshLegacyDistributionRuleState(state);
+
+      return mapRuleVersionRecord(nextVersion);
+    });
+  }
+
+  function publishAdminDistributionRuleVersion(ruleVersionId, payload = {}, actor = {}) {
+    return withState((state) => {
+      const current = (state.distributionRuleVersions || []).find((item) => item.id === ruleVersionId);
+
+      if (!current) {
+        return null;
+      }
+
+      if (current.status === "published") {
+        return mapRuleVersionRecord(current);
+      }
+
+      const now = formatDateTime();
+      const actorName = String(actor.realName || actor.username || "系统管理员").trim() || "系统管理员";
+      const effectiveAt = String(payload.effectiveAt || "").trim() || now;
+
+      (state.distributionRuleVersions || []).forEach((item) => {
+        if (item.status === "published") {
+          item.status = "archived";
+          item.updatedAt = now;
+        }
+      });
+
+      current.status = "published";
+      current.effectiveAt = effectiveAt;
+      current.publishedAt = now;
+      current.publishedBy = actorName;
+      current.updatedAt = now;
+      state.distributionRuleActiveVersionId = current.id;
+
+      buildRuleLogRecord({
+        state,
+        ruleVersionId: current.id,
+        action: "published",
+        summary: "发布分销规则版本",
+        payload: normalizeRulePayload(current, current),
+        actor
+      });
+      refreshLegacyDistributionRuleState(state);
+
+      return mapRuleVersionRecord(current);
+    });
+  }
+
+  function getAdminDistributionRuleChangeLogs(options = {}) {
+    const state = getState();
+    ensureDistributionRuleVersionState(state);
+    const action = String(options.action || "").trim();
+    const ruleVersionId = String(options.ruleVersionId || "").trim();
+    const list = (state.distributionRuleChangeLogs || [])
+      .filter((item) => {
+        if (action && item.action !== action) {
+          return false;
+        }
+
+        if (ruleVersionId && item.ruleVersionId !== ruleVersionId) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((item) => {
+        const relatedVersion = (state.distributionRuleVersions || []).find((version) => version.id === item.ruleVersionId);
+
+        return {
+          logId: item.id,
+          action: item.action || "",
+          summary: item.summary || "",
+          payloadJson: item.payloadJson || "",
+          actorId: item.actorId || "",
+          actorName: item.actorName || "",
+          createdAt: item.createdAt || "",
+          ruleVersion: relatedVersion
+            ? {
+                versionId: relatedVersion.id,
+                versionNo: relatedVersion.versionNo
+              }
+            : null
+        };
+      });
+
+    return paginateList(list, options);
   }
 
   function updateAdminDistributionRules(payload = {}, actor = {}) {
     return withState((state) => {
-      state.distributionRules = {
-        ...state.distributionRules,
-        enabled: typeof payload.enabled === "undefined" ? state.distributionRules.enabled : !!payload.enabled,
-        levelOneRate: typeof payload.levelOneRate === "undefined" ? state.distributionRules.levelOneRate : Number(payload.levelOneRate || 0),
-        levelTwoRate: typeof payload.levelTwoRate === "undefined" ? state.distributionRules.levelTwoRate : Number(payload.levelTwoRate || 0),
-        bindDays: typeof payload.bindDays === "undefined" ? state.distributionRules.bindDays : Number(payload.bindDays || 0),
-        ruleDesc: payload.ruleDesc || state.distributionRules.ruleDesc,
-        updatedAt: formatDateTime(),
-        updatedBy: {
-          adminUserId: actor.adminUserId || "admin-1",
-          realName: actor.realName || "系统管理员"
+      const active = getActiveRuleVersion(state);
+      const normalized = normalizeRulePayload(payload, active || {});
+      const now = formatDateTime();
+      const actorName = String(actor.realName || actor.username || "系统管理员").trim() || "系统管理员";
+
+      (state.distributionRuleVersions || []).forEach((item) => {
+        if (item.status === "published") {
+          item.status = "archived";
+          item.updatedAt = now;
         }
+      });
+
+      const nextVersion = {
+        id: generateId("drv"),
+        versionNo: buildRuleVersionNo(),
+        ...normalized,
+        status: "published",
+        effectiveAt: now,
+        publishedAt: now,
+        publishedBy: actorName,
+        createdBy: actorName,
+        createdAt: now,
+        updatedAt: now
       };
+
+      state.distributionRuleVersions = [nextVersion].concat(state.distributionRuleVersions || []);
+      state.distributionRuleActiveVersionId = nextVersion.id;
+      buildRuleLogRecord({
+        state,
+        ruleVersionId: nextVersion.id,
+        action: "legacy_put_publish",
+        summary: "兼容旧接口直接发布规则",
+        payload: normalized,
+        actor
+      });
+      refreshLegacyDistributionRuleState(state);
 
       return cloneData(state.distributionRules);
     });
@@ -880,6 +1382,182 @@ function createAdminApi(deps) {
     });
   }
 
+  function getWithdrawalStatusText(status) {
+    return {
+      submitted: "待审核",
+      approved: "待打款",
+      rejected: "已拒绝",
+      paying: "打款中",
+      paid: "已打款",
+      pay_failed: "打款失败",
+      cancelled: "已撤销"
+    }[status] || "未知状态";
+  }
+
+  function buildAdminWithdrawalRecord(record = {}, state = getState()) {
+    const user = (state.userRecords || []).find((item) => item.id === record.userId) || {};
+    const payouts = Array.isArray(record.payouts) ? record.payouts : [];
+    const latestPayout = payouts.length ? payouts[payouts.length - 1] : null;
+
+    return {
+      withdrawalId: record.id || "",
+      requestNo: record.requestNo || "",
+      userId: record.userId || "",
+      nickname: user.nickname || "",
+      mobile: user.mobile || "",
+      status: record.status || "submitted",
+      statusText: getWithdrawalStatusText(record.status),
+      amountCent: Math.round(Number(record.amount || 0) * 100),
+      amountText: formatPrice(record.amount || 0),
+      serviceFeeCent: Math.round(Number(record.serviceFee || 0) * 100),
+      serviceFeeText: formatPrice(record.serviceFee || 0),
+      netAmountCent: Math.round(Number(record.netAmount || 0) * 100),
+      netAmountText: formatPrice(record.netAmount || 0),
+      channel: record.channel || "manual_bank",
+      accountName: record.accountName || "",
+      accountNoMask: record.accountNoMask || "",
+      reviewRemark: record.reviewRemark || "",
+      reviewedBy: record.reviewedBy || "",
+      reviewedAt: record.reviewedAt || "",
+      paidAt: record.paidAt || "",
+      createdAt: record.createdAt || "",
+      updatedAt: record.updatedAt || "",
+      latestPayout: latestPayout ? cloneData(latestPayout) : null
+    };
+  }
+
+  function getAdminWithdrawalRequests(options = {}) {
+    const keyword = String(options.keyword || "").trim().toLowerCase();
+    const status = String(options.status || "").trim();
+    const state = getState();
+    const list = (state.withdrawalRequests || [])
+      .filter((item) => {
+        if (status && item.status !== status) {
+          return false;
+        }
+
+        if (!keyword) {
+          return true;
+        }
+
+        const user = (state.userRecords || []).find((record) => record.id === item.userId) || {};
+        const text = [
+          item.requestNo,
+          user.nickname,
+          user.mobile,
+          item.accountNoMask
+        ].map((field) => String(field || "").toLowerCase()).join("|");
+
+        return text.includes(keyword);
+      })
+      .map((item) => buildAdminWithdrawalRecord(item, state));
+
+    return paginateList(list, options);
+  }
+
+  function getAdminWithdrawalDetail(withdrawalId) {
+    const state = getState();
+    const record = (state.withdrawalRequests || []).find((item) => item.id === withdrawalId);
+
+    if (!record) {
+      return null;
+    }
+
+    return {
+      ...buildAdminWithdrawalRecord(record, state),
+      payouts: cloneData(record.payouts || [])
+    };
+  }
+
+  function reviewAdminWithdrawalRequest(withdrawalId, payload = {}, actor = {}) {
+    const action = String(payload.action || "").trim();
+
+    if (action !== "approve" && action !== "reject") {
+      throw new Error("缺少有效审核动作");
+    }
+
+    return withState((state) => {
+      const current = (state.withdrawalRequests || []).find((item) => item.id === withdrawalId);
+
+      if (!current) {
+        return null;
+      }
+
+      if (current.status !== "submitted") {
+        if ((action === "approve" && current.status === "approved") || (action === "reject" && current.status === "rejected")) {
+          return buildAdminWithdrawalRecord(current, state);
+        }
+
+        throw new Error("当前提现单状态不可审核");
+      }
+
+      current.status = action === "approve" ? "approved" : "rejected";
+      current.reviewRemark = String(payload.remark || "").trim();
+      current.reviewedBy = String(actor.realName || actor.username || "系统管理员").trim() || "系统管理员";
+      current.reviewedAt = formatDateTime();
+      current.updatedAt = current.reviewedAt;
+
+      if (current.status === "rejected") {
+        state.distributor = {
+          ...state.distributor,
+          withdrawingCommission: Number(Math.max(0, Number((state.distributor || {}).withdrawingCommission || 0) - Number(current.amount || 0)).toFixed(2))
+        };
+      }
+
+      return buildAdminWithdrawalRecord(current, state);
+    });
+  }
+
+  function payoutAdminWithdrawalRequest(withdrawalId, payload = {}, actor = {}) {
+    const result = String(payload.result || "paid").trim() === "failed" ? "failed" : "paid";
+
+    return withState((state) => {
+      const current = (state.withdrawalRequests || []).find((item) => item.id === withdrawalId);
+
+      if (!current) {
+        return null;
+      }
+
+      if (!["approved", "paying", "pay_failed", "paid"].includes(current.status)) {
+        throw new Error("当前提现单状态不可打款");
+      }
+
+      if (current.status === "paid" && result === "paid") {
+        return buildAdminWithdrawalRecord(current, state);
+      }
+
+      const now = formatDateTime();
+      const payout = {
+        id: generateId("wdp"),
+        channel: String(payload.channel || "manual_bank").trim() || "manual_bank",
+        channelBillNo: String(payload.channelBillNo || "").trim(),
+        status: result === "paid" ? "paid" : "failed",
+        remark: String(payload.remark || "").trim(),
+        paidBy: String(actor.realName || actor.username || "系统管理员").trim() || "系统管理员",
+        paidAt: now,
+        createdAt: now
+      };
+
+      current.payouts = (current.payouts || []).concat([payout]);
+      current.updatedAt = now;
+
+      if (result === "paid") {
+        current.status = "paid";
+        current.paidAt = now;
+        state.distributor = {
+          ...state.distributor,
+          withdrawingCommission: Number(Math.max(0, Number((state.distributor || {}).withdrawingCommission || 0) - Number(current.amount || 0)).toFixed(2)),
+          withdrawnCommission: Number((Number((state.distributor || {}).withdrawnCommission || 0) + Number(current.amount || 0)).toFixed(2)),
+          settledCommission: Number(Math.max(0, Number((state.distributor || {}).settledCommission || 0) - Number(current.amount || 0)).toFixed(2))
+        };
+      } else {
+        current.status = "pay_failed";
+      }
+
+      return buildAdminWithdrawalRecord(current, state);
+    });
+  }
+
   return {
     getAdminDashboardSummary,
     getAdminCategories,
@@ -902,10 +1580,18 @@ function createAdminApi(deps) {
     saveAdminCouponTemplate,
     updateAdminCouponTemplateStatus,
     getAdminDistributionRules,
+    getAdminDistributionRuleVersions,
+    createAdminDistributionRuleVersion,
+    publishAdminDistributionRuleVersion,
+    getAdminDistributionRuleChangeLogs,
     updateAdminDistributionRules,
     getAdminDistributors,
     getAdminDistributorDetail,
-    updateAdminDistributorStatus
+    updateAdminDistributorStatus,
+    getAdminWithdrawalRequests,
+    getAdminWithdrawalDetail,
+    reviewAdminWithdrawalRequest,
+    payoutAdminWithdrawalRequest
   };
 }
 

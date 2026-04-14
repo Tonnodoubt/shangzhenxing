@@ -28,7 +28,21 @@ const MOBILE_CODE_EXPIRE_MS = 5 * 60 * 1000;
 const MOBILE_CODE_RESEND_INTERVAL_MS = 60 * 1000;
 const MOBILE_CODE_MAX_VERIFY_ATTEMPTS = 5;
 const mobileCodeStore = new Map();
-let randomCodeGenerator = () => String(Math.floor(100000 + Math.random() * 900000));
+
+// 定期清理过期的验证码记录
+const mobileCodeCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [mobile, record] of mobileCodeStore) {
+    if (record.expiresAt <= now) {
+      mobileCodeStore.delete(mobile);
+    }
+  }
+}, 5 * 60 * 1000);
+if (typeof mobileCodeCleanupTimer.unref === "function") {
+  mobileCodeCleanupTimer.unref();
+}
+// 默认验证码生成器——仅测试辅助函数会替换此引用，生产代码路径始终使用默认值
+let _randomCodeGenerator = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const DEFAULT_NON_PRODUCTION_ACCOUNT_USERS = [
   {
@@ -196,7 +210,7 @@ function issueMobileLoginCode(rawMobile, createStorefrontError) {
     }
   }
 
-  const code = normalizeSixDigitCode(randomCodeGenerator());
+  const code = normalizeSixDigitCode(_randomCodeGenerator());
 
   if (!/^\d{6}$/.test(code)) {
     throw createStorefrontError("验证码服务异常，请稍后重试", 500, "MOBILE_CODE_GENERATION_FAILED");
@@ -303,18 +317,26 @@ function resolveStorefrontSessionLoginType(payload = {}, createStorefrontError, 
   throw createStorefrontError("暂不支持当前登录方式", 400, "LOGIN_TYPE_UNSUPPORTED");
 }
 
+const _isNonProduction = () => String(process.env.NODE_ENV || "").trim().toLowerCase() !== "production";
+
 function resetMobileLoginCodeStoreForTest() {
+  if (!_isNonProduction()) return;
   mobileCodeStore.clear();
-  randomCodeGenerator = () => String(Math.floor(100000 + Math.random() * 900000));
+  _randomCodeGenerator = () => String(Math.floor(100000 + Math.random() * 900000));
 }
 
 function setMobileLoginCodeGeneratorForTest(generator) {
+  if (!_isNonProduction()) return;
   if (typeof generator !== "function") {
     return;
   }
 
-  randomCodeGenerator = generator;
+  _randomCodeGenerator = generator;
 }
+
+const _testOnlyExports = _isNonProduction()
+  ? { resetMobileLoginCodeStoreForTest, setMobileLoginCodeGeneratorForTest }
+  : {};
 
 module.exports = {
   isMockWechatLoginAllowed,
@@ -324,6 +346,5 @@ module.exports = {
   issueMobileLoginCode,
   verifyMobileLoginCode,
   resolveStorefrontSessionLoginType,
-  resetMobileLoginCodeStoreForTest,
-  setMobileLoginCodeGeneratorForTest
+  ..._testOnlyExports
 };

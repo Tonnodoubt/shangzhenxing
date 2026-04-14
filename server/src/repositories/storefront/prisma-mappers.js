@@ -29,13 +29,16 @@ function createStorefrontPrismaMapperModule({
       return "";
     }
 
-    const pad = (value) => String(value).padStart(2, "0");
-
-    return [
-      current.getFullYear(),
-      pad(current.getMonth() + 1),
-      pad(current.getDate())
-    ].join("-") + " " + [pad(current.getHours()), pad(current.getMinutes())].join(":");
+    return current.toLocaleString("sv-SE", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).replace(",", "");
   }
 
   function formatDate(date) {
@@ -176,7 +179,7 @@ function createStorefrontPrismaMapperModule({
   function mapSession(session = {}) {
     return {
       sessionToken: session.sessionToken || "",
-      expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : "",
+      expiresAt: session.expiresAt ? formatDateTime(session.expiresAt) : "",
       status: session.status || "active"
     };
   }

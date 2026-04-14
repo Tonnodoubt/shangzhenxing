@@ -31,11 +31,18 @@ function formatDateTime(date) {
 
 function createDistributionModule(overrides = {}) {
   return createStorefrontPrismaDistributionModule({
+    createStorefrontError: (message, statusCode = 500, code = "") => {
+      const error = new Error(message || "服务异常");
+      error.statusCode = statusCode;
+      error.code = code;
+      return error;
+    },
     defaultDistributorProfile: DEFAULT_DISTRIBUTOR_PROFILE,
     buildCoverLabel: (title = "") => String(title || "").trim().slice(0, 1) || "默",
     ensureCouponFeatureData: async () => {},
     formatDate,
     formatDateTime,
+    getPrisma: async () => ({}),
     getCurrentUserContext: async () => ({
       prisma: {},
       user: {
@@ -110,10 +117,14 @@ test("distribution helper builds referral snapshots from eligible products only"
   assert.deepEqual(snapshot, {
     referralBindingId: "binding-1",
     inviterUserId: "inviter-1",
+    levelTwoInviterUserId: null,
+    ruleVersionId: null,
     sourceScene: "poster_share",
     commissionBaseAmount: 40,
     commissionRate: 0.08,
-    commissionAmount: 3.2
+    commissionAmount: 3.2,
+    levelTwoCommissionRate: 0,
+    levelTwoCommissionAmount: 0
   });
 });
 
@@ -183,6 +194,82 @@ test("distribution helper records commission once an invited order is done", asy
   assert.equal(record.status, "pending");
 });
 
+test("distribution helper snapshots ruleVersion and level two commission", async () => {
+  const distributionModule = createDistributionModule({
+    getReferralBindingByInvitee: async (prisma, inviteeUserId) => {
+      if (inviteeUserId === "user-2") {
+        return {
+          id: "binding-1",
+          inviterUserId: "inviter-1",
+          sourceScene: "share"
+        };
+      }
+
+      if (inviteeUserId === "inviter-1") {
+        return {
+          id: "binding-2",
+          inviterUserId: "inviter-2",
+          sourceScene: "share"
+        };
+      }
+
+      return null;
+    }
+  });
+  const prisma = {
+    product: {
+      findMany: async () => ([
+        {
+          id: "prod-1",
+          distributionEnabled: true
+        }
+      ])
+    },
+    distributionRuleVersion: {
+      findFirst: async () => ({
+        id: "drv-1",
+        enabled: true,
+        levelOneRate: 10,
+        levelTwoRate: 2
+      })
+    },
+    distributorProfile: {
+      upsert: async ({ where }) => ({
+        id: `dist-${where.userId}`,
+        status: "active",
+        level: "普通分销员"
+      })
+    }
+  };
+
+  const snapshot = await distributionModule.helpers.buildOrderReferralSnapshot(
+    prisma,
+    {
+      id: "user-2"
+    },
+    [
+      {
+        productId: "prod-1",
+        price: 100,
+        quantity: 1
+      }
+    ]
+  );
+
+  assert.deepEqual(snapshot, {
+    referralBindingId: "binding-1",
+    inviterUserId: "inviter-1",
+    levelTwoInviterUserId: "inviter-2",
+    ruleVersionId: "drv-1",
+    sourceScene: "share",
+    commissionBaseAmount: 100,
+    commissionRate: 0.1,
+    commissionAmount: 10,
+    levelTwoCommissionRate: 0.02,
+    levelTwoCommissionAmount: 2
+  });
+});
+
 test("distribution methods expose mapped commission records", async () => {
   const distributionModule = createDistributionModule({
     getCurrentUserContext: async () => ({
@@ -250,6 +337,7 @@ test("distribution methods expose mapped commission records", async () => {
   assert.deepEqual(result.records, [
     {
       id: "commission-2",
+      ruleVersionId: "",
       title: "每日精选零食礼盒",
       fromUser: "林小满",
       orderNo: "NO20260401088",
@@ -344,4 +432,101 @@ test("distribution methods build poster payloads with share path and available c
     title: "分享成交券"
   });
   assert.equal(result.sharePath, "/pages/home/index?inviterUserId=user-1&sourceScene=share");
+});
+
+test("distribution methods create withdrawal request and freeze withdrawing commission", async () => {
+  let profileUpdatedPayload = null;
+  const tx = {
+    distributorProfile: {
+      findUnique: async () => ({
+        id: "dist-10",
+        settledCommission: 80,
+        withdrawingCommission: 10,
+        withdrawableCommission: 70
+      }),
+      update: async (payload) => {
+        profileUpdatedPayload = payload;
+        return payload;
+      }
+    },
+    withdrawalRequest: {
+      create: async ({ data }) => ({
+        id: "wd-1",
+        createdAt: new Date("2026-04-13T10:00:00+08:00"),
+        updatedAt: new Date("2026-04-13T10:00:00+08:00"),
+        payouts: [],
+        ...data
+      })
+    }
+  };
+  const prisma = {
+    distributorProfile: {
+      upsert: async () => ({
+        id: "dist-10",
+        settledCommission: 80,
+        withdrawingCommission: 10,
+        withdrawnCommission: 0
+      })
+    },
+    $transaction: async (handler) => handler(tx)
+  };
+  const distributionModule = createDistributionModule({
+    getCurrentUserContext: async () => ({
+      prisma,
+      user: {
+        id: "user-1",
+        nickname: "阿青"
+      }
+    })
+  });
+
+  const result = await distributionModule.methods.createWithdrawalRequest("session-token", {
+    amount: 20,
+    accountName: "张三",
+    accountNo: "6222020202026699",
+    remark: "测试提现"
+  });
+
+  assert.equal(result.status, "submitted");
+  assert.equal(result.amount, 20);
+  assert.equal(result.accountNoMask, "************6699");
+  assert.deepEqual(profileUpdatedPayload, {
+    where: {
+      id: "dist-10"
+    },
+    data: {
+      withdrawingCommission: {
+        increment: 20
+      },
+      withdrawableCommission: 50
+    }
+  });
+});
+
+test("distribution methods reject withdrawal creation when available balance is insufficient", async () => {
+  const distributionModule = createDistributionModule({
+    getCurrentUserContext: async () => ({
+      prisma: {
+        distributorProfile: {
+          upsert: async () => ({
+            id: "dist-11",
+            settledCommission: 12,
+            withdrawingCommission: 10
+          })
+        },
+        $transaction: async () => null
+      },
+      user: {
+        id: "user-1",
+        nickname: "阿青"
+      }
+    })
+  });
+
+  await assert.rejects(
+    () => distributionModule.methods.createWithdrawalRequest("session-token", {
+      amount: 9
+    }),
+    /可提现余额不足/
+  );
 });
