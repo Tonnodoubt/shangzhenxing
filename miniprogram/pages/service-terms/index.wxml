@@ -1,0 +1,66 @@
+<view class="policy-wrap">
+  <view class="policy-card">
+    <text class="policy-h1">{{legal.appName}}用户服务条款</text>
+    <text class="policy-meta">生效日期：2026-04-13</text>
+
+    <view class="policy-section">
+      <text class="policy-title">1. 运营主体与联系方式</text>
+      <text class="policy-item">1. 运营主体：{{legal.entityName}}</text>
+      <text class="policy-item">2. 营业执照主体名称：{{legal.entityName}}</text>
+      <text class="policy-item">3. 客服联系方式：{{legal.contactPhone}}</text>
+      <text class="policy-item">4. 联系邮箱：{{legal.contactEmail}}</text>
+      <text class="policy-item">5. 联系地址：{{legal.contactAddress}}</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">2. 条款确认与接受</text>
+      <text class="policy-text">你在本小程序完成注册、登录或下单，即视为已阅读并同意本条款。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">3. 账号与安全</text>
+      <text class="policy-item">1. 你应妥善保管账号及登录设备，避免信息泄露。</text>
+      <text class="policy-item">2. 因账号保管不当造成的风险，由使用该账号一方承担。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">4. 商品与订单</text>
+      <text class="policy-item">1. 商品页面展示的信息（价格、库存、规格）可能随活动实时调整。</text>
+      <text class="policy-item">2. 订单提交后，请在支付时效内完成付款，超时未支付订单可能自动关闭。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">5. 支付与发票</text>
+      <text class="policy-item">1. 支付通过微信支付等合规通道完成。</text>
+      <text class="policy-item">2. 如需开票，请按店铺公告或客服指引申请。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">6. 配送与签收</text>
+      <text class="policy-item">1. 请准确填写收货地址与联系方式。</text>
+      <text class="policy-item">2. 商品签收后如有问题，请及时发起售后申请。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">7. 售后服务</text>
+      <text class="policy-item">1. 售后范围、时效和处理方式以页面规则及客服说明为准。</text>
+      <text class="policy-item">2. 平台会依据订单状态、商品情况和申请资料进行审核处理。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">8. 禁止行为</text>
+      <text class="policy-item">1. 不得利用本服务从事违法违规行为。</text>
+      <text class="policy-item">2. 不得恶意下单、刷单、攻击系统或干扰平台正常运营。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">9. 责任限制</text>
+      <text class="policy-text">在法律允许范围内，因不可抗力、系统维护、通信故障等导致的服务中断，我们将尽力恢复服务并减少影响。</text>
+    </view>
+
+    <view class="policy-section">
+      <text class="policy-title">10. 条款更新与联系</text>
+      <text class="policy-text">本条款可能根据业务和法规进行更新，更新后会在小程序内公示。你可通过上述联系方式联系我们。</text>
+    </view>
+  </view>
+</view>

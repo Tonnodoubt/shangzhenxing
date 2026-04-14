@@ -1,7 +1,7 @@
 const envConfig = require("../config/env");
 const request = require("./request");
 const sessionStore = require("./session");
-const mockMallService = require("./mall");
+const mockMallService = require("../shared/mall-core");
 const WECHAT_PROFILE_STORAGE_KEY = "wechat-mini-shop:wechat-profile";
 
 let sessionBootstrapPromise = null;
@@ -91,8 +91,8 @@ function getSessionLoginModeSummary() {
   return {
     mode: "mock",
     tag: "模拟登录态",
-    title: "当前仍走 mock session",
-    copy: "这样能继续稳定联调；等服务端配好微信密钥后，再切成真实微信登录。"
+    title: "当前使用模拟登录",
+    copy: "可正常体验浏览和下单流程，完成微信登录配置后会自动切换。"
   };
 }
 
@@ -155,7 +155,7 @@ async function buildSessionCreatePayload() {
 }
 
 async function createApiSessionByPayload(payload = {}) {
-  const data = await request.post("/api/auth/session", payload, {
+  const data = await request.post("/api/v1/auth/session", payload, {
     skipAuthorization: true
   });
 
@@ -263,10 +263,38 @@ function apiDelete(url, data, options = {}) {
   return callApi("del", url, data, options);
 }
 
+function runWxRequestPayment(params = {}) {
+  return new Promise((resolve, reject) => {
+    if (typeof wx === "undefined" || typeof wx.requestPayment !== "function") {
+      reject(new Error("当前环境暂不支持微信支付调起"));
+      return;
+    }
+
+    wx.requestPayment({
+      timeStamp: String(params.timeStamp || ""),
+      nonceStr: String(params.nonceStr || ""),
+      package: String(params.package || ""),
+      signType: String(params.signType || "RSA"),
+      paySign: String(params.paySign || ""),
+      success: resolve,
+      fail: (error) => {
+        const message = String((error || {}).errMsg || "").trim();
+
+        if (message.includes("cancel")) {
+          reject(new Error("你已取消支付"));
+          return;
+        }
+
+        reject(new Error(message || "支付调起失败"));
+      }
+    });
+  });
+}
+
 function getLoginReadiness() {
   return dispatch(
     () => Promise.resolve(getDefaultLoginReadiness()),
-    () => request.get("/api/auth/login-readiness", {}, {
+    () => request.get("/api/v1/auth/login-readiness", {}, {
       skipAuthorization: true
     })
   );
@@ -296,7 +324,7 @@ function getAddresses() {
   return dispatch(
     () => mockMallService.getAddresses(),
     async () => {
-      const data = await apiGet("/api/addresses");
+      const data = await apiGet("/api/v1/addresses");
       return data.addresses || [];
     }
   );
@@ -312,7 +340,7 @@ function getAddressById(addressId) {
 function getAddressListData() {
   return dispatch(
     () => mockMallService.getAddressListData(),
-    () => apiGet("/api/addresses")
+    () => apiGet("/api/v1/addresses")
   );
 }
 
@@ -320,7 +348,7 @@ function getSelectedAddress() {
   return dispatch(
     () => mockMallService.getSelectedAddress(),
     async () => {
-      const data = await apiGet("/api/checkout");
+      const data = await apiGet("/api/v1/checkout");
       return data.address || null;
     }
   );
@@ -338,7 +366,7 @@ function saveAddress(payload = {}) {
     () => mockMallService.saveAddress(payload),
     () => payload.id
       ? apiPut(`/api/addresses/${payload.id}`, payload)
-      : apiPost("/api/addresses", payload)
+      : apiPost("/api/v1/addresses", payload)
   );
 }
 
@@ -354,42 +382,42 @@ function deleteAddress(addressId) {
 function getCartPageData() {
   return dispatch(
     () => mockMallService.getCartPageData(),
-    () => apiGet("/api/cart")
+    () => apiGet("/api/v1/cart")
   );
 }
 
 function setCartItems(cartItems) {
   return dispatch(
     () => mockMallService.setCartItems(cartItems),
-    () => apiPut("/api/cart", { cartItems })
+    () => apiPut("/api/v1/cart", { cartItems })
   );
 }
 
 function addToCart(product) {
   return dispatch(
     () => mockMallService.addToCart(product),
-    () => apiPost("/api/cart/items/add", { product })
+    () => apiPost("/api/v1/cart/items/add", { product })
   );
 }
 
 function increaseCartItem(id, specText) {
   return dispatch(
     () => mockMallService.increaseCartItem(id, specText),
-    () => apiPost("/api/cart/items/increase", { id, specText })
+    () => apiPost("/api/v1/cart/items/increase", { id, specText })
   );
 }
 
 function decreaseCartItem(id, specText) {
   return dispatch(
     () => mockMallService.decreaseCartItem(id, specText),
-    () => apiPost("/api/cart/items/decrease", { id, specText })
+    () => apiPost("/api/v1/cart/items/decrease", { id, specText })
   );
 }
 
 function removeCartItem(id, specText) {
   return dispatch(
     () => mockMallService.removeCartItem(id, specText),
-    () => apiPost("/api/cart/items/remove", { id, specText })
+    () => apiPost("/api/v1/cart/items/remove", { id, specText })
   );
 }
 
@@ -408,7 +436,7 @@ function getCartCount() {
 function getCouponPageData() {
   return dispatch(
     () => mockMallService.getCouponPageData(),
-    () => apiGet("/api/coupons")
+    () => apiGet("/api/v1/coupons")
   );
 }
 
@@ -416,7 +444,7 @@ function getSelectedCoupon() {
   return dispatch(
     () => mockMallService.getSelectedCoupon(),
     async () => {
-      const data = await apiGet("/api/checkout");
+      const data = await apiGet("/api/v1/checkout");
       return data.selectedCoupon || null;
     }
   );
@@ -437,21 +465,21 @@ function getAvailableCoupons(totalAmount) {
 function claimCoupon(templateId) {
   return dispatch(
     () => mockMallService.claimCoupon(templateId),
-    () => apiPost("/api/coupons/claim", { templateId })
+    () => apiPost("/api/v1/coupons/claim", { templateId })
   );
 }
 
 function selectCoupon(couponId, amount) {
   return dispatch(
     () => mockMallService.selectCoupon(couponId, amount),
-    () => apiPost("/api/coupons/select", { couponId, amount })
+    () => apiPost("/api/v1/coupons/select", { couponId, amount })
   );
 }
 
 function clearSelectedCoupon() {
   return dispatch(
     () => mockMallService.clearSelectedCoupon(),
-    () => apiPost("/api/coupons/clear")
+    () => apiPost("/api/v1/coupons/clear")
   );
 }
 
@@ -460,21 +488,96 @@ function clearSelectedCoupon() {
 function getCheckoutPageData() {
   return dispatch(
     () => mockMallService.getCheckoutPageData(),
-    () => apiGet("/api/checkout")
+    () => apiGet("/api/v1/checkout")
   );
 }
 
 function submitOrder(options = {}) {
   return dispatch(
     () => mockMallService.submitOrder(options),
-    () => apiPost("/api/orders/submit", options)
+    () => apiPost("/api/v1/orders/submit", options)
   );
+}
+
+function prepareOrderPayment(orderId, payload = {}) {
+  return dispatch(
+    () => mockMallService.prepareOrderPayment(orderId, payload),
+    () => apiPost(`/api/v1/orders/${orderId}/payment/prepare`, payload)
+  );
+}
+
+function getOrderPayment(orderId) {
+  return dispatch(
+    () => mockMallService.getOrderPayment(orderId),
+    () => apiGet(`/api/v1/orders/${orderId}/payment`)
+  );
+}
+
+function confirmMockOrderPayment(orderId, payload = {}) {
+  return dispatch(
+    () => mockMallService.confirmMockOrderPayment(orderId, payload),
+    () => apiPost(`/api/v1/orders/${orderId}/payment/mock-confirm`, payload)
+  );
+}
+
+async function payOrder(orderId, payload = {}) {
+  const prepared = await prepareOrderPayment(orderId, payload);
+
+  if (!prepared) {
+    return {
+      ok: false,
+      message: "订单不存在"
+    };
+  }
+
+  if (prepared.status === "paid") {
+    return {
+      ok: true,
+      mode: prepared.provider || "mock",
+      payment: prepared
+    };
+  }
+
+  if (prepared.mockFlow) {
+    const confirmed = await confirmMockOrderPayment(orderId, {
+      mockToken: prepared.mockToken,
+      scene: String(payload.scene || "checkout").trim() || "checkout"
+    });
+
+    return {
+      ok: true,
+      mode: "mock",
+      payment: confirmed
+    };
+  }
+
+  if (!prepared.requestPayment) {
+    throw new Error("当前支付能力尚未配置完成");
+  }
+
+  await runWxRequestPayment(prepared.requestPayment);
+  const payment = await getOrderPayment(orderId);
+
+  if (payment && payment.status !== "paid") {
+    return {
+      ok: true,
+      mode: prepared.provider || "wechat_jsapi",
+      pendingConfirmation: true,
+      payment
+    };
+  }
+
+  return {
+    ok: true,
+    mode: prepared.provider || "wechat_jsapi",
+    payment
+  };
 }
 
 function getAllOrders(options = {}) {
   return dispatch(
     () => normalizeOrderPageData(mockMallService.getAllOrders(options)),
-    async () => normalizeOrderPageData(await apiGet("/api/orders", options))
+    async () => normalizeOrderPageData(await apiGet("/api/v1/orders", options))
   );
 }
 
@@ -519,7 +622,7 @@ function getUser() {
     () => mockMallService.getUser(),
     async () => {
       try {
-        const data = await apiGet("/api/me");
+        const data = await apiGet("/api/v1/me");
         return data.user || {};
       } catch (error) {
         if (error && error.code === "LOGGED_OUT") {
@@ -540,7 +643,7 @@ function getUser() {
 function authorizeUser(payload = {}) {
   return dispatch(
     () => mockMallService.authorizeUser(payload),
-    () => apiPost("/api/auth/authorize", payload || {})
+    () => apiPost("/api/v1/auth/authorize", payload || {})
   );
 }
 
@@ -558,7 +661,7 @@ async function logout() {
   }
 
   try {
-    return await request.post("/api/auth/logout", {}, {
+    return await request.post("/api/v1/auth/logout", {}, {
       disableSessionRetry: true
     });
   } finally {
@@ -579,7 +682,7 @@ function getProfileData() {
     () => mockMallService.getProfileData(),
     async () => {
       try {
-        return await apiGet("/api/profile");
+        return await apiGet("/api/v1/profile");
       } catch (error) {
         if (error && error.code === "LOGGED_OUT") {
           return {
@@ -612,28 +715,28 @@ function getProfileData() {
 function getDistributionData() {
   return dispatch(
     () => mockMallService.getDistributionData(),
-    () => apiGet("/api/distribution")
+    () => apiGet("/api/v1/distribution")
   );
 }
 
 function getTeamData() {
   return dispatch(
     () => mockMallService.getTeamData(),
-    () => apiGet("/api/team")
+    () => apiGet("/api/v1/team")
   );
 }
 
 function getCommissionData() {
   return dispatch(
     () => mockMallService.getCommissionData(),
-    () => apiGet("/api/commissions")
+    () => apiGet("/api/v1/commissions")
   );
 }
 
 function getPosterData() {
   return dispatch(
     () => mockMallService.getPosterData(),
-    () => apiGet("/api/poster")
+    () => apiGet("/api/v1/poster")
   );
 }
 
@@ -666,6 +769,10 @@ module.exports = {
   clearSelectedCoupon,
   getCheckoutPageData,
   submitOrder,
+  prepareOrderPayment,
+  getOrderPayment,
+  confirmMockOrderPayment,
+  payOrder,
   getAllOrders,
   getOrderById,
   getOrderDetailData,

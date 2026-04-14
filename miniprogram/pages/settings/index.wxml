@@ -35,7 +35,7 @@
       </view>
       <view class="menu-row" bindtap="openMessageSettings">
         <text class="menu-label">消息通知设置</text>
-        <text class="menu-value">开发中</text>
+        <text class="menu-value">即将上线</text>
       </view>
     </view>
 

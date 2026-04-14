@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">结算页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">结算页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backCart">返回购物车</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -18,7 +18,7 @@
   <view class="panel state-card" wx:elif="{{pageState === 'empty'}}">
     <text class="state-tag">购物车为空</text>
     <text class="state-title">还没有可结算的商品</text>
-    <text class="state-copy">先回首页或分类页加几件商品，结算页再继续补优惠券和地址选择。</text>
+    <text class="state-copy">请先挑选商品加入购物车，结算时可自动使用优惠券并选择地址。</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backCart">返回购物车</button>
       <button class="primary-button state-button" bindtap="goShopping">去首页逛逛</button>
@@ -34,7 +34,7 @@
       </block>
       <block wx:else>
         <text class="checkout-empty-title">还没有可用收货地址</text>
-        <text class="checkout-empty-copy">先补一个常用地址，提交订单按钮才会解锁。</text>
+        <text class="checkout-empty-copy">请先添加收货地址，填写后即可提交订单。</text>
       </block>
       <text class="checkout-action">{{address ? '点击切换地址' : '点击添加地址'}}</text>
       <text class="checkout-warning" wx:if="{{missingAddress}}">当前未选择地址，暂时不能提交订单。</text>
@@ -71,7 +71,7 @@
         class="remark-box"
         maxlength="120"
         value="{{remark}}"
-        placeholder="可填写订单备注，后续可扩展发票、配送时间等"
+        placeholder="选填：配送偏好、联系时间等"
         bindinput="handleRemarkInput"
       />
     </view>

@@ -73,8 +73,8 @@ function buildHero(homeData = {}, categoryNav = [], profileData = {}) {
   return {
     titleTop: (banners[0] || {}).title || "新人福利专区",
     titleBottom: (banners[1] || {}).title || "分享爆款赚佣金",
-    copy: (banners[0] || {}).subtitle || "把新人券、主推商品和分销入口收在同一屏，首页更像品牌门面。",
-    statusText: user.isAuthorized ? "已授权" : "预览态",
+    copy: (banners[0] || {}).subtitle || "新人福利、主推商品和分销入口一屏可见，逛起来更高效。",
+    statusText: user.isAuthorized ? "已授权" : "未登录",
     product: heroProduct,
     backdropWords: categoryNav.map((item, index) => ({
       id: `backdrop-${item.id}`,
@@ -97,7 +97,7 @@ function buildBenefitCard(profileData = {}) {
     title: "领券下单 分享赚佣",
     copy: coupons.length
       ? `${coupons.length} 张常用券已经集中在这里，先领券再下单会更顺手。`
-      : "首页先把福利入口放前面，新人券和常用满减都从这里进入。",
+      : "新人券和常用满减券都在这里，领券后下单更划算。",
     footer: distributor.teamCount
       ? `团队 ${distributor.teamCount} 人 · 待结算 ¥${formatMoney(distributor.pendingCommission || 0)}`
       : "分销主链已接通，分享后的团队和佣金会继续沉淀。",
@@ -114,12 +114,17 @@ function buildFeatureStory(homeData = {}) {
     ...product,
     kicker: product.tag || "主推",
     title: product.title || "主推专题位",
-    copy: product.shortDesc || "这里适合放一张首页主推图，把故事感和商品感一起拉出来。"
+    copy: product.shortDesc || "甄选主推商品，兼顾品质与性价比。"
   };
 }
 
 function buildHomeViewModel(homeData = {}, profileData = {}, categories = []) {
   const categoryNav = buildCategoryNav(categories);
+  const banners = homeData.banners || [];
+  const pageSections = (homeData.pageSections || [])
+    .filter((section) => section.visible !== false)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const theme = homeData.theme || {};
 
   return {
     user: profileData.user || {},
@@ -128,6 +133,10 @@ function buildHomeViewModel(homeData = {}, profileData = {}, categories = []) {
     benefitCard: buildBenefitCard(profileData),
     featureStory: buildFeatureStory(homeData),
     productGrid: (homeData.recommendedProducts || []).slice(0, 4).map((item) => buildProductCard(item)),
+    banners,
+    pageSections,
+    theme,
+    activeBannerIndex: 0,
     pageState: "success",
     errorMessage: ""
   };
@@ -141,10 +150,17 @@ Page({
     benefitCard: {},
     featureStory: {},
     productGrid: [],
+    banners: [],
+    pageSections: [],
+    theme: {},
+    activeBannerIndex: 0,
     pageState: "loading",
-    errorMessage: ""
+    errorMessage: "",
+    lastLoadTime: 0
   },
   async onShow() {
+    const now = Date.now();
+    if (this.data.pageState === "success" && now - this.data.lastLoadTime < 30000) return;
     await this.loadHomeData();
   },
   async loadHomeData() {
@@ -161,7 +177,10 @@ Page({
         catalogService.getCategories()
       ]);
 
-      this.setData(buildHomeViewModel(homeData, profileData, categories));
+      this.setData({
+        ...buildHomeViewModel(homeData, profileData, categories),
+        lastLoadTime: Date.now()
+      });
     } catch (error) {
       this.setData({
         pageState: "error",
@@ -203,6 +222,26 @@ Page({
     wx.switchTab({
       url: "/pages/category/index"
     });
+  },
+  swiperChange(e) {
+    this.setData({
+      activeBannerIndex: e.detail.current
+    });
+  },
+  onBannerTap(e) {
+    const { linkType, linkValue } = e.currentTarget.dataset;
+
+    if (!linkType || !linkValue) {
+      return;
+    }
+
+    if (linkType === "product") {
+      wx.navigateTo({ url: `/pages/product/index?id=${linkValue}` });
+    } else if (linkType === "category") {
+      wx.switchTab({ url: "/pages/category/index" });
+    } else if (linkType === "page") {
+      wx.navigateTo({ url: linkValue });
+    }
   },
   retryLoad() {
     this.loadHomeData();

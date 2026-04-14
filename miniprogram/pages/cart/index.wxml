@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">购物车暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">购物车暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="goShopping">去首页逛逛</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -16,11 +16,6 @@
   </view>
 
   <view wx:else>
-    <view class="cart-header panel">
-      <text class="section-title">购物车骨架</text>
-      <text class="section-subtitle">这里已经连上了数量增减、删除和结算入口，方便我们后面继续接支付。</text>
-    </view>
-
     <view wx:if="{{!isEmpty}}">
       <view class="cart-list">
         <block wx:for="{{cartItems}}" wx:key="cartKey">
@@ -91,7 +86,7 @@
 
     <view class="empty-box panel" wx:else>
       <text class="empty-title">购物车目前还是空的</text>
-      <text class="empty-copy">你可以先去首页或分类页点几件商品进来，整条下单链路就能跑起来了。</text>
+      <text class="empty-copy">去首页或分类页挑选商品，加入购物车后可统一结算。</text>
       <button class="primary-button empty-action" bindtap="goShopping">去逛逛</button>
     </view>
   </view>

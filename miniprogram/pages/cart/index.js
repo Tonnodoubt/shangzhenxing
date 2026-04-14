@@ -1,4 +1,5 @@
 const mallService = require("../../services/mall-client");
+const { confirmAction } = require("../../shared/dialog");
 
 const MAX_QUANTITY = 99;
 
@@ -41,23 +42,6 @@ function buildCartViewModel(payload = {}) {
     pageState: "success",
     errorMessage: ""
   };
-}
-
-function confirmAction(options = {}) {
-  return new Promise((resolve) => {
-    wx.showModal({
-      title: options.title || "请确认",
-      content: options.content || "",
-      confirmText: options.confirmText || "确定",
-      cancelText: options.cancelText || "取消",
-      success(result) {
-        resolve(!!result.confirm);
-      },
-      fail() {
-        resolve(false);
-      }
-    });
-  });
 }
 
 Page({

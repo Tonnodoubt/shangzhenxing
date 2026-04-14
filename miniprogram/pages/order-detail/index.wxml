@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">订单详情暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">订单详情暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backOrders">返回订单列表</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -97,7 +97,7 @@
     </view>
 
     <view class="panel detail-card">
-      <text class="block-title">订单服务说明</text>
+      <text class="block-title">订单服务</text>
       <block wx:for="{{order.serviceTips}}" wx:key="id">
         <view class="service-row">
           <text class="service-title">{{item.title}}</text>

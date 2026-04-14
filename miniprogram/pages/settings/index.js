@@ -94,7 +94,7 @@ Page({
   },
   openMessageSettings() {
     wx.showToast({
-      title: "消息设置开发中",
+      title: "消息通知设置即将上线",
       icon: "none"
     });
   },

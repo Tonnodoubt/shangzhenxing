@@ -112,7 +112,7 @@ function buildGuideSteps(levelPlan = {}) {
     {
       id: "step-2",
       title: "跟进新邀请和团队成员",
-      copy: levelPlan.todayTip || "邀请进来的用户会沉淀到团队列表，方便后续跟进。"
+      copy: levelPlan.todayTip || "新邀请用户会展示在团队列表，便于持续跟进成交。"
     },
     {
       id: "step-3",

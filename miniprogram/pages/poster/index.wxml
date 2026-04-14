@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">海报页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">海报页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backDistribution">返回分销中心</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -26,11 +26,11 @@
         <text class="poster-coupon-copy">{{coupon.title}}</text>
       </view>
       <view class="poster-coupon poster-coupon-empty" wx:else>
-        <text class="poster-coupon-copy">当前还没有可展示的优惠券，后面可以补新人券或活动券。</text>
+        <text class="poster-coupon-copy">当前暂无可展示优惠券，可先分享商品海报吸引新客。</text>
       </view>
 
       <view class="poster-code">
-        <text class="poster-code-text">小程序码示意区</text>
+        <text class="poster-code-text">小程序码展示区</text>
       </view>
     </view>
 

@@ -130,14 +130,14 @@ function buildServicePromises(product = {}) {
     {
       id: "aftersale",
       title: "支持基础售后申请",
-      copy: "待收货和已完成订单支持发起售后，当前版本先走文本申请流程。"
+      copy: "待收货和已完成订单支持发起售后，提交后可跟踪处理进度。"
     },
     {
       id: "distribution",
       title: product.distributionEnabled === false ? "当前偏自购展示" : "支持分销分享",
       copy: product.distributionEnabled === false
-        ? "这类商品更适合先验证自购下单链路，后面再补推广策略。"
-        : "商品卡和海报可以继续复用到分销中心，方便演示分享赚佣。"
+        ? "该商品暂不参与分销，支持直接下单购买。"
+        : "支持分享商品给好友，成交后可获得对应佣金。"
     }
   ];
 }
@@ -359,7 +359,14 @@ Page({
 
       wx.showToast({
         title: "已加入购物车",
-        icon: "success"
+        icon: "success",
+        complete: () => {
+          if (action === "buy") {
+            wx.navigateTo({
+              url: "/pages/checkout/index"
+            });
+          }
+        }
       });
 
       return true;
@@ -380,17 +387,7 @@ Page({
     await this.addCurrentProductToCart("cart");
   },
   async buyNow() {
-    const ok = await this.addCurrentProductToCart("buy");
-
-    if (!ok) {
-      return;
-    }
-
-    setTimeout(() => {
-      wx.navigateTo({
-        url: "/pages/checkout/index"
-      });
-    }, 300);
+    await this.addCurrentProductToCart("buy");
   },
   retryLoad() {
     this.loadProduct();

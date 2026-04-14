@@ -1,4 +1,5 @@
 const mallService = require("../../services/mall-client");
+const { confirmAction } = require("../../shared/dialog");
 
 function buildAddressViewModel(payload = {}) {
   return {
@@ -7,23 +8,6 @@ function buildAddressViewModel(payload = {}) {
     pageState: "success",
     errorMessage: ""
   };
-}
-
-function confirmAction(options = {}) {
-  return new Promise((resolve) => {
-    wx.showModal({
-      title: options.title || "请确认",
-      content: options.content || "",
-      confirmText: options.confirmText || "确定",
-      cancelText: options.cancelText || "取消",
-      success(result) {
-        resolve(!!result.confirm);
-      },
-      fail() {
-        resolve(false);
-      }
-    });
-  });
 }
 
 Page({
@@ -91,14 +75,13 @@ Page({
 
     wx.showToast({
       title: "地址已切换",
-      icon: "success"
+      icon: "success",
+      complete() {
+        wx.navigateBack({
+          delta: 1
+        });
+      }
     });
-
-    setTimeout(() => {
-      wx.navigateBack({
-        delta: 1
-      });
-    }, 250);
   },
   openCreate() {
     if (this.data.actionLoadingId || this.data.pageState !== "success") {

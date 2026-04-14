@@ -7,45 +7,36 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">首页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">首页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
-      <button class="ghost-button state-button" bindtap="openCategory">先看分类</button>
+      <button class="ghost-button state-button" bindtap="openCategory">查看分类</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
     </view>
   </view>
 
   <view wx:else>
-    <view class="hero-shell">
-      <view class="hero-backdrop">
-        <block wx:for="{{hero.backdropWords}}" wx:key="id">
-          <text class="hero-backdrop-word {{item.className}}">{{item.text}}</text>
-        </block>
-      </view>
-
-      <view class="hero-topbar">
-        <view class="hero-search" bindtap="openCategory">
-          <text class="hero-search-icon">⌕</text>
-        </view>
-        <view class="hero-status-pill">{{hero.statusText}}</view>
-      </view>
-
-      <view class="hero-medallion" style="background: {{hero.product.accent}};">
-        <text class="hero-medallion-text">{{hero.product.coverLabel}}</text>
-      </view>
-
-      <view class="hero-copygroup">
-        <text class="hero-title">{{hero.titleTop}}</text>
-        <text class="hero-title hero-title-sub">{{hero.titleBottom}}</text>
-        <text class="hero-copy">{{hero.copy}}</text>
-      </view>
-
-      <view class="hero-dots">
-        <block wx:for="{{hero.dots}}" wx:key="id">
-          <view class="hero-dot {{item.active ? 'hero-dot-active' : ''}}"></view>
-        </block>
-      </view>
-    </view>
+    <swiper class="hero-swiper"
+            indicator-dots="{{true}}"
+            indicator-color="rgba(255,255,255,0.4)"
+            indicator-active-color="rgba(255,255,255,0.88)"
+            autoplay="{{true}}"
+            interval="{{4000}}"
+            circular="{{true}}"
+            current="{{activeBannerIndex}}"
+            bindchange="swiperChange">
+      <block wx:for="{{banners}}" wx:key="id">
+        <swiper-item>
+          <view class="hero-slide" bindtap="onBannerTap" data-index="{{index}}" data-link-type="{{item.linkType}}" data-link-value="{{item.linkValue}}">
+            <image wx:if="{{item.imageUrl}}" class="hero-slide-image" src="{{item.imageUrl}}" mode="aspectFill" />
+            <view wx:else class="hero-slide-fallback">
+              <text class="hero-slide-title">{{item.title}}</text>
+              <text wx:if="{{item.subtitle}}" class="hero-slide-subtitle">{{item.subtitle}}</text>
+            </view>
+          </view>
+        </swiper-item>
+      </block>
+    </swiper>
 
     <view class="panel category-rack">
       <block wx:for="{{categoryNav}}" wx:key="id">
@@ -82,11 +73,6 @@
         <text class="feature-story-title">{{featureStory.title}}</text>
         <text class="feature-story-copy">{{featureStory.copy}}</text>
       </view>
-    </view>
-
-    <view class="section-head home-section-head">
-      <text class="section-title">甄选商品</text>
-      <text class="section-subtitle">保留更像图稿的首页节奏，主推位下面直接接双列商品。</text>
     </view>
 
     <view class="product-grid">

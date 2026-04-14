@@ -63,7 +63,7 @@ function buildProcessSteps(afterSale = null) {
     {
       id: "result",
       title: "结果回到订单详情",
-      copy: afterSale && afterSale.statusText ? afterSale.statusText : "当前版本会在订单详情展示处理状态",
+      copy: afterSale && afterSale.statusText ? afterSale.statusText : "处理结果会同步到订单详情页",
       active: resultActive
     }
   ];
@@ -310,14 +310,13 @@ Page({
 
     wx.showToast({
       title: "售后申请已提交",
-      icon: "success"
+      icon: "success",
+      complete: () => {
+        wx.redirectTo({
+          url: `/pages/order-detail/index?id=${this.data.order.id}`
+        });
+      }
     });
-
-    setTimeout(() => {
-      wx.redirectTo({
-        url: `/pages/order-detail/index?id=${this.data.order.id}`
-      });
-    }, 300);
   },
   retryLoad() {
     this.loadOrder();

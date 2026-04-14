@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">支付结果页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是订单信息还没同步成功。'}}</text>
+    <text class="state-title">支付结果页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '订单信息同步中，请稍后刷新。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="viewOrders">查看订单列表</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -29,7 +29,7 @@
     <view class="panel result-card">
       <text class="result-badge">支付成功</text>
       <text class="result-title">订单已经创建完成</text>
-      <text class="result-copy">这一版先按 mock 支付成功流转，后面再接真实微信支付回调。</text>
+      <text class="result-copy">支付状态以服务端回调确认为准，如有延迟请在订单详情页刷新查看。</text>
       <text class="result-amount">实付 ¥{{order.displayAmount}}</text>
       <text class="result-order">订单号 {{order.id}}</text>
     </view>

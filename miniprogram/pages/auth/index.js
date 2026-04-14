@@ -296,19 +296,13 @@ Page({
     });
   },
   openPrivacyPolicy() {
-    wx.showModal({
-      title: "隐私政策",
-      content: "隐私政策页面正在整理中，当前先保留登录与下单必要信息。",
-      showCancel: false,
-      confirmText: "知道了"
+    wx.navigateTo({
+      url: "/pages/privacy-policy/index"
     });
   },
   openServiceTerms() {
-    wx.showModal({
-      title: "服务条款",
-      content: "服务条款页面正在整理中，当前先保留基础功能体验。",
-      showCancel: false,
-      confirmText: "知道了"
+    wx.navigateTo({
+      url: "/pages/service-terms/index"
     });
   },
   async handleLogout() {

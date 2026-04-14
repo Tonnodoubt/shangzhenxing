@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">商品详情暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是接口暂时不可用。'}}</text>
+    <text class="state-title">商品详情暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backHome">返回首页</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -97,11 +97,11 @@
           </view>
         </block>
       </block>
-      <text class="detail-block-copy" wx:else>商品卖点正在整理中，后面会补成更完整的详情说明。</text>
+      <text class="detail-block-copy" wx:else>卖点信息完善中，可先查看图文详情了解更多。</text>
     </view>
 
     <view class="panel detail-block">
-      <text class="block-title">购买权益说明</text>
+      <text class="block-title">购买权益</text>
       <block wx:for="{{product.servicePromises}}" wx:key="id">
         <view class="promise-row">
           <view class="promise-main">
@@ -113,7 +113,7 @@
     </view>
 
     <view class="panel detail-block">
-      <text class="block-title">图文详情说明</text>
+      <text class="block-title">图文详情</text>
       <block wx:for="{{product.detailParagraphs}}" wx:key="index">
         <text class="detail-paragraph">{{item}}</text>
       </block>

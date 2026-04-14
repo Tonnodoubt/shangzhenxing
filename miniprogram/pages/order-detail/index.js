@@ -1,21 +1,5 @@
 const mallService = require("../../services/mall-client");
-
-function confirmAction(options = {}) {
-  return new Promise((resolve) => {
-    wx.showModal({
-      title: options.title || "请确认",
-      content: options.content || "",
-      confirmText: options.confirmText || "确定",
-      cancelText: options.cancelText || "取消",
-      success(result) {
-        resolve(!!result.confirm);
-      },
-      fail() {
-        resolve(false);
-      }
-    });
-  });
-}
+const { confirmAction } = require("../../shared/dialog");
 
 function buildOrderItems(order = {}) {
   return (order.items || []).map((item) => {
@@ -134,7 +118,7 @@ function buildServiceTips(order = {}, afterSale = null) {
     tips.push({
       id: "aftersale",
       title: "当前支持申请售后",
-      copy: "待收货和已完成订单可发起售后，当前版本先走文本申请。"
+      copy: "待收货和已完成订单可发起售后，提交后可在订单内跟踪进度。"
     });
   }
 
@@ -150,7 +134,7 @@ function buildServiceTips(order = {}, afterSale = null) {
     tips.push({
       id: "service",
       title: "当前订单已进入稳定状态",
-      copy: "可以继续查看金额、地址和商品信息，后续再补物流与支付明细。"
+      copy: "可继续查看金额、地址、商品和服务信息。"
     });
   }
 

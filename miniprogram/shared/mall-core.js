@@ -18,7 +18,14 @@ const {
   paginateList
 } = require("./utils");
 
-const AUTO_SHIP_DELAY_MS = 10 * 1000;
+const AUTO_SHIP_DELAY_MS = (() => {
+  const processEnv = (typeof process !== "undefined" && process && process.env)
+    ? process.env
+    : null;
+  const configured = processEnv ? Number(processEnv.AUTO_SHIP_DELAY_MS) : NaN;
+
+  return Number.isFinite(configured) && configured > 0 ? configured : (10 * 1000);
+})();
 
 function parseSalesCount(salesText) {
   const matched = String(salesText || "").match(/\d+/);
@@ -135,7 +142,7 @@ function buildRuntimeOrder(cartItems, options = {}) {
   const summary = buildCheckoutSummary(cartItems, options.coupon);
 
   return {
-    id: `NO${Date.now()}`,
+    id: `NO${generateId()}`,
     sourceType: "runtime",
     autoShipAfter: Date.now() + AUTO_SHIP_DELAY_MS,
     status: "pending",
