@@ -185,11 +185,15 @@
                   排序
                   <input id="product-sort-order" type="number" value="0" />
                 </label>
-                <label>
-                  封面图
-                  <input id="product-cover-image" placeholder="https://..." />
-                </label>
               </div>
+              <label>
+                封面图
+                <div class="upload-row">
+                  <input id="product-cover-image" placeholder="https://... 或点击右侧上传" />
+                  <button class="secondary" id="product-cover-upload-btn" type="button">上传图片</button>
+                </div>
+                <div id="product-cover-preview" class="cover-preview"></div>
+              </label>
               <label>
                 卖点摘要
                 <textarea id="product-short-desc" placeholder="会同时作为前台摘要文案"></textarea>
@@ -332,6 +336,304 @@
               <button class="secondary" id="aftersales-filter-reset" type="button">清空筛选</button>
             </div>
             <div id="aftersales-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="distribution-overview-panel" data-section-key="distribution-overview">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>分销总览 KPI</h2>
+                <p class="muted">运营先看规则、生效版本、分销员活跃度和待处理提现。</p>
+              </div>
+            </div>
+            <div id="distribution-kpi-grid" class="metrics-grid"></div>
+          </section>
+
+          <section class="panel hidden" id="distribution-rules-panel" data-section-key="distribution-rules">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>分销规则版本</h2>
+                <p class="muted">支持草稿创建、版本发布、变更日志追踪。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="rule-versions-count">0 个版本</span>
+                  <span class="section-count" id="rule-logs-count">0 条日志</span>
+                </div>
+              </div>
+            </div>
+
+            <div id="distribution-rule-current" class="detail-box"></div>
+            <div class="divider"></div>
+
+            <form id="rule-version-form" class="editor-grid">
+              <div class="compact-grid">
+                <label>
+                  规则启用
+                  <select id="rule-enabled">
+                    <option value="true">启用</option>
+                    <option value="false">停用</option>
+                  </select>
+                </label>
+                <label>
+                  一级佣金比例（%）
+                  <input id="rule-level-one-rate" type="number" min="0" step="0.01" value="8" />
+                </label>
+                <label>
+                  二级佣金比例（%）
+                  <input id="rule-level-two-rate" type="number" min="0" step="0.01" value="3" />
+                </label>
+                <label>
+                  绑定有效天数
+                  <input id="rule-bind-days" type="number" min="1" step="1" value="15" />
+                </label>
+                <label>
+                  最低提现金额（元）
+                  <input id="rule-min-withdrawal-amount" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <label>
+                  费率手续费
+                  <input id="rule-service-fee-rate" type="number" min="0" step="0.0001" value="0" />
+                </label>
+                <label>
+                  固定手续费（元）
+                  <input id="rule-service-fee-fixed" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <label>
+                  默认生效时间（发布时可改）
+                  <input id="rule-effective-at" type="datetime-local" />
+                </label>
+              </div>
+              <label>
+                规则说明
+                <textarea id="rule-desc" placeholder="例如：用户通过分享进入后 15 天内下单归属邀请人"></textarea>
+              </label>
+              <div class="action-row">
+                <button class="primary" id="rule-version-save" type="submit">创建规则草稿</button>
+                <button class="secondary" id="rule-version-reset" type="button">恢复默认</button>
+              </div>
+            </form>
+
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>版本列表</h3>
+                  <p class="muted">支持按状态和关键词筛选，再执行发布。</p>
+                </div>
+              </div>
+              <div class="toolbar">
+                <label>
+                  关键词
+                  <input id="rule-versions-filter-keyword" placeholder="支持版本号、规则说明" />
+                </label>
+                <label>
+                  状态
+                  <select id="rule-versions-filter-status">
+                    <option value="">全部</option>
+                    <option value="draft">草稿</option>
+                    <option value="published">已发布</option>
+                    <option value="archived">已归档</option>
+                  </select>
+                </label>
+                <button class="secondary" id="rule-versions-filter-submit" type="button">刷新版本</button>
+                <button class="secondary" id="rule-versions-filter-reset" type="button">清空筛选</button>
+              </div>
+              <div id="rule-versions-list" class="list"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>操作日志</h3>
+                  <p class="muted">可按动作或版本过滤，辅助运营对账与复盘。</p>
+                </div>
+              </div>
+              <div class="toolbar">
+                <label>
+                  动作
+                  <select id="rule-logs-filter-action">
+                    <option value="">全部</option>
+                    <option value="created_draft">创建草稿</option>
+                    <option value="published">发布版本</option>
+                    <option value="legacy_put_publish">兼容旧接口发布</option>
+                  </select>
+                </label>
+                <label>
+                  规则版本
+                  <select id="rule-logs-filter-version-id">
+                    <option value="">全部版本</option>
+                  </select>
+                </label>
+                <button class="secondary" id="rule-logs-filter-submit" type="button">刷新日志</button>
+                <button class="secondary" id="rule-logs-filter-reset" type="button">清空筛选</button>
+              </div>
+              <div id="rule-logs-list" class="list"></div>
+            </div>
+          </section>
+
+          <section class="panel hidden" id="distributors-panel" data-section-key="distributors">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>分销员管理</h2>
+                <p class="muted">查看分销员状态、佣金概览，支持冻结与恢复。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="distributors-count">0 位分销员</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                昵称 / 手机号
+                <input id="distributors-filter-keyword" placeholder="支持昵称、手机号模糊搜索" />
+              </label>
+              <label>
+                状态
+                <select id="distributors-filter-status">
+                  <option value="">全部</option>
+                  <option value="active">正常</option>
+                  <option value="inactive">已冻结</option>
+                </select>
+              </label>
+              <button class="secondary" id="distributors-filter-submit" type="button">刷新分销员</button>
+              <button class="secondary" id="distributors-filter-reset" type="button">清空筛选</button>
+            </div>
+            <div id="distributors-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="distribution-panel" data-section-key="distribution-withdrawals">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>分销提现</h2>
+                <p class="muted">处理分销员提现申请，支持审核通过/驳回和人工打款登记。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="withdrawals-count">0 条提现单</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                分销员 / 提现单号
+                <input id="withdrawals-filter-keyword" placeholder="支持单号、昵称、手机号模糊搜索" />
+              </label>
+              <label>
+                状态
+                <select id="withdrawals-filter-status">
+                  <option value="">全部</option>
+                  <option value="submitted">待审核</option>
+                  <option value="approved">待打款</option>
+                  <option value="paying">打款中</option>
+                  <option value="paid">已打款</option>
+                  <option value="pay_failed">打款失败</option>
+                  <option value="rejected">已拒绝</option>
+                  <option value="cancelled">已撤销</option>
+                </select>
+              </label>
+              <button class="secondary" id="withdrawals-filter-submit" type="button">刷新提现单</button>
+              <button class="secondary" id="withdrawals-filter-reset" type="button">清空筛选</button>
+            </div>
+            <div id="withdrawals-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="decoration-panel" data-section-key="decoration">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>页面装修</h2>
+                <p class="muted">管理首页轮播图、版块排序和主题配色。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="banners-count">0 张轮播图</span>
+                  <span class="section-count" id="sections-count">0 个版块</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>轮播图管理</h3>
+                  <p class="muted">添加、编辑或删除首页轮播图，支持设置跳转链接和排序。</p>
+                </div>
+              </div>
+              <form id="banner-form" class="editor-grid">
+                <input id="banner-id" type="hidden" />
+                <div class="compact-grid">
+                  <label>
+                    标题
+                    <input id="banner-title" placeholder="例如：春季新品上市" />
+                  </label>
+                  <label>
+                    副标题
+                    <input id="banner-subtitle" placeholder="选填，例如：全场满 199 减 30" />
+                  </label>
+                </div>
+                <div class="upload-row">
+                  <label>
+                    图片地址
+                    <input id="banner-image-url" placeholder="https://..." />
+                  </label>
+                  <button class="secondary" id="banner-upload-btn" type="button">上传图片</button>
+                </div>
+                <div class="compact-grid">
+                  <label>
+                    跳转类型
+                    <select id="banner-link-type">
+                      <option value="none">不跳转</option>
+                      <option value="product">商品详情</option>
+                      <option value="category">分类页面</option>
+                      <option value="page">自定义页面</option>
+                    </select>
+                  </label>
+                  <label>
+                    跳转目标
+                    <input id="banner-link-value" placeholder="选择商品或分类后自动填入" />
+                  </label>
+                  <label>
+                    排序
+                    <input id="banner-sort-order" type="number" value="0" />
+                  </label>
+                  <label>
+                    状态
+                    <select id="banner-status">
+                      <option value="enabled">启用</option>
+                      <option value="disabled">停用</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="action-row">
+                  <button class="primary" id="banner-save" type="submit">保存轮播图</button>
+                  <button class="secondary" id="banner-reset" type="button">新建轮播图</button>
+                </div>
+              </form>
+              <div id="banners-list" class="list"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>版块排序</h3>
+                  <p class="muted">通过调整排序数字控制首页版块的显示顺序，数字越小越靠前。可单独开关版块可见性。</p>
+                </div>
+              </div>
+              <div id="page-sections-list" class="list"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>主题设置</h3>
+                  <p class="muted">调整商城的主题配色，保存后立即生效。</p>
+                </div>
+              </div>
+              <div class="color-picker-row">
+                <label>
+                  主题色
+                  <input id="theme-primary-color" type="color" value="#7b4b28" />
+                </label>
+                <button class="primary" id="theme-save" type="button">保存主题</button>
+              </div>
+            </div>
           </section>
         </main>
       </div>

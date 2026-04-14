@@ -10,7 +10,17 @@ const state = {
   skuDrafts: [],
   orders: [],
   afterSales: [],
-  orderDetails: new Map()
+  distributionRules: null,
+  distributionRuleVersions: [],
+  distributionRuleChangeLogs: [],
+  distributors: [],
+  distributorDetails: new Map(),
+  withdrawals: [],
+  withdrawalDetails: new Map(),
+  orderDetails: new Map(),
+  banners: [],
+  pageSections: [],
+  storeTheme: {}
 };
 
 const summaryLabels = [
@@ -60,6 +70,8 @@ const nodes = {
   productMarketPrice: document.getElementById("product-market-price"),
   productSortOrder: document.getElementById("product-sort-order"),
   productCoverImage: document.getElementById("product-cover-image"),
+  productCoverUploadBtn: document.getElementById("product-cover-upload-btn"),
+  productCoverPreview: document.getElementById("product-cover-preview"),
   productShortDesc: document.getElementById("product-short-desc"),
   productSubTitle: document.getElementById("product-sub-title"),
   productDetailContent: document.getElementById("product-detail-content"),
@@ -86,7 +98,64 @@ const nodes = {
   ordersList: document.getElementById("orders-list"),
   aftersalesPanel: document.getElementById("aftersales-panel"),
   aftersalesCount: document.getElementById("aftersales-count"),
-  aftersalesList: document.getElementById("aftersales-list")
+  aftersalesList: document.getElementById("aftersales-list"),
+  distributionOverviewPanel: document.getElementById("distribution-overview-panel"),
+  distributionKpiGrid: document.getElementById("distribution-kpi-grid"),
+  distributionRulesPanel: document.getElementById("distribution-rules-panel"),
+  distributionRuleCurrent: document.getElementById("distribution-rule-current"),
+  ruleVersionsCount: document.getElementById("rule-versions-count"),
+  ruleLogsCount: document.getElementById("rule-logs-count"),
+  ruleVersionForm: document.getElementById("rule-version-form"),
+  ruleEnabled: document.getElementById("rule-enabled"),
+  ruleLevelOneRate: document.getElementById("rule-level-one-rate"),
+  ruleLevelTwoRate: document.getElementById("rule-level-two-rate"),
+  ruleBindDays: document.getElementById("rule-bind-days"),
+  ruleMinWithdrawalAmount: document.getElementById("rule-min-withdrawal-amount"),
+  ruleServiceFeeRate: document.getElementById("rule-service-fee-rate"),
+  ruleServiceFeeFixed: document.getElementById("rule-service-fee-fixed"),
+  ruleEffectiveAt: document.getElementById("rule-effective-at"),
+  ruleDesc: document.getElementById("rule-desc"),
+  ruleVersionSave: document.getElementById("rule-version-save"),
+  ruleVersionReset: document.getElementById("rule-version-reset"),
+  ruleVersionsFilterKeyword: document.getElementById("rule-versions-filter-keyword"),
+  ruleVersionsFilterStatus: document.getElementById("rule-versions-filter-status"),
+  ruleVersionsFilterSubmit: document.getElementById("rule-versions-filter-submit"),
+  ruleVersionsList: document.getElementById("rule-versions-list"),
+  ruleLogsFilterAction: document.getElementById("rule-logs-filter-action"),
+  ruleLogsFilterVersionId: document.getElementById("rule-logs-filter-version-id"),
+  ruleLogsFilterSubmit: document.getElementById("rule-logs-filter-submit"),
+  ruleLogsList: document.getElementById("rule-logs-list"),
+  distributorsPanel: document.getElementById("distributors-panel"),
+  distributorsCount: document.getElementById("distributors-count"),
+  distributorsFilterKeyword: document.getElementById("distributors-filter-keyword"),
+  distributorsFilterStatus: document.getElementById("distributors-filter-status"),
+  distributorsFilterSubmit: document.getElementById("distributors-filter-submit"),
+  distributorsList: document.getElementById("distributors-list"),
+  distributionPanel: document.getElementById("distribution-panel"),
+  withdrawalsCount: document.getElementById("withdrawals-count"),
+  withdrawalsFilterKeyword: document.getElementById("withdrawals-filter-keyword"),
+  withdrawalsFilterStatus: document.getElementById("withdrawals-filter-status"),
+  withdrawalsFilterSubmit: document.getElementById("withdrawals-filter-submit"),
+  withdrawalsList: document.getElementById("withdrawals-list"),
+  decorationPanel: document.getElementById("decoration-panel"),
+  bannersCount: document.getElementById("banners-count"),
+  sectionsCount: document.getElementById("sections-count"),
+  bannerForm: document.getElementById("banner-form"),
+  bannerId: document.getElementById("banner-id"),
+  bannerTitle: document.getElementById("banner-title"),
+  bannerSubtitle: document.getElementById("banner-subtitle"),
+  bannerImageUrl: document.getElementById("banner-image-url"),
+  bannerUploadBtn: document.getElementById("banner-upload-btn"),
+  bannerLinkType: document.getElementById("banner-link-type"),
+  bannerLinkValue: document.getElementById("banner-link-value"),
+  bannerSortOrder: document.getElementById("banner-sort-order"),
+  bannerStatus: document.getElementById("banner-status"),
+  bannerSave: document.getElementById("banner-save"),
+  bannerReset: document.getElementById("banner-reset"),
+  bannersList: document.getElementById("banners-list"),
+  pageSectionsList: document.getElementById("page-sections-list"),
+  themePrimaryColor: document.getElementById("theme-primary-color"),
+  themeSave: document.getElementById("theme-save")
 };
 
 function setStatus(node, message, type) {
@@ -140,6 +209,38 @@ function canEditSkus() {
   return hasPermission("sku.edit") || hasPermission("stock.adjust");
 }
 
+function canViewDecoration() {
+  return hasPermission("page_decoration.view");
+}
+
+function canEditDecoration() {
+  return hasPermission("page_decoration.edit") || hasPermission("page_decoration.manage");
+}
+
+function canViewDistribution() {
+  return hasPermission("distribution.distributor.view");
+}
+
+function canViewDistributionRules() {
+  return hasPermission("distribution.rule.view");
+}
+
+function canEditDistributionRules() {
+  return hasPermission("distribution.rule.edit");
+}
+
+function canViewDistributors() {
+  return hasPermission("distribution.distributor.view");
+}
+
+function canEditDistributors() {
+  return hasPermission("distribution.distributor.status");
+}
+
+function canReviewWithdrawals() {
+  return hasPermission("distribution.withdraw.review");
+}
+
 function toBoolean(value) {
   return value === true || value === "true";
 }
@@ -165,6 +266,12 @@ function getWorkspaceStats() {
   const onSaleCount = state.products.filter((item) => item.status === "on_sale").length;
   const lowStockCount = state.products.filter((item) => toNumber(item.totalStock, 0) > 0 && toNumber(item.totalStock, 0) < 10).length;
   const todoCount = toNumber((state.summary || {}).pendingShipmentCount, 0) + toNumber((state.summary || {}).pendingAftersaleCount, 0);
+  const activeDistributorCount = state.distributors.filter((item) => String(item.status || "") === "active").length;
+  const distributorCommissionTotal = state.distributors.reduce((sum, item) => sum + toNumber(item.totalCommissionText || 0), 0);
+  const pendingWithdrawalCount = state.withdrawals.filter((item) => {
+    const status = String(item.status || "").trim();
+    return status === "submitted" || status === "approved" || status === "pay_failed" || status === "paying";
+  }).length;
 
   return {
     todoCount,
@@ -174,7 +281,16 @@ function getWorkspaceStats() {
     lowStockCount,
     skuCount: state.skuDrafts.length,
     orderCount: state.orders.length,
-    aftersaleCount: state.afterSales.length
+    aftersaleCount: state.afterSales.length,
+    distributionRuleVersionCount: state.distributionRuleVersions.length,
+    distributionRuleLogCount: state.distributionRuleChangeLogs.length,
+    distributorCount: state.distributors.length,
+    activeDistributorCount,
+    distributorCommissionTotal,
+    withdrawalCount: state.withdrawals.length,
+    pendingWithdrawalCount,
+    bannerCount: state.banners.length,
+    sectionCount: state.pageSections.length
   };
 }
 
@@ -229,6 +345,46 @@ function getVisibleSections() {
       count: stats.aftersaleCount + " 条售后",
       visible: !!state.session && hasPermission("aftersale.view"),
       node: nodes.aftersalesPanel
+    },
+    {
+      key: "distribution-overview",
+      label: "分销总览",
+      hint: "看运营关键指标",
+      count: stats.distributorCount + " 位分销员",
+      visible: !!state.session && (canViewDistributionRules() || canViewDistributors()),
+      node: nodes.distributionOverviewPanel
+    },
+    {
+      key: "distribution-rules",
+      label: "规则版本",
+      hint: "草稿与发布",
+      count: stats.distributionRuleVersionCount + " 个版本",
+      visible: !!state.session && canViewDistributionRules(),
+      node: nodes.distributionRulesPanel
+    },
+    {
+      key: "distributors",
+      label: "分销员管理",
+      hint: "状态与佣金",
+      count: stats.activeDistributorCount + " 位活跃",
+      visible: !!state.session && canViewDistributors(),
+      node: nodes.distributorsPanel
+    },
+    {
+      key: "distribution-withdrawals",
+      label: "分销提现",
+      hint: "审核与打款",
+      count: stats.pendingWithdrawalCount + " 待处理",
+      visible: !!state.session && canViewDistribution(),
+      node: nodes.distributionPanel
+    },
+    {
+      key: "decoration",
+      label: "页面装修",
+      hint: "轮播图、版块与主题",
+      count: stats.bannerCount + " 张轮播图",
+      visible: !!state.session && canViewDecoration(),
+      node: nodes.decorationPanel
     }
   ].filter((item) => item.visible);
 }
@@ -259,6 +415,12 @@ function renderWorkspaceChrome() {
   nodes.skuCount.textContent = stats.skuCount + " 条规格";
   nodes.ordersCount.textContent = stats.orderCount + " 笔订单";
   nodes.aftersalesCount.textContent = stats.aftersaleCount + " 条售后";
+  nodes.ruleVersionsCount.textContent = stats.distributionRuleVersionCount + " 个版本";
+  nodes.ruleLogsCount.textContent = stats.distributionRuleLogCount + " 条日志";
+  nodes.distributorsCount.textContent = stats.distributorCount + " 位分销员";
+  nodes.withdrawalsCount.textContent = stats.withdrawalCount + " 条提现单";
+  nodes.bannersCount.textContent = stats.bannerCount + " 张轮播图";
+  nodes.sectionsCount.textContent = stats.sectionCount + " 个版块";
 
   nodes.workspaceNav.innerHTML = sections.map((item) => {
     return [
@@ -271,9 +433,9 @@ function renderWorkspaceChrome() {
 
   nodes.workspaceStats.innerHTML = [
     { label: "待处理", value: String(stats.todoCount) },
-    { label: "分类数", value: String(stats.categoryCount) },
     { label: "在售商品", value: String(stats.onSaleCount) },
-    { label: "低库存", value: String(stats.lowStockCount) }
+    { label: "活跃分销员", value: String(stats.activeDistributorCount) },
+    { label: "待审提现", value: String(stats.pendingWithdrawalCount) }
   ].map((item) => {
     return [
       '<div class="mini-stat">',
@@ -322,6 +484,26 @@ async function request(url, options = {}) {
   }
 
   return payload.data;
+}
+
+async function uploadImage(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch("/admin/v1/upload/image", {
+    method: "POST",
+    credentials: "same-origin",
+    body: formData
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code) {
+    const error = new Error(payload.message || "图片上传失败");
+    error.statusCode = response.status;
+    throw error;
+  }
+
+  return ((payload || {}).data || {}).imageUrl || "";
 }
 
 async function ensureRepositoryMode() {
@@ -430,6 +612,7 @@ function resetProductForm() {
   renderCategorySelects();
   nodes.productCategoryId.value = getFirstCategoryId();
   resetProductSelection();
+  updateCoverPreview();
   renderProducts();
 }
 
@@ -447,7 +630,233 @@ function populateProductForm(detail) {
   nodes.productDetailContent.value = detail.detailContent || "";
   renderCategorySelects();
   nodes.productCategoryId.value = detail.categoryId || getFirstCategoryId();
+  updateCoverPreview();
   renderProducts();
+}
+
+function toDateTimeLocalValue(value) {
+  const normalized = String(value || "").trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.replace(" ", "T").slice(0, 16);
+}
+
+function populateRuleVersionForm(record = {}) {
+  nodes.ruleEnabled.value = record.enabled === false ? "false" : "true";
+  nodes.ruleLevelOneRate.value = String(toNumber(record.levelOneRate, 8));
+  nodes.ruleLevelTwoRate.value = String(toNumber(record.levelTwoRate, 3));
+  nodes.ruleBindDays.value = String(Math.max(1, Math.round(toNumber(record.bindDays, 15))));
+  nodes.ruleMinWithdrawalAmount.value = String(toNumber(record.minWithdrawalAmount, 0));
+  nodes.ruleServiceFeeRate.value = String(toNumber(record.serviceFeeRate, 0));
+  nodes.ruleServiceFeeFixed.value = String(toNumber(record.serviceFeeFixed, 0));
+  nodes.ruleDesc.value = String(record.ruleDesc || "");
+  nodes.ruleEffectiveAt.value = toDateTimeLocalValue(record.effectiveAt || record.publishedAt || "");
+}
+
+function resetRuleVersionForm() {
+  populateRuleVersionForm(state.distributionRules || {});
+}
+
+function renderDistributionOverview() {
+  const activeRule = state.distributionRules || {};
+  const pendingWithdrawalCount = state.withdrawals.filter((item) => {
+    const status = String(item.status || "").trim();
+    return status === "submitted" || status === "approved" || status === "paying" || status === "pay_failed";
+  }).length;
+  const activeDistributorCount = state.distributors.filter((item) => String(item.status || "") === "active").length;
+  const totalCommission = state.distributors.reduce((sum, item) => sum + toNumber(item.totalCommissionText || 0), 0);
+
+  nodes.distributionKpiGrid.innerHTML = [
+    {
+      label: "当前生效规则",
+      value: activeRule.activeVersionNo || "未发布",
+      note: activeRule.publishedAt ? ("发布于 " + activeRule.publishedAt) : "建议先发布一个可回溯版本"
+    },
+    {
+      label: "活跃分销员",
+      value: String(activeDistributorCount),
+      note: "总分销员 " + String(state.distributors.length) + " 位"
+    },
+    {
+      label: "待处理提现",
+      value: String(pendingWithdrawalCount),
+      note: "submitted / approved / paying / pay_failed"
+    },
+    {
+      label: "累计佣金规模",
+      value: totalCommission.toFixed(2) + " 元",
+      note: "按分销员列表合计"
+    },
+    {
+      label: "一级比例",
+      value: toNumber(activeRule.levelOneRate, 0).toFixed(2) + "%",
+      note: "二级比例 " + toNumber(activeRule.levelTwoRate, 0).toFixed(2) + "%"
+    },
+    {
+      label: "提现门槛",
+      value: toNumber(activeRule.minWithdrawalAmount, 0).toFixed(2) + " 元",
+      note: "绑客有效期 " + String(Math.max(0, Math.round(toNumber(activeRule.bindDays, 0)))) + " 天"
+    }
+  ].map((item) => {
+    return [
+      '<div class="metric-card">',
+      "<span>" + escapeHtml(item.label) + "</span>",
+      "<strong>" + escapeHtml(item.value) + "</strong>",
+      "<small>" + escapeHtml(item.note) + "</small>",
+      "</div>"
+    ].join("");
+  }).join("");
+
+  renderWorkspaceChrome();
+}
+
+function renderRuleLogVersionFilterOptions() {
+  const selectedValue = nodes.ruleLogsFilterVersionId.value || "";
+  const options = [{ value: "", label: "全部版本" }].concat(
+    state.distributionRuleVersions.map((item) => ({
+      value: item.versionId || "",
+      label: (item.versionNo || item.versionId || "未命名版本") + (item.isActive ? "（当前生效）" : "")
+    }))
+  );
+
+  nodes.ruleLogsFilterVersionId.innerHTML = options.map((item) => {
+    return '<option value="' + escapeHtml(item.value) + '"' + (item.value === selectedValue ? " selected" : "") + ">" + escapeHtml(item.label) + "</option>";
+  }).join("");
+}
+
+function renderDistributionRules() {
+  const activeRule = state.distributionRules || {};
+
+  nodes.distributionRuleCurrent.innerHTML = [
+    "<p><strong>当前规则快照</strong></p>",
+    "<p>版本 " + escapeHtml(activeRule.activeVersionNo || "未发布") + " · 状态 " + escapeHtml(activeRule.status || "draft") + "</p>",
+    "<p class=\"muted\">一级 " + escapeHtml(toNumber(activeRule.levelOneRate, 0).toFixed(2)) + "% · 二级 " + escapeHtml(toNumber(activeRule.levelTwoRate, 0).toFixed(2)) + "% · 绑定 " + escapeHtml(String(Math.max(0, Math.round(toNumber(activeRule.bindDays, 0))))) + " 天</p>",
+    "<p class=\"muted\">最低提现 " + escapeHtml(toNumber(activeRule.minWithdrawalAmount, 0).toFixed(2)) + " 元 · 手续费率 " + escapeHtml(toNumber(activeRule.serviceFeeRate, 0).toFixed(4)) + " · 固定手续费 " + escapeHtml(toNumber(activeRule.serviceFeeFixed, 0).toFixed(2)) + " 元</p>",
+    "<p class=\"muted\">" + escapeHtml(activeRule.ruleDesc || "暂无规则说明") + "</p>"
+  ].join("");
+  renderRuleLogVersionFilterOptions();
+
+  if (!state.distributionRuleVersions.length) {
+    nodes.ruleVersionsList.innerHTML = '<div class="empty">当前没有规则版本。</div>';
+  } else {
+    nodes.ruleVersionsList.innerHTML = state.distributionRuleVersions.map((item) => {
+      const versionId = item.versionId || "";
+      const canPublish = canEditDistributionRules() && item.status !== "published";
+      const effectiveInputValue = toDateTimeLocalValue(item.effectiveAt || nodes.ruleEffectiveAt.value || "");
+
+      return [
+        '<article class="card' + (item.isActive ? " selected-card" : "") + '">',
+        '<div class="card-top">',
+        '<div class="meta">',
+        '<strong>' + escapeHtml(item.versionNo || versionId || "-") + (item.isActive ? " · 当前生效" : "") + "</strong>",
+        '<span class="muted">创建人 ' + escapeHtml(item.createdBy || "-") + " · " + escapeHtml(item.createdAt || "-") + "</span>",
+        "</div>",
+        '<div class="tag-row">',
+        '<span class="tag">' + escapeHtml(item.statusText || item.status || "-") + "</span>",
+        '<span class="tag">一级 ' + escapeHtml(toNumber(item.levelOneRate, 0).toFixed(2)) + "%</span>",
+        '<span class="tag">二级 ' + escapeHtml(toNumber(item.levelTwoRate, 0).toFixed(2)) + "%</span>",
+        "</div>",
+        "</div>",
+        '<p class="muted">绑定 ' + escapeHtml(String(item.bindDays || 0)) + " 天 · 最低提现 " + escapeHtml(toNumber(item.minWithdrawalAmount, 0).toFixed(2)) + " 元 · 费率 " + escapeHtml(toNumber(item.serviceFeeRate, 0).toFixed(4)) + " · 固定 " + escapeHtml(toNumber(item.serviceFeeFixed, 0).toFixed(2)) + " 元</p>",
+        '<p class="muted">' + escapeHtml(item.ruleDesc || "暂无规则说明") + "</p>",
+        '<div class="card-actions">',
+        '<button class="secondary" data-action="fill-rule-form" data-rule-version-id="' + escapeHtml(versionId) + '">载入到表单</button>',
+        (canPublish
+          ? '<label class="muted">生效时间<input type="datetime-local" data-rule-effective-at="' + escapeHtml(versionId) + '" value="' + escapeHtml(effectiveInputValue) + '" /></label>'
+          : ""),
+        (canPublish
+          ? '<button class="primary" data-action="publish-rule-version" data-rule-version-id="' + escapeHtml(versionId) + '">发布版本</button>'
+          : ""),
+        "</div>",
+        "</article>"
+      ].join("");
+    }).join("");
+  }
+
+  if (!state.distributionRuleChangeLogs.length) {
+    nodes.ruleLogsList.innerHTML = '<div class="empty">当前没有规则日志。</div>';
+  } else {
+    nodes.ruleLogsList.innerHTML = state.distributionRuleChangeLogs.map((item) => {
+      return [
+        '<article class="card">',
+        '<div class="card-top">',
+        '<div class="meta">',
+        '<strong>' + escapeHtml(item.summary || item.action || "规则变更") + "</strong>",
+        '<span class="muted">操作人 ' + escapeHtml(item.actorName || "-") + " · " + escapeHtml(item.createdAt || "-") + "</span>",
+        "</div>",
+        '<div class="tag-row">',
+        '<span class="tag">' + escapeHtml(item.action || "-") + "</span>",
+        '<span class="tag">' + escapeHtml(((item.ruleVersion || {}).versionNo) || "未关联版本") + "</span>",
+        "</div>",
+        "</div>",
+        '<p class="muted">' + escapeHtml(item.payloadJson || "无 payload") + "</p>",
+        "</article>"
+      ].join("");
+    }).join("");
+  }
+
+  renderWorkspaceChrome();
+}
+
+function renderDistributors() {
+  if (!state.distributors.length) {
+    nodes.distributorsList.innerHTML = '<div class="empty">当前没有符合条件的分销员。</div>';
+    renderWorkspaceChrome();
+    return;
+  }
+
+  nodes.distributorsList.innerHTML = state.distributors.map((item) => {
+    const detail = state.distributorDetails.get(item.distributorId) || null;
+    const nextStatus = item.status === "inactive" ? "active" : "inactive";
+    const nextStatusText = item.status === "inactive" ? "恢复正常" : "冻结账号";
+
+    return [
+      '<article class="card">',
+      '<div class="card-top">',
+      '<div class="meta">',
+      '<strong>' + escapeHtml(item.nickname || "未命名分销员") + "</strong>",
+      '<span class="muted">' + escapeHtml(item.mobile || "-") + " · 加入时间 " + escapeHtml(item.joinedAt || "-") + "</span>",
+      "</div>",
+      '<div class="tag-row">',
+      '<span class="tag">' + escapeHtml(item.statusText || item.status || "-") + "</span>",
+      '<span class="tag">' + escapeHtml(item.level || "普通分销员") + "</span>",
+      '<span class="tag">团队 ' + escapeHtml(String(item.teamCount || 0)) + " 人</span>",
+      "</div>",
+      "</div>",
+      '<div class="metrics-grid">',
+      '<div class="metric-card"><span>累计佣金</span><strong>' + escapeHtml(item.totalCommissionText || "0.00") + '</strong><small>单位：元</small></div>',
+      '<div class="metric-card"><span>待结算</span><strong>' + escapeHtml(item.pendingCommissionText || "0.00") + '</strong><small>单位：元</small></div>',
+      "</div>",
+      '<div class="card-actions">',
+      '<button class="secondary" data-action="toggle-distributor-detail" data-distributor-id="' + escapeHtml(item.distributorId) + '">' + (detail ? "收起详情" : "查看详情") + "</button>",
+      (canEditDistributors()
+        ? '<button class="' + (item.status === "inactive" ? "success" : "danger") + '" data-action="update-distributor-status" data-distributor-id="' + escapeHtml(item.distributorId) + '" data-next-status="' + escapeHtml(nextStatus) + '">' + escapeHtml(nextStatusText) + "</button>"
+        : ""),
+      "</div>",
+      (detail
+        ? [
+            '<div class="detail-grid">',
+            '<div class="detail-box"><p><strong>已结算</strong></p><p>' + escapeHtml(detail.settledCommissionText || "0.00") + ' 元</p></div>',
+            '<div class="detail-box"><p><strong>提现中</strong></p><p>' + escapeHtml(detail.withdrawingCommissionText || "0.00") + ' 元</p></div>',
+            '<div class="detail-box"><p><strong>可提现</strong></p><p>' + escapeHtml(detail.withdrawableCommissionText || "0.00") + ' 元</p></div>',
+            "</div>",
+            '<div class="order-items">',
+            (detail.recentCommissionRecords || []).length
+              ? (detail.recentCommissionRecords || []).map((record) => {
+                  return '<div class="order-item"><strong>' + escapeHtml(record.title || "佣金流水") + '</strong><p class="muted">订单 ' + escapeHtml(record.orderNo || "-") + ' · ' + escapeHtml(record.levelText || "-") + ' · ' + escapeHtml(record.amountText || "0.00") + ' 元</p><p class="muted">状态 ' + escapeHtml(record.statusText || record.status || "-") + ' · ' + escapeHtml(record.createdAt || "-") + '</p></div>';
+                }).join("")
+              : '<div class="empty">暂无佣金流水。</div>',
+            "</div>"
+          ].join("")
+        : ""),
+      "</article>"
+    ].join("");
+  }).join("");
+
+  renderWorkspaceChrome();
 }
 
 function renderSession() {
@@ -467,6 +876,11 @@ function renderSession() {
   nodes.skuPanel.classList.toggle("hidden", !loggedIn || !hasPermission("sku.view"));
   nodes.ordersPanel.classList.toggle("hidden", !loggedIn || !hasPermission("order.view"));
   nodes.aftersalesPanel.classList.toggle("hidden", !loggedIn || !hasPermission("aftersale.view"));
+  nodes.distributionOverviewPanel.classList.toggle("hidden", !loggedIn || !(canViewDistributionRules() || canViewDistributors()));
+  nodes.distributionRulesPanel.classList.toggle("hidden", !loggedIn || !canViewDistributionRules());
+  nodes.distributorsPanel.classList.toggle("hidden", !loggedIn || !canViewDistributors());
+  nodes.distributionPanel.classList.toggle("hidden", !loggedIn || !canViewDistribution());
+  nodes.decorationPanel.classList.toggle("hidden", !loggedIn || !canViewDecoration());
 
   nodes.categorySave.disabled = !loggedIn || !canEditCategories();
   nodes.categoryReset.disabled = !loggedIn || !canEditCategories();
@@ -474,6 +888,11 @@ function renderSession() {
   nodes.productReset.disabled = !loggedIn || !canEditProducts();
   nodes.skuAddRow.disabled = !loggedIn || !canEditSkus();
   nodes.skuSave.disabled = !loggedIn || !canEditSkus();
+  nodes.ruleVersionSave.disabled = !loggedIn || !canEditDistributionRules();
+  nodes.ruleVersionReset.disabled = !loggedIn || !canEditDistributionRules();
+  nodes.bannerSave.disabled = !loggedIn || !canEditDecoration();
+  nodes.bannerReset.disabled = !loggedIn || !canEditDecoration();
+  nodes.themeSave.disabled = !loggedIn || !canEditDecoration();
   renderWorkspaceChrome();
 }
 
@@ -857,6 +1276,148 @@ function renderAfterSales() {
   renderWorkspaceChrome();
 }
 
+function getWithdrawalId(record = {}) {
+  return record.withdrawalId || record.id || "";
+}
+
+function renderWithdrawalDetail(detail = {}) {
+  const payouts = Array.isArray(detail.payouts) ? detail.payouts : [];
+  const items = Array.isArray(detail.items) ? detail.items : [];
+
+  return [
+    '<div class="detail-grid">',
+    '<div class="detail-box">',
+    "<p><strong>审核信息</strong></p>",
+    "<p>" + escapeHtml(detail.reviewedBy || "未审核") + "</p>",
+    "<p class=\"muted\">" + escapeHtml(detail.reviewedAt || "-") + "</p>",
+    "<p class=\"muted\">" + escapeHtml(detail.reviewRemark || "暂无审核备注") + "</p>",
+    "</div>",
+    '<div class="detail-box">',
+    "<p><strong>打款信息</strong></p>",
+    "<p>" + escapeHtml(detail.paidAt || "未打款") + "</p>",
+    "<p class=\"muted\">最近流水号 " + escapeHtml((((detail.latestPayout || {}).channelBillNo) || "-")) + "</p>",
+    "</div>",
+    '<div class="detail-box">',
+    "<p><strong>金额信息</strong></p>",
+    "<p>申请 " + escapeHtml(String(detail.amount || 0)) + " 元</p>",
+    "<p>手续费 " + escapeHtml(String(detail.serviceFee || 0)) + " 元</p>",
+    "<p>到账 " + escapeHtml(String(detail.netAmount || 0)) + " 元</p>",
+    "</div>",
+    "</div>",
+    (items.length
+      ? [
+          '<div class="order-items">',
+          items.map((item) => {
+            return [
+              '<div class="order-item">',
+              "<strong>" + escapeHtml(item.commissionTitle || "佣金流水") + "</strong>",
+              "<p class=\"muted\">订单 " + escapeHtml(item.commissionOrderNo || "-") + " · 金额 " + escapeHtml(String(item.amount || 0)) + " 元</p>",
+              "<p class=\"muted\">状态 " + escapeHtml(item.commissionStatus || "-") + "</p>",
+              "</div>"
+            ].join("");
+          }).join(""),
+          "</div>"
+        ].join("")
+      : ""),
+    (payouts.length
+      ? [
+          '<div class="order-items">',
+          payouts.map((item) => {
+            return [
+              '<div class="order-item">',
+              "<strong>打款流水</strong>",
+              "<p class=\"muted\">" + escapeHtml(item.channel || "manual_bank") + " · " + escapeHtml(item.status || "-") + "</p>",
+              "<p class=\"muted\">单号 " + escapeHtml(item.channelBillNo || "-") + " · " + escapeHtml(item.paidBy || "-") + " · " + escapeHtml(item.paidAt || "-") + "</p>",
+              "</div>"
+            ].join("");
+          }).join(""),
+          "</div>"
+        ].join("")
+      : "")
+  ].join("");
+}
+
+function renderWithdrawals() {
+  if (!state.withdrawals.length) {
+    nodes.withdrawalsList.innerHTML = '<div class="empty">当前没有符合条件的提现单。</div>';
+    renderWorkspaceChrome();
+    return;
+  }
+
+  nodes.withdrawalsList.innerHTML = state.withdrawals.map((record) => {
+    const withdrawalId = getWithdrawalId(record);
+    const detail = state.withdrawalDetails.get(withdrawalId) || null;
+    const distributor = record.distributor || {};
+    const distributorNickname = record.nickname || distributor.nickname || "未知分销员";
+    const distributorMobile = record.mobile || distributor.mobile || "-";
+    const canReview = canReviewWithdrawals();
+    const reviewable = String(record.status || "").trim() === "submitted";
+    const payable = ["approved", "pay_failed", "paying"].includes(String(record.status || "").trim());
+
+    return [
+      '<article class="card">',
+      '<div class="card-top">',
+      '<div class="meta">',
+      '<strong>' + escapeHtml(record.requestNo || withdrawalId) + "</strong>",
+      '<span class="muted">' + escapeHtml(distributorNickname) + " · " + escapeHtml(distributorMobile) + " · " + escapeHtml(record.createdAt || "-") + "</span>",
+      "</div>",
+      '<div class="tag-row">',
+      '<span class="tag">' + escapeHtml(record.statusText || record.status || "-") + "</span>",
+      '<span class="tag">申请 ' + escapeHtml(record.amountText || String(record.amount || 0)) + " 元</span>",
+      '<span class="tag">到账 ' + escapeHtml(record.netAmountText || String(record.netAmount || 0)) + " 元</span>",
+      "</div>",
+      "</div>",
+      '<div class="detail-grid">',
+      '<div class="detail-box">',
+      "<p><strong>提现账户</strong></p>",
+      "<p>" + escapeHtml(record.accountName || "未填写") + "</p>",
+      "<p class=\"muted\">" + escapeHtml(record.accountNoMask || "-") + "</p>",
+      "</div>",
+      '<div class="detail-box">',
+      "<p><strong>审核备注</strong></p>",
+      "<p>" + escapeHtml(record.reviewRemark || "暂无") + "</p>",
+      "<p class=\"muted\">" + escapeHtml(record.reviewedBy || "-") + " · " + escapeHtml(record.reviewedAt || "-") + "</p>",
+      "</div>",
+      '<div class="detail-box">',
+      "<p><strong>最新打款</strong></p>",
+      "<p>" + escapeHtml((((record.latestPayout || {}).status) || "暂无")) + "</p>",
+      "<p class=\"muted\">单号 " + escapeHtml((((record.latestPayout || {}).channelBillNo) || "-")) + "</p>",
+      "</div>",
+      "</div>",
+      (canReview && reviewable
+        ? [
+            '<div class="review-form">',
+            '<label>审核备注<textarea data-review-withdrawal-remark="' + escapeHtml(withdrawalId) + '" placeholder="例如：已核实实名信息，允许提现"></textarea></label>',
+            '<div class="action-row">',
+            '<button class="success" data-action="approve-withdrawal" data-withdrawal-id="' + escapeHtml(withdrawalId) + '">审核通过</button>',
+            '<button class="danger" data-action="reject-withdrawal" data-withdrawal-id="' + escapeHtml(withdrawalId) + '">审核驳回</button>',
+            "</div>",
+            "</div>"
+          ].join("")
+        : ""),
+      (canReview && payable
+        ? [
+            '<div class="review-form">',
+            '<label>打款流水号<input data-payout-bill="' + escapeHtml(withdrawalId) + '" placeholder="例如：BANK20260413001" /></label>',
+            '<label>打款备注<textarea data-payout-remark="' + escapeHtml(withdrawalId) + '" placeholder="例如：人工转账已完成"></textarea></label>',
+            '<div class="action-row">',
+            '<button class="primary" data-action="payout-withdrawal" data-withdrawal-id="' + escapeHtml(withdrawalId) + '">登记打款成功</button>',
+            '<button class="danger" data-action="payout-withdrawal-failed" data-withdrawal-id="' + escapeHtml(withdrawalId) + '">登记打款失败</button>',
+            "</div>",
+            "</div>"
+          ].join("")
+        : ""),
+      '<div class="card-bottom">',
+      '<span class="muted">渠道 ' + escapeHtml(record.channel || "manual_bank") + "</span>",
+      '<div class="action-row"><button class="secondary" data-action="toggle-withdrawal-detail" data-withdrawal-id="' + escapeHtml(withdrawalId) + '">' + (detail ? "收起详情" : "查看详情") + "</button></div>",
+      "</div>",
+      (detail ? renderWithdrawalDetail(detail) : ""),
+      "</article>"
+    ].join("");
+  }).join("");
+  renderWorkspaceChrome();
+}
+
 async function login(username, password) {
   const payload = await request("/admin/v1/auth/login", {
     method: "POST",
@@ -897,7 +1458,17 @@ function clearSession() {
   state.skuDrafts = [];
   state.orders = [];
   state.afterSales = [];
+  state.distributionRules = null;
+  state.distributionRuleVersions = [];
+  state.distributionRuleChangeLogs = [];
+  state.distributors = [];
+  state.distributorDetails = new Map();
+  state.withdrawals = [];
+  state.withdrawalDetails = new Map();
   state.orderDetails = new Map();
+  state.banners = [];
+  state.pageSections = [];
+  state.storeTheme = {};
   renderSession();
   renderSummary();
   renderCategorySelects();
@@ -906,6 +1477,13 @@ function clearSession() {
   renderSkuEditor();
   renderOrders();
   renderAfterSales();
+  resetRuleVersionForm();
+  renderDistributionOverview();
+  renderDistributionRules();
+  renderDistributors();
+  renderWithdrawals();
+  renderBannersList();
+  renderPageSectionsList();
 }
 
 async function refreshSummary() {
@@ -1000,6 +1578,347 @@ async function refreshAfterSales() {
   renderAfterSales();
 }
 
+async function refreshDistributionRules() {
+  state.distributionRules = await request("/admin/v1/distribution/rules");
+  renderDistributionOverview();
+  renderDistributionRules();
+}
+
+async function refreshDistributionRuleVersions() {
+  const query = new URLSearchParams({
+    page: "1",
+    pageSize: "50"
+  });
+  const keyword = nodes.ruleVersionsFilterKeyword.value.trim();
+  const status = nodes.ruleVersionsFilterStatus.value;
+
+  if (keyword) {
+    query.set("keyword", keyword);
+  }
+
+  if (status) {
+    query.set("status", status);
+  }
+
+  const payload = await request("/admin/v1/distribution/rule-versions?" + query.toString());
+  state.distributionRuleVersions = payload.list || [];
+  renderDistributionOverview();
+  renderDistributionRules();
+}
+
+async function refreshDistributionRuleChangeLogs() {
+  const query = new URLSearchParams({
+    page: "1",
+    pageSize: "100"
+  });
+  const action = nodes.ruleLogsFilterAction.value;
+  const ruleVersionId = nodes.ruleLogsFilterVersionId.value;
+
+  if (action) {
+    query.set("action", action);
+  }
+
+  if (ruleVersionId) {
+    query.set("ruleVersionId", ruleVersionId);
+  }
+
+  const payload = await request("/admin/v1/distribution/rule-change-logs?" + query.toString());
+  state.distributionRuleChangeLogs = payload.list || [];
+  renderDistributionRules();
+}
+
+async function refreshDistributors() {
+  const query = new URLSearchParams({
+    page: "1",
+    pageSize: "100"
+  });
+  const keyword = nodes.distributorsFilterKeyword.value.trim();
+  const status = nodes.distributorsFilterStatus.value;
+
+  if (keyword) {
+    query.set("keyword", keyword);
+  }
+
+  if (status) {
+    query.set("status", status);
+  }
+
+  const payload = await request("/admin/v1/distributors?" + query.toString());
+  state.distributors = payload.list || [];
+  renderDistributionOverview();
+  renderDistributors();
+}
+
+async function refreshWithdrawals() {
+  const keyword = nodes.withdrawalsFilterKeyword.value.trim();
+  const status = nodes.withdrawalsFilterStatus.value;
+  const query = new URLSearchParams({
+    page: "1",
+    pageSize: "50"
+  });
+
+  if (keyword) {
+    query.set("keyword", keyword);
+  }
+
+  if (status) {
+    query.set("status", status);
+  }
+
+  const payload = await request("/admin/v1/distribution/withdrawals?" + query.toString());
+  state.withdrawals = payload.list || [];
+  renderDistributionOverview();
+  renderWithdrawals();
+}
+
+async function loadBanners() {
+  const payload = await request("/admin/v1/banners");
+  state.banners = payload.list || payload || [];
+  renderBannersList();
+}
+
+async function saveBanner() {
+  const bannerId = nodes.bannerId.value.trim();
+  const payload = {
+    title: nodes.bannerTitle.value.trim(),
+    subtitle: nodes.bannerSubtitle.value.trim(),
+    imageUrl: nodes.bannerImageUrl.value.trim(),
+    linkType: nodes.bannerLinkType.value,
+    linkValue: nodes.bannerLinkValue.value.trim(),
+    sortOrder: toNumber(nodes.bannerSortOrder.value, 0),
+    status: nodes.bannerStatus.value
+  };
+
+  const result = bannerId
+    ? await request("/admin/v1/banners/" + encodeURIComponent(bannerId), {
+        method: "PUT",
+        body: payload
+      })
+    : await request("/admin/v1/banners", {
+        method: "POST",
+        body: payload
+      });
+
+  await loadBanners();
+  populateBannerForm(result);
+  scrollToSection("decoration");
+}
+
+async function deleteBanner(bannerId) {
+  await request("/admin/v1/banners/" + encodeURIComponent(bannerId), {
+    method: "DELETE"
+  });
+
+  if (nodes.bannerId.value === bannerId) {
+    resetBannerForm();
+  }
+
+  await loadBanners();
+}
+
+async function loadPageSections() {
+  const payload = await request("/admin/v1/page-sections");
+  state.pageSections = payload.list || payload || [];
+  renderPageSectionsList();
+}
+
+async function updateSectionVisibility(sectionKey, visible) {
+  await request("/admin/v1/page-sections/" + encodeURIComponent(sectionKey), {
+    method: "PUT",
+    body: { visible }
+  });
+
+  await loadPageSections();
+}
+
+async function loadStoreTheme() {
+  const payload = await request("/admin/v1/store-theme");
+  state.storeTheme = payload || {};
+
+  const primaryColor = state.storeTheme.primaryColor || state.storeTheme.primary_color;
+  if (primaryColor) {
+    nodes.themePrimaryColor.value = primaryColor;
+  }
+}
+
+async function saveTheme() {
+  const primaryColor = nodes.themePrimaryColor.value;
+
+  await request("/admin/v1/store-theme/primary_color", {
+    method: "PUT",
+    body: { themeValue: primaryColor }
+  });
+
+  state.storeTheme = Object.assign({}, state.storeTheme, {
+    primary_color: primaryColor,
+    primaryColor
+  });
+}
+
+async function uploadBannerImage() {
+  if (!canEditDecoration()) {
+    return;
+  }
+
+  const picker = document.createElement("input");
+  picker.type = "file";
+  picker.accept = "image/jpeg,image/png,image/webp";
+  picker.click();
+
+  const file = await new Promise((resolve) => {
+    picker.addEventListener("change", () => resolve((picker.files || [])[0] || null), { once: true });
+  });
+
+  if (!file) {
+    return;
+  }
+
+  nodes.bannerUploadBtn.disabled = true;
+  try {
+    const imageUrl = await uploadImage(file);
+    if (!imageUrl) {
+      throw new Error("图片上传失败");
+    }
+    nodes.bannerImageUrl.value = imageUrl;
+    setStatus(nodes.sessionStatus, "图片上传成功。", "success");
+  } catch (error) {
+    setStatus(nodes.sessionStatus, error.message || "图片上传失败", "error");
+  } finally {
+    nodes.bannerUploadBtn.disabled = false;
+  }
+}
+
+function updateCoverPreview() {
+  const url = (nodes.productCoverImage.value || "").trim();
+  if (url) {
+    nodes.productCoverPreview.innerHTML = '<img src="' + url.replace(/"/g, "") + '" alt="封面预览" />';
+  } else {
+    nodes.productCoverPreview.innerHTML = "";
+  }
+}
+
+async function uploadProductCoverImage() {
+  const picker = document.createElement("input");
+  picker.type = "file";
+  picker.accept = "image/jpeg,image/png,image/webp";
+  picker.click();
+
+  const file = await new Promise(function (resolve) {
+    picker.addEventListener("change", function () { resolve((picker.files || [])[0] || null); }, { once: true });
+  });
+
+  if (!file) {
+    return;
+  }
+
+  nodes.productCoverUploadBtn.disabled = true;
+  try {
+    var imageUrl = await uploadImage(file);
+    if (!imageUrl) {
+      throw new Error("图片上传失败");
+    }
+    nodes.productCoverImage.value = imageUrl;
+    updateCoverPreview();
+    setStatus(nodes.sessionStatus, "封面图上传成功。", "success");
+  } catch (error) {
+    setStatus(nodes.sessionStatus, error.message || "图片上传失败", "error");
+  } finally {
+    nodes.productCoverUploadBtn.disabled = false;
+  }
+}
+
+function resetBannerForm() {
+  nodes.bannerId.value = "";
+  nodes.bannerTitle.value = "";
+  nodes.bannerSubtitle.value = "";
+  nodes.bannerImageUrl.value = "";
+  nodes.bannerLinkType.value = "none";
+  nodes.bannerLinkValue.value = "";
+  nodes.bannerSortOrder.value = "0";
+  nodes.bannerStatus.value = "enabled";
+  renderBannersList();
+}
+
+function populateBannerForm(record) {
+  nodes.bannerId.value = record.bannerId || record.id || "";
+  nodes.bannerTitle.value = record.title || "";
+  nodes.bannerSubtitle.value = record.subtitle || "";
+  nodes.bannerImageUrl.value = record.imageUrl || "";
+  nodes.bannerLinkType.value = record.linkType || "none";
+  nodes.bannerLinkValue.value = record.linkValue || "";
+  nodes.bannerSortOrder.value = String(record.sortOrder || 0);
+  nodes.bannerStatus.value = record.status || "enabled";
+  renderBannersList();
+}
+
+function renderBannersList() {
+  if (!state.banners.length) {
+    nodes.bannersList.innerHTML = '<div class="empty">当前还没有轮播图，先新建一张。</div>';
+    renderWorkspaceChrome();
+    return;
+  }
+
+  const currentBannerId = nodes.bannerId.value.trim();
+
+  nodes.bannersList.innerHTML = state.banners.map((item) => {
+    const bannerId = item.bannerId || item.id || "";
+    const thumbnailHtml = item.imageUrl
+      ? '<div class="banner-thumbnail"><img src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.title || "轮播图") + '" loading="lazy" /></div>'
+      : '<div class="banner-thumbnail">无图</div>';
+
+    return [
+      '<article class="banner-card' + (currentBannerId === bannerId ? " selected-card" : "") + '">',
+      thumbnailHtml,
+      '<div class="banner-body">',
+      '<div class="meta">',
+      '<strong>' + escapeHtml(item.title || "未命名轮播图") + '<span class="sort-badge">排序 ' + escapeHtml(String(item.sortOrder || 0)) + "</span></strong>",
+      '<span class="muted">' + escapeHtml(item.subtitle || "无副标题") + " · " + escapeHtml(item.statusText || item.status || "-") + "</span>",
+      "</div>",
+      '<div class="tag-row">',
+      '<span class="tag">' + escapeHtml(item.linkType === "none" ? "不跳转" : item.linkType) + "</span>",
+      "</div>",
+      '<div class="card-actions">',
+      (canEditDecoration()
+        ? '<button class="secondary" data-action="edit-banner" data-banner-id="' + escapeHtml(bannerId) + '">编辑</button>'
+        : ""),
+      (canEditDecoration()
+        ? '<button class="danger" data-action="delete-banner" data-banner-id="' + escapeHtml(bannerId) + '">删除</button>'
+        : ""),
+      "</div>",
+      "</div>",
+      "</article>"
+    ].join("");
+  }).join("");
+  renderWorkspaceChrome();
+}
+
+function renderPageSectionsList() {
+  if (!state.pageSections.length) {
+    nodes.pageSectionsList.innerHTML = '<div class="empty">当前没有可配置的版块。</div>';
+    renderWorkspaceChrome();
+    return;
+  }
+
+  nodes.pageSectionsList.innerHTML = state.pageSections.map((item) => {
+    const sectionKey = item.key || item.sectionKey || "";
+    const visible = item.visible !== false;
+
+    return [
+      '<article class="section-order-item">',
+      '<div class="section-info">',
+      "<strong>" + escapeHtml(item.title || item.name || sectionKey) + "</strong>",
+      "<span>" + escapeHtml(item.description || "排序 " + (item.sortOrder || 0)) + "</span>",
+      "</div>",
+      '<div class="section-controls">',
+      '<button class="toggle-switch' + (visible ? " active" : "") + '" data-action="toggle-section-visibility" data-section-key="' + escapeHtml(sectionKey) + '" data-visible="' + (visible ? "true" : "false") + '" type="button" aria-label="' + (visible ? "隐藏版块" : "显示版块") + '"></button>',
+      '<input class="sort-input" type="number" min="0" data-action="update-section-sort" data-section-key="' + escapeHtml(sectionKey) + '" value="' + escapeHtml(String(item.sortOrder || 0)) + '"' + (canEditDecoration() ? "" : " disabled") + ' />',
+      "</div>",
+      "</article>"
+    ].join("");
+  }).join("");
+  renderWorkspaceChrome();
+}
+
 async function refreshAll() {
   setStatus(nodes.sessionStatus, "正在刷新控制台数据...");
 
@@ -1028,6 +1947,37 @@ async function refreshAll() {
 
     if (hasPermission("aftersale.view")) {
       await refreshAfterSales();
+    }
+
+    if (canViewDistributionRules()) {
+      await refreshDistributionRules();
+      await refreshDistributionRuleVersions();
+      resetRuleVersionForm();
+      await refreshDistributionRuleChangeLogs();
+    } else {
+      state.distributionRules = null;
+      state.distributionRuleVersions = [];
+      state.distributionRuleChangeLogs = [];
+      renderDistributionRules();
+    }
+
+    if (canViewDistributors()) {
+      await refreshDistributors();
+    } else {
+      state.distributors = [];
+      state.distributorDetails = new Map();
+      renderDistributors();
+    }
+
+    if (canViewDistribution()) {
+      await refreshWithdrawals();
+      renderDistributionOverview();
+    }
+
+    if (canViewDecoration()) {
+      await loadBanners();
+      await loadPageSections();
+      await loadStoreTheme();
     }
 
     setStatus(nodes.sessionStatus, "数据已更新。", "success");
@@ -1213,6 +2163,107 @@ function resetAfterSaleFilters() {
   refreshAfterSales();
 }
 
+function resetWithdrawalFilters() {
+  nodes.withdrawalsFilterKeyword.value = "";
+  nodes.withdrawalsFilterStatus.value = "";
+  refreshWithdrawals();
+}
+
+function resetRuleVersionFilters() {
+  nodes.ruleVersionsFilterKeyword.value = "";
+  nodes.ruleVersionsFilterStatus.value = "";
+  refreshDistributionRuleVersions();
+}
+
+function resetRuleLogFilters() {
+  nodes.ruleLogsFilterAction.value = "";
+  nodes.ruleLogsFilterVersionId.value = "";
+  refreshDistributionRuleChangeLogs();
+}
+
+function resetDistributorFilters() {
+  nodes.distributorsFilterKeyword.value = "";
+  nodes.distributorsFilterStatus.value = "";
+  refreshDistributors();
+}
+
+async function createRuleVersion(event) {
+  event.preventDefault();
+
+  if (!canEditDistributionRules()) {
+    throw new Error("当前账号没有规则编辑权限");
+  }
+
+  const payload = {
+    enabled: toBoolean(nodes.ruleEnabled.value),
+    levelOneRate: toNumber(nodes.ruleLevelOneRate.value, 8),
+    levelTwoRate: toNumber(nodes.ruleLevelTwoRate.value, 3),
+    bindDays: Math.max(1, Math.round(toNumber(nodes.ruleBindDays.value, 15))),
+    minWithdrawalAmount: Math.max(0, toNumber(nodes.ruleMinWithdrawalAmount.value, 0)),
+    serviceFeeRate: Math.max(0, toNumber(nodes.ruleServiceFeeRate.value, 0)),
+    serviceFeeFixed: Math.max(0, toNumber(nodes.ruleServiceFeeFixed.value, 0)),
+    ruleDesc: nodes.ruleDesc.value.trim()
+  };
+
+  await request("/admin/v1/distribution/rule-versions", {
+    method: "POST",
+    body: payload
+  });
+
+  await refreshDistributionRuleVersions();
+  await refreshDistributionRuleChangeLogs();
+  scrollToSection("distribution-rules");
+}
+
+async function publishRuleVersion(ruleVersionId) {
+  if (!canEditDistributionRules()) {
+    throw new Error("当前账号没有规则编辑权限");
+  }
+
+  const effectiveInput = document.querySelector('[data-rule-effective-at="' + ruleVersionId + '"]');
+  const effectiveAt = effectiveInput ? effectiveInput.value.trim() : nodes.ruleEffectiveAt.value.trim();
+
+  await request("/admin/v1/distribution/rule-versions/" + encodeURIComponent(ruleVersionId) + "/publish", {
+    method: "POST",
+    body: {
+      effectiveAt: effectiveAt || undefined
+    }
+  });
+
+  await refreshDistributionRules();
+  await refreshDistributionRuleVersions();
+  await refreshDistributionRuleChangeLogs();
+  scrollToSection("distribution-rules");
+}
+
+async function toggleDistributorDetail(distributorId) {
+  if (state.distributorDetails.has(distributorId)) {
+    state.distributorDetails.delete(distributorId);
+    renderDistributors();
+    return;
+  }
+
+  const detail = await request("/admin/v1/distributors/" + encodeURIComponent(distributorId));
+  state.distributorDetails.set(distributorId, detail);
+  renderDistributors();
+}
+
+async function updateDistributorStatus(distributorId, nextStatus) {
+  await request("/admin/v1/distributors/" + encodeURIComponent(distributorId) + "/status", {
+    method: "POST",
+    body: {
+      status: nextStatus
+    }
+  });
+
+  state.distributorDetails.delete(distributorId);
+  await refreshDistributors();
+  if (canViewDistribution()) {
+    await refreshWithdrawals();
+  }
+  renderDistributionOverview();
+}
+
 async function toggleOrderDetail(orderId) {
   if (state.orderDetails.has(orderId)) {
     state.orderDetails.delete(orderId);
@@ -1267,6 +2318,57 @@ async function reviewAfterSale(afterSaleId, action) {
   await refreshSummary();
 }
 
+async function toggleWithdrawalDetail(withdrawalId) {
+  if (state.withdrawalDetails.has(withdrawalId)) {
+    state.withdrawalDetails.delete(withdrawalId);
+    renderWithdrawals();
+    return;
+  }
+
+  const detail = await request("/admin/v1/distribution/withdrawals/" + encodeURIComponent(withdrawalId));
+  state.withdrawalDetails.set(withdrawalId, detail);
+  renderWithdrawals();
+}
+
+async function reviewWithdrawal(withdrawalId, action) {
+  const remarkNode = document.querySelector('[data-review-withdrawal-remark="' + withdrawalId + '"]');
+
+  await request("/admin/v1/distribution/withdrawals/" + encodeURIComponent(withdrawalId) + "/review", {
+    method: "POST",
+    body: {
+      action,
+      remark: remarkNode ? remarkNode.value.trim() : ""
+    }
+  });
+
+  state.withdrawalDetails.delete(withdrawalId);
+  await refreshWithdrawals();
+  if (hasPermission("dashboard.view")) {
+    await refreshSummary();
+  }
+}
+
+async function payoutWithdrawal(withdrawalId, result) {
+  const billNode = document.querySelector('[data-payout-bill="' + withdrawalId + '"]');
+  const remarkNode = document.querySelector('[data-payout-remark="' + withdrawalId + '"]');
+
+  await request("/admin/v1/distribution/withdrawals/" + encodeURIComponent(withdrawalId) + "/payout", {
+    method: "POST",
+    body: {
+      result,
+      channel: "manual_bank",
+      channelBillNo: billNode ? billNode.value.trim() : "",
+      remark: remarkNode ? remarkNode.value.trim() : ""
+    }
+  });
+
+  state.withdrawalDetails.delete(withdrawalId);
+  await refreshWithdrawals();
+  if (hasPermission("dashboard.view")) {
+    await refreshSummary();
+  }
+}
+
 nodes.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setStatus(nodes.loginStatus, "正在登录...");
@@ -1302,15 +2404,33 @@ nodes.productForm.addEventListener("submit", async (event) => {
   }
 });
 
+nodes.ruleVersionForm.addEventListener("submit", async (event) => {
+  try {
+    await createRuleVersion(event);
+    setStatus(nodes.sessionStatus, "规则草稿已创建。", "success");
+  } catch (error) {
+    setStatus(nodes.sessionStatus, error.message || "规则草稿创建失败", "error");
+  }
+});
+
 document.getElementById("refresh-all").addEventListener("click", refreshAll);
 document.getElementById("orders-filter-submit").addEventListener("click", refreshOrders);
 document.getElementById("orders-filter-reset").addEventListener("click", resetOrderFilters);
 document.getElementById("aftersales-filter-submit").addEventListener("click", refreshAfterSales);
 document.getElementById("aftersales-filter-reset").addEventListener("click", resetAfterSaleFilters);
+nodes.ruleVersionsFilterSubmit.addEventListener("click", refreshDistributionRuleVersions);
+document.getElementById("rule-versions-filter-reset").addEventListener("click", resetRuleVersionFilters);
+nodes.ruleLogsFilterSubmit.addEventListener("click", refreshDistributionRuleChangeLogs);
+document.getElementById("rule-logs-filter-reset").addEventListener("click", resetRuleLogFilters);
+nodes.distributorsFilterSubmit.addEventListener("click", refreshDistributors);
+document.getElementById("distributors-filter-reset").addEventListener("click", resetDistributorFilters);
+nodes.withdrawalsFilterSubmit.addEventListener("click", refreshWithdrawals);
+document.getElementById("withdrawals-filter-reset").addEventListener("click", resetWithdrawalFilters);
 nodes.productsFilterSubmit.addEventListener("click", refreshProducts);
 document.getElementById("products-filter-reset").addEventListener("click", resetProductFilters);
 nodes.categoryReset.addEventListener("click", resetCategoryForm);
 nodes.productReset.addEventListener("click", resetProductForm);
+nodes.ruleVersionReset.addEventListener("click", resetRuleVersionForm);
 nodes.skuAddRow.addEventListener("click", addSkuRow);
 nodes.skuSave.addEventListener("click", async () => {
   try {
@@ -1318,6 +2438,34 @@ nodes.skuSave.addEventListener("click", async () => {
     setStatus(nodes.sessionStatus, "SKU 已保存。", "success");
   } catch (error) {
     setStatus(nodes.sessionStatus, error.message || "SKU 保存失败", "error");
+  }
+});
+
+nodes.bannerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await saveBanner();
+    setStatus(nodes.sessionStatus, "轮播图已保存。", "success");
+  } catch (error) {
+    setStatus(nodes.sessionStatus, error.message || "轮播图保存失败", "error");
+  }
+});
+
+nodes.bannerReset.addEventListener("click", resetBannerForm);
+nodes.bannerUploadBtn.addEventListener("click", uploadBannerImage);
+
+nodes.productCoverUploadBtn.addEventListener("click", uploadProductCoverImage);
+nodes.productCoverImage.addEventListener("input", updateCoverPreview);
+
+nodes.themeSave.addEventListener("click", async () => {
+  nodes.themeSave.disabled = true;
+  try {
+    await saveTheme();
+    setStatus(nodes.sessionStatus, "主题已保存。", "success");
+  } catch (error) {
+    setStatus(nodes.sessionStatus, error.message || "主题保存失败", "error");
+  } finally {
+    nodes.themeSave.disabled = false;
   }
 });
 
@@ -1367,8 +2515,13 @@ document.body.addEventListener("click", async (event) => {
   const afterSaleId = target.dataset.aftersaleId;
   const categoryId = target.dataset.categoryId;
   const productId = target.dataset.productId;
+  const withdrawalId = target.dataset.withdrawalId;
+  const ruleVersionId = target.dataset.ruleVersionId;
+  const distributorId = target.dataset.distributorId;
   const nextStatus = target.dataset.nextStatus;
   const skuIndex = Number(target.dataset.skuIndex || -1);
+  const bannerId = target.dataset.bannerId;
+  const sectionVisibilityKey = target.dataset.sectionKey;
 
   target.disabled = true;
 
@@ -1401,6 +2554,47 @@ document.body.addEventListener("click", async (event) => {
       await reviewAfterSale(afterSaleId, "approve");
     } else if (action === "reject-aftersale") {
       await reviewAfterSale(afterSaleId, "reject");
+    } else if (action === "fill-rule-form") {
+      const record = state.distributionRuleVersions.find((item) => item.versionId === ruleVersionId);
+      if (record) {
+        populateRuleVersionForm(record);
+        scrollToSection("distribution-rules");
+      }
+    } else if (action === "publish-rule-version") {
+      await publishRuleVersion(ruleVersionId);
+    } else if (action === "toggle-distributor-detail") {
+      await toggleDistributorDetail(distributorId);
+    } else if (action === "update-distributor-status") {
+      await updateDistributorStatus(distributorId, nextStatus);
+      scrollToSection("distributors");
+    } else if (action === "toggle-withdrawal-detail") {
+      await toggleWithdrawalDetail(withdrawalId);
+    } else if (action === "approve-withdrawal") {
+      await reviewWithdrawal(withdrawalId, "approve");
+    } else if (action === "reject-withdrawal") {
+      await reviewWithdrawal(withdrawalId, "reject");
+    } else if (action === "payout-withdrawal") {
+      await payoutWithdrawal(withdrawalId, "paid");
+    } else if (action === "payout-withdrawal-failed") {
+      await payoutWithdrawal(withdrawalId, "failed");
+    } else if (action === "edit-banner") {
+      const record = state.banners.find((item) => (item.bannerId || item.id) === bannerId);
+      if (record) {
+        populateBannerForm(record);
+        scrollToSection("decoration");
+      }
+    } else if (action === "delete-banner") {
+      await deleteBanner(bannerId);
+    } else if (action === "toggle-section-visibility") {
+      const currentVisible = target.dataset.visible === "true";
+      await updateSectionVisibility(sectionVisibilityKey, !currentVisible);
+    } else if (action === "update-section-sort") {
+      const newSortOrder = toNumber(target.value, 0);
+      await request("/admin/v1/page-sections/" + encodeURIComponent(sectionVisibilityKey), {
+        method: "PUT",
+        body: { sortOrder: newSortOrder }
+      });
+      await loadPageSections();
     }
 
     setStatus(nodes.sessionStatus, "操作已完成。", "success");
@@ -1419,4 +2613,11 @@ renderProducts();
 renderSkuEditor();
 renderOrders();
 renderAfterSales();
+resetRuleVersionForm();
+renderDistributionOverview();
+renderDistributionRules();
+renderDistributors();
+renderWithdrawals();
+renderBannersList();
+renderPageSectionsList();
 validateSession();
