@@ -18,7 +18,12 @@ const {
   paginateList
 } = require("./utils");
 
-const AUTO_SHIP_DELAY_MS = 10 * 1000;
+/**
+ * 自动发货延迟时间（毫秒）。
+ * 订单创建后等待此时间自动标记为已发货，用于虚拟/无需物流商品的演示场景。
+ * 可通过环境变量 AUTO_SHIP_DELAY_MS 覆盖，默认 10 秒。
+ */
+const AUTO_SHIP_DELAY_MS = Number(process.env.AUTO_SHIP_DELAY_MS) || (10 * 1000);
 
 function parseSalesCount(salesText) {
   const matched = String(salesText || "").match(/\d+/);
@@ -135,7 +140,7 @@ function buildRuntimeOrder(cartItems, options = {}) {
   const summary = buildCheckoutSummary(cartItems, options.coupon);
 
   return {
-    id: `NO${Date.now()}`,
+    id: `NO${generateId()}`,
     sourceType: "runtime",
     autoShipAfter: Date.now() + AUTO_SHIP_DELAY_MS,
     status: "pending",

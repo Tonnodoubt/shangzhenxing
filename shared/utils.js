@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+
 function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -43,17 +45,27 @@ function formatPrice(value) {
 }
 
 function formatDateTime(date = new Date()) {
-  const pad = (value) => String(value).padStart(2, "0");
+  const current = date instanceof Date ? date : new Date(date);
 
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate())
-  ].join("-") + " " + [pad(date.getHours()), pad(date.getMinutes())].join(":");
+  if (Number.isNaN(current.getTime())) {
+    return "";
+  }
+
+  return current.toLocaleString("sv-SE", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).replace(",", "");
 }
 
 function generateId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const hex = crypto.randomBytes(8).toString("hex");
+  return prefix ? `${prefix}-${hex}` : hex;
 }
 
 function requireString(value, fallback = "") {
