@@ -53,6 +53,7 @@ npm run admin:hash-password -- '你的强密码'
 - `WECHAT_APP_ID`
 - `WECHAT_APP_SECRET`
 - `ADMIN_USERS`
+- `COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET / COS_REGION`（启用图片持久化时）
 
 ## 2. 云托管里怎么配
 
@@ -112,6 +113,10 @@ ADMIN_USERS='[{"id":"admin-1","username":"admin","realName":"商城管理员","m
 CORS_ORIGINS=""
 ADMIN_SESSION_TTL_MS=28800000
 DATABASE_TCP_PROBE_TIMEOUT_MS=2000
+COS_SECRET_ID="AKID..."
+COS_SECRET_KEY="..."
+COS_BUCKET="your-bucket-1250000000"
+COS_REGION="ap-shanghai"
 ```
 
 这里最容易填错的是 `ADMIN_USERS`：
@@ -119,6 +124,13 @@ DATABASE_TCP_PROBE_TIMEOUT_MS=2000
 - 这是一个 JSON 字符串
 - `passwordHash` 里放的是 bcrypt 哈希
 - 不能写“替换成bcrypt哈希”这种占位文字
+
+填完后建议先在本地做一次统一校验：
+
+```bash
+cd server
+npm run env:check:strict
+```
 
 ## 4. 小程序端要确认什么
 

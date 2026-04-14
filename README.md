@@ -62,11 +62,12 @@
 
 - `router -> service -> repository` 分层结构
 - `memory | prisma` 双数据源切换
-- `POST /api/auth/session`
-- `GET /api/me`
-- `POST /api/auth/logout`
+- `POST /api/v1/auth/session`
+- `GET /api/v1/me`
+- `POST /api/v1/auth/logout`
 - `wx.login + code2Session` 预埋链路
-- 订单、优惠券、售后、分销团队、佣金、海报等用户态接口
+- 订单、优惠券、售后、分销（团队/佣金/海报/提现）等用户态接口
+- 分销后台提现审核 / 打款、规则版本化（创建草稿 / 发布 / 变更日志）接口
 - 本地 Docker MySQL + Prisma 真库回归
 - 最小履约控制台 `/admin-console/`
 
@@ -79,6 +80,7 @@
 - 订单详情
 - 后台发货
 - 售后审核
+- 分销提现审核与打款登记
 
 默认账号：
 
@@ -204,6 +206,9 @@ http://127.0.0.1:3000/admin-console/
 
 - `docs/growth/distribution-production-checklist.md`
   适合看分销当前进度和后续补齐顺序
+
+- `docs/growth/distribution-delivery-plan.md`
+  适合看分销里程碑状态（M1/M2/M3/M4）和下一阶段排期
 
 ## 当前关键路径
 

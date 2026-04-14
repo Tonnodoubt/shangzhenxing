@@ -1,0 +1,140 @@
+name: PR Combined Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-combined-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Bug Regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Full tests
+        run: npm test
+
+      - name: Critical smoke tests (login/add-to-cart/order/cancel rollback)
+        run: node --test tests/session-login.test.js tests/prisma-cart.test.js tests/prisma-order.test.js
+
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit high vulnerabilities
+        run: npm audit --audit-level=high
+
+  secret-scan:
+    name: Secret Leak Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  debt-guard:
+    name: Technical Debt Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies for server checks
+        working-directory: server
+        run: npm ci
+
+      - name: Duplication guard (jscpd <= 19%)
+        run: |
+          npx --yes jscpd \
+            --reporters console \
+            --mode strict \
+            --min-lines 5 \
+            --min-tokens 50 \
+            --pattern "**/*.{js,wxml,wxss}" \
+            --ignore "**/.git/**,**/node_modules/**,**/docs/**,**/*.md,**/*.json,**/*.svg,**/*.png,**/*.jpg,**/*.jpeg,**/*.zip" \
+            --threshold 19 \
+            server/src server/tests miniprogram
+
+      - name: Circular dependency check (server)
+        working-directory: server
+        run: npx --yes madge --circular --extensions js src
+
+      - name: Circular dependency check (miniprogram)
+        run: npx --yes madge --circular --extensions js miniprogram
+
+      - name: Unused exports/files report (knip)
+        working-directory: server
+        continue-on-error: true
+        run: npx --yes knip
+
+      - name: TODO/FIXME/HACK guard
+        run: |
+          if command -v rg >/dev/null 2>&1; then
+            if rg -n "TODO|FIXME|HACK" --glob '!**/node_modules/**' .; then
+              echo "Found TODO/FIXME/HACK markers. Please clean them up before merge."
+              exit 1
+            fi
+            echo "No TODO/FIXME/HACK markers found."
+          else
+            if grep -RInE "TODO|FIXME|HACK" --exclude-dir=node_modules .; then
+              echo "Found TODO/FIXME/HACK markers. Please clean them up before merge."
+              exit 1
+            fi
+            echo "No TODO/FIXME/HACK markers found."
+          fi

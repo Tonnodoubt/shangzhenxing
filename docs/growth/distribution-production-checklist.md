@@ -1,169 +1,165 @@
 # 分销 / 分佣现状与上线路线
 
-更新时间：2026-03-31
+更新时间：2026-04-13
 
-这份文档把原来的“结构图”和“上线路线图”合并成了一篇，目的只有一个：
+这份文档用于回答两个问题：
 
-- 说清楚当前代码里已经有什么，离可运营版还差什么
+- 现在分销系统已经做到什么程度
+- 离“可长期运营”的版本还差哪些关键能力
+
+如果要看按里程碑的实施方案，请配合阅读：
+
+- [distribution-delivery-plan.md](/Users/tongqianqiu/shangzhenxing/wechat-mini-shop/docs/growth/distribution-delivery-plan.md)
 
 ## 一句话结论
 
-当前项目已经做完“一级分佣第一版基础链路”，但还没有到正式可长期运营版。
+当前分销系统已经从“展示型”升级为“可操作型”：
 
-已经落到代码里的部分有：
+- 一级分销归因链路已落地
+- 提现闭环（申请/审核/打款）已落地
+- 规则版本化后端能力已落地
 
-- 分销中心、团队、佣金、海报页
-- inviter 首次绑定
-- 下单归因快照
-- 确认收货后给 inviter 记佣
+但还不是最终运营版，核心缺口仍在：
 
-还没补完的关键部分有：
+- 退款/售后冲回佣金未闭环
+- 规则版本尚未与订单/佣金快照强绑定
+- admin-console 分销工作区只完成了提现台，规则和分销员 UI 仍待补齐
+- 二级分销（M4）尚未开始
 
-- 退款 / 售后冲回
-- 结算状态和人工结算
-- 提现申请和审核
-- 后台规则配置和调账
+## 里程碑状态
 
-## 当前代码里已经有的能力
+- `M1 提现闭环`：已完成（后端 + 提现审核台）
+- `M2 规则后台化`：后端已完成（版本/发布/日志接口可用）
+- `M3 admin-console 分销工作区`：进行中（已完成提现审核台，规则/分销员管理未完成）
+- `M4 二级分销`：未开始
 
-### 页面与接口
+## 当前已落地能力
 
-用户侧已经有：
+### 1. 用户侧（小程序）
+
+页面已接入：
 
 - `pages/distribution/index`
 - `pages/team/index`
 - `pages/commissions/index`
 - `pages/poster/index`
 
-前端已经接上：
+接口已可用：
 
-- `GET /api/distribution`
-- `GET /api/team`
-- `GET /api/commissions`
-- `GET /api/poster`
+- `GET /api/v1/distribution`
+- `GET /api/v1/team`
+- `GET /api/v1/commissions`
+- `GET /api/v1/poster`
+- `GET /api/v1/withdrawals`
+- `POST /api/v1/withdrawals`
+- `GET /api/v1/withdrawals/:id`
+- `POST /api/v1/withdrawals/:id/cancel`
 
-### 数据落点
+### 2. 后台侧（运营）
 
-Prisma 当前已经有这些核心字段或模型：
+提现运营接口已可用：
 
+- `GET /admin/v1/distribution/withdrawals`
+- `GET /admin/v1/distribution/withdrawals/:withdrawalId`
+- `POST /admin/v1/distribution/withdrawals/:withdrawalId/review`
+- `POST /admin/v1/distribution/withdrawals/:withdrawalId/payout`
+
+规则版本化接口已可用：
+
+- `GET /admin/v1/distribution/rules`
+- `PUT /admin/v1/distribution/rules`（兼容旧接口，直接发布）
+- `GET /admin/v1/distribution/rule-versions`
+- `POST /admin/v1/distribution/rule-versions`
+- `POST /admin/v1/distribution/rule-versions/:ruleVersionId/publish`
+- `GET /admin/v1/distribution/rule-change-logs`
+
+分销员接口已可用：
+
+- `GET /admin/v1/distributors`
+- `GET /admin/v1/distributors/:distributorId`
+- `POST /admin/v1/distributors/:distributorId/status`
+
+### 3. 数据模型（Prisma）
+
+已包含：
+
+- `ReferralBinding`
 - `DistributorProfile`
 - `CommissionRecord`
-- `ReferralBinding`
-- `Order.referralBindingId`
-- `Order.inviterUserId`
-- `Order.sourceScene`
-- `Order.commissionBaseAmount`
-- `Order.commissionRate`
-- `Order.commissionAmount`
+- `WithdrawalRequest`
+- `WithdrawalRequestItem`
+- `WithdrawalPayout`
+- `DistributionRuleVersion`
+- `DistributionRuleChangeLog`
 
-### 当前真实归因链路
+并已扩展状态字段：
 
-现在第一版的链路已经是：
+- `CommissionStatus = pending|settled|withdrawing|withdrawn|reversed`
+- `WithdrawalStatus = submitted|approved|rejected|paying|paid|pay_failed|cancelled`
 
-1. 用户通过分享路径进入
-2. 会话建立时尝试绑定 `inviterUserId`
-3. 下单时把 inviter、来源和佣金快照固化到订单
-4. 订单确认收货后，把佣金记到 inviter 的分销账户
+## 当前主要缺口（按优先级）
 
-这意味着当前项目已经不是“纯展示分销”，而是有了真实归因雏形。
+### P0：退款 / 售后冲回佣金
 
-## 当前还没做完的地方
+现状：
 
-### 1. 结算链路不完整
+- 订单完成记佣已实现
+- `reversed` 状态已预留
+- 但“退款/售后完成 -> 按比例冲回佣金”尚未形成完整业务闭环
 
-当前有 `pending / settled` 基础，但还缺：
+风险：
 
-- 提现申请
-- 提现审核
-- 打款状态
-- 结算批次
+- 账务会偏乐观，影响财务对账与提现风控
 
-### 2. 退款冲回还没闭环
+### P0：规则版本与订单快照绑定
 
-现在最值得补的是：
+现状：
 
-- 全额退款如何冲回佣金
-- 部分退款如何按比例冲回
-- 售后完成后佣金状态如何变化
+- 规则版本可创建/发布/留痕
+- 但订单与佣金还未记录 `ruleVersionId` 快照
 
-### 3. 后台运营能力还不够
+风险：
 
-目前缺少：
+- 后续追溯“某笔佣金按哪个规则算出”会不够硬
 
-- 分销规则后台
-- 分销员管理
-- 调账能力
-- 审计日志
+### P1：admin-console 分销工作区补完
 
-### 4. 分享侧还不够完整
+现状：
 
-当前已经有海报分享带参，但还可以继续补：
+- 提现审核台已有可操作 UI
+- 规则版本列表/发布、分销员管理等可视化页仍缺
 
-- 商品卡真实分享
-- 邀请记录页
-- 更完整的直属成员和成交统计
+风险：
 
-## 首发最推荐的规则冻结
+- 运营仍需依赖接口层，无法完全在控制台独立闭环
 
-如果目标是尽快补成可用版，建议先把规则收成下面这一版：
+### P2：二级分销（M4）
 
-1. 只做一级直推，不做二级。
-2. 邀请关系只认首次有效绑定，不反复改上级。
-3. 佣金在确认收货后生成。
-4. 佣金基数按参与分销商品的实付小计算。
-5. 退款和售后先做“冲回佣金”，再考虑复杂调账。
-6. 结算先做人工作业，不要先做自动打款。
+现状：
 
-这样做的好处是：
+- 方案已定，代码未开工
 
-- 用户容易理解
-- 财务容易核对
-- 技术复杂度也明显更低
+## 推荐下一步（短期）
 
-## 最值得继续补的顺序
+1. 先补“售后冲回佣金”闭环（含幂等、对账字段、自动化测试）。
+2. 再补“规则版本 -> 订单/佣金快照”绑定字段与写入逻辑。
+3. 完成 admin-console 的规则版本页和分销员管理页，形成完整运营工作区。
 
-如果按性价比排序，建议这样推进：
+## 相关代码参考
 
-1. 先补退款 / 售后冲回佣金
-2. 再补结算状态和人工结算后台
-3. 再补提现申请 / 审核
-4. 最后再考虑商品卡分享、排行榜、等级体系
-
-## 当前明确不建议先做的东西
-
-当前不建议先拉进主线的内容：
-
-- 二级分佣
-- 自动打款
-- 复杂等级晋升
-- 排行榜
-- 大团队树
-- 很重的风控规则引擎
-
-原因不是这些没价值，而是：
-
-- 它们都不是第一版真正阻塞上线的部分
-- 先把一级分佣做扎实，比一口气加很多玩法更值钱
-
-## 相关代码
-
-- 小程序入口参数透传：[app.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/app.js)
-- 会话建链透传 inviter：[mall-client.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/services/mall-client.js)
-- 海报分享路径：[poster/index.js](/Users/tongqianqiu/store/wechat-mini-shop/miniprogram/pages/poster/index.js)
-- 数据模型：[schema.prisma](/Users/tongqianqiu/store/wechat-mini-shop/server/prisma/schema.prisma)
-- 分销主逻辑：[prisma.js](/Users/tongqianqiu/store/wechat-mini-shop/server/src/repositories/storefront/prisma.js)
+- 分销后端主模块：[prisma-distribution.js](/Users/tongqianqiu/shangzhenxing/wechat-mini-shop/server/src/repositories/storefront/prisma-distribution.js)
+- 分销管理路由：[router.js](/Users/tongqianqiu/shangzhenxing/wechat-mini-shop/server/src/admin/router.js)
+- 分销数据模型：[schema.prisma](/Users/tongqianqiu/shangzhenxing/wechat-mini-shop/server/prisma/schema.prisma)
+- admin-console（含提现审核台）：[admin-console.js](/Users/tongqianqiu/shangzhenxing/wechat-mini-shop/server/public/admin-console/admin-console.js)
 
 ## 结论
 
-一句话收口：
+分销系统已从“只能看”进入“可运营早期版”。
 
-- 当前已经不是“纯展示分销”
-- 但还不是“正式可运营分销系统”
+下一步关键不是继续加玩法，而是把：
 
-接下来最合理的动作，不是继续加花样，而是把：
+- 冲回对账
+- 规则快照
+- 运营控制台收口
 
-- 退款冲回
-- 结算状态
-- 后台运营入口
-
-这三件事补扎实。
+这三件事补稳，才能进入长期可运营状态。
