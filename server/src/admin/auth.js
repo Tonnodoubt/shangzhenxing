@@ -17,6 +17,7 @@ const ROLE_PRESETS = {
     permissions: [
       "dashboard.page",
       "dashboard.view",
+      "statistics.sales.view",
       "product.page",
       "product.view",
       "category.page",
@@ -26,6 +27,8 @@ const ROLE_PRESETS = {
       "coupon.create",
       "coupon.edit",
       "coupon.status",
+      "user.view",
+      "user.status",
       "order.page",
       "order.view",
       "order.detail",
@@ -37,7 +40,11 @@ const ROLE_PRESETS = {
       "page_decoration.edit",
       "theme.view",
       "theme.edit",
-      "upload.image"
+      "upload.image",
+      "review.view",
+      "review.status",
+      "review.reply",
+      "notification.view"
     ],
     dataScopes: {
       product: "all",
@@ -70,7 +77,9 @@ const ROLE_PRESETS = {
       "page_decoration.edit",
       "theme.view",
       "theme.edit",
-      "upload.image"
+      "upload.image",
+      "review.view",
+      "notification.view"
     ],
     dataScopes: {
       product: "all"
@@ -80,6 +89,7 @@ const ROLE_PRESETS = {
     permissions: [
       "dashboard.page",
       "dashboard.view",
+      "statistics.sales.view",
       "order.page",
       "order.view",
       "order.detail",
@@ -90,7 +100,8 @@ const ROLE_PRESETS = {
       "shipment.create",
       "shipment.confirm",
       "aftersale.page",
-      "aftersale.view"
+      "aftersale.view",
+      "notification.view"
     ],
     dataScopes: {
       order: "all",
@@ -108,7 +119,8 @@ const ROLE_PRESETS = {
       "aftersale.view",
       "aftersale.review",
       "aftersale.approve",
-      "aftersale.reject"
+      "aftersale.reject",
+      "notification.view"
     ],
     dataScopes: {
       order: "readonly_all",
@@ -126,7 +138,8 @@ const ROLE_PRESETS = {
       "distribution.distributor.view",
       "distribution.distributor.review",
       "distribution.distributor.status",
-      "distribution.commission.view"
+      "distribution.commission.view",
+      "notification.view"
     ],
     dataScopes: {
       distribution: "all"
@@ -137,6 +150,7 @@ const ROLE_PRESETS = {
       "dashboard.page",
       "dashboard.view",
       "dashboard.export",
+      "statistics.sales.view",
       "order.page",
       "order.view",
       "order.detail",
@@ -144,7 +158,8 @@ const ROLE_PRESETS = {
       "distribution.distributor.page",
       "distribution.distributor.view",
       "distribution.commission.view",
-      "distribution.withdraw.review"
+      "distribution.withdraw.review",
+      "notification.view"
     ],
     dataScopes: {
       order: "readonly_all",
@@ -155,6 +170,7 @@ const ROLE_PRESETS = {
     permissions: [
       "dashboard.page",
       "dashboard.view",
+      "statistics.sales.view",
       "product.page",
       "product.view",
       "category.page",
@@ -164,13 +180,15 @@ const ROLE_PRESETS = {
       "order.detail",
       "coupon.page",
       "coupon.view",
-      "distribution.rule.page",
+      "user.view",
       "distribution.rule.view",
       "distribution.distributor.page",
       "distribution.distributor.view",
       "banner.view",
       "page_decoration.view",
-      "theme.view"
+      "theme.view",
+      "review.view",
+      "notification.view"
     ],
     dataScopes: {
       product: "readonly_all",

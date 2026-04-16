@@ -43,6 +43,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+swiper.detail-cover {
+  display: block;
+}
+
+.detail-cover-image {
+  width: 100%;
+  height: 100%;
 }
 
 .detail-cover-text {
@@ -278,6 +288,13 @@
   display: block;
   color: #6f665b;
   line-height: 1.8;
+}
+
+.detail-image {
+  display: block;
+  width: 100%;
+  margin-top: 18rpx;
+  border-radius: 12rpx;
 }
 
 .selection-row {

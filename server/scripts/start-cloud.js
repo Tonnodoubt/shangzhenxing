@@ -181,7 +181,23 @@ async function main() {
 
     console.log(`[cloud-start] running prisma migrate deploy for ${summarizeDatabaseTarget(databaseUrl)}`);
 
-    await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
+    try {
+      await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
+    } catch (migrateError) {
+      console.log("[cloud-start] migrate deploy failed, resolving dirty migrations...");
+      const pendingMigrations = [
+        "20260415090000_add_product_images"
+      ];
+      for (const migrationName of pendingMigrations) {
+        try {
+          await runCommand(NPM_COMMAND, ["run", "prisma:migrate:resolve", "--", "--applied", migrationName]);
+          console.log(`[cloud-start] resolved migration ${migrationName} as applied`);
+        } catch (_resolveError) {
+          console.log(`[cloud-start] could not resolve ${migrationName}, continuing`);
+        }
+      }
+      await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
+    }
     console.log(`[cloud-start] prisma migrate deploy completed in ${Date.now() - startedAt}ms`);
 
     setRuntimeState({

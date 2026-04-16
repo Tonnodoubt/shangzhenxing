@@ -1,6 +1,18 @@
 const { createStorefrontError } = require("../../modules/storefront/errors");
 const { normalizeDetailContent, getShanghaiTodayRange } = require("../../../shared/utils");
 
+function parseJsonArray(value, fallback) {
+  if (!value) {
+    return fallback || [];
+  }
+  try {
+    var parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.length ? parsed : (fallback || []);
+  } catch (_e) {
+    return fallback || [];
+  }
+}
+
 function createStorefrontPrismaAdminRepository({
   getPrisma,
   assertUserOrderStatusTransition,
@@ -368,7 +380,8 @@ function createStorefrontPrismaAdminRepository({
       categoryName: ((product.category || {}).name) || "",
       productType: "general",
       coverImage: product.coverImage || "",
-      imageList: product.coverImage ? [product.coverImage] : [],
+      imageList: parseJsonArray(product.imageList, product.coverImage ? [product.coverImage] : []),
+      detailImages: parseJsonArray(product.detailImages, []),
       detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       labelTags: buildHighlightTags(product),
       status,
@@ -833,6 +846,10 @@ function createStorefrontPrismaAdminRepository({
           String(payload.detailContent || "").trim(),
           String(payload.shortDesc || payload.subTitle || payload.title || "").trim()
         ) || null,
+        imageList: Array.isArray(payload.imageList) && payload.imageList.length
+          ? JSON.stringify(payload.imageList.filter(function (u) { return u; })) : null,
+        detailImages: Array.isArray(payload.detailImages) && payload.detailImages.length
+          ? JSON.stringify(payload.detailImages.filter(function (u) { return u; })) : null,
         price: toNumber(payload.price),
         marketPrice: toNumber(payload.marketPrice || payload.price),
         salesCount: Math.max(0, Number(payload.salesCount || 0)),
@@ -992,7 +1009,7 @@ function createStorefrontPrismaAdminRepository({
     async getAdminDashboardSummary() {
       const prisma = await getPrisma();
       const { start: todayStart, end: tomorrowStart } = getShanghaiTodayRange();
-      const [todayOrderCount, todayPaidAmount, newUserCount, newDistributorCount, pendingShipmentCount, shippingOrderCount, pendingAftersaleCount, processedAftersaleCount] = await Promise.all([
+      const [todayOrderCount, todayPaidAmount, newUserCount, newDistributorCount, pendingShipmentCount, shippingOrderCount, pendingAftersaleCount, processedAftersaleCount, totalOrderCount, totalPaidAmount, totalUserCount, totalProductCount] = await Promise.all([
         prisma.order.count({
           where: {
             createdAt: {
@@ -1052,6 +1069,23 @@ function createStorefrontPrismaAdminRepository({
               in: ["approved", "rejected", "done"]
             }
           }
+        }),
+        prisma.order.count(),
+        prisma.order.aggregate({
+          _sum: {
+            payableAmount: true
+          },
+          where: {
+            status: {
+              not: "cancelled"
+            }
+          }
+        }),
+        prisma.user.count(),
+        prisma.product.count({
+          where: {
+            status: "on_sale"
+          }
         })
       ]);
 
@@ -1064,8 +1098,52 @@ function createStorefrontPrismaAdminRepository({
         pendingShipmentCount,
         shippingOrderCount,
         pendingAftersaleCount,
-        processedAftersaleCount
+        processedAftersaleCount,
+        totalOrderCount,
+        totalPaidAmountCent: Math.round(toNumber((totalPaidAmount._sum || {}).payableAmount) * 100),
+        totalPaidAmountText: formatMoney((totalPaidAmount._sum || {}).payableAmount),
+        totalUserCount,
+        totalProductCount
       };
+    },
+    async getAdminSalesStatistics(options = {}) {
+      const prisma = await getPrisma();
+      const now = new Date();
+      const days = Math.min(Math.max(toNumber(options.days, 7), 1), 90);
+      const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+      const orders = await prisma.order.findMany({
+        where: {
+          createdAt: { gte: startDate },
+          status: { not: "cancelled" }
+        },
+        select: {
+          createdAt: true,
+          payableAmount: true
+        }
+      });
+
+      const buckets = {};
+      for (let i = 0; i < days; i++) {
+        const d = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+        const key = d.toISOString().slice(0, 10);
+        buckets[key] = { date: key, orderCount: 0, salesAmount: 0 };
+      }
+
+      for (const order of orders) {
+        const key = order.createdAt.toISOString().slice(0, 10);
+        if (buckets[key]) {
+          buckets[key].orderCount += 1;
+          buckets[key].salesAmount += toNumber(order.payableAmount, 0);
+        }
+      }
+
+      return Object.values(buckets).map((item) => ({
+        date: item.date,
+        orderCount: item.orderCount,
+        salesAmount: item.salesAmount,
+        salesAmountText: formatMoney(item.salesAmount)
+      }));
     },
     async getAdminOrders(options = {}) {
       const prisma = await getPrisma();
@@ -1366,6 +1444,404 @@ function createStorefrontPrismaAdminRepository({
       });
 
       return updated ? buildAdminAfterSaleDetail(updated) : null;
+    },
+    async getAdminUsers(options = {}) {
+      const prisma = await getPrisma();
+      const keyword = String(options.keyword || "").trim();
+      const status = String(options.status || "").trim();
+      const where = {};
+
+      if (status) {
+        where.status = status;
+      }
+
+      if (keyword) {
+        where.OR = [
+          { nickname: { contains: keyword } },
+          { mobile: { contains: keyword } }
+        ];
+      }
+
+      const pagination = getPaginationQuery(options);
+      const [total, users] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: pagination.skip,
+          take: pagination.take,
+          include: {
+            distributorProfile: {
+              select: { id: true, status: true, level: true }
+            },
+            _count: {
+              select: { orders: true, userCoupons: true }
+            }
+          }
+        })
+      ]);
+
+      return buildPaginatedResult(
+        users.map((item) => ({
+          userId: item.id,
+          nickname: item.nickname || "",
+          avatarUrl: item.avatarUrl || "",
+          mobile: item.mobile || "",
+          status: item.status || "active",
+          statusText: item.status === "disabled" ? "已禁用" : "正常",
+          isAuthorized: !!item.isAuthorized,
+          isDistributor: !!(item.distributorProfile && item.distributorProfile.id),
+          distributorStatus: (item.distributorProfile || {}).status || null,
+          orderCount: (item._count || {}).orders || 0,
+          couponCount: (item._count || {}).userCoupons || 0,
+          createdAt: formatDateTime(item.createdAt),
+          updatedAt: formatDateTime(item.updatedAt)
+        })),
+        total,
+        options
+      );
+    },
+    async getAdminUserDetail(userId) {
+      const prisma = await getPrisma();
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          distributorProfile: true,
+          orders: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            select: {
+              id: true,
+              orderNo: true,
+              status: true,
+              payableAmount: true,
+              createdAt: true
+            }
+          },
+          userCoupons: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            include: {
+              template: {
+                select: { title: true, amount: true, threshold: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return {
+        userId: user.id,
+        nickname: user.nickname || "",
+        avatarUrl: user.avatarUrl || "",
+        mobile: user.mobile || "",
+        status: user.status || "active",
+        statusText: user.status === "disabled" ? "已禁用" : "正常",
+        isAuthorized: !!user.isAuthorized,
+        openId: user.openId || "",
+        createdAt: formatDateTime(user.createdAt),
+        updatedAt: formatDateTime(user.updatedAt),
+        distributor: user.distributorProfile || null,
+        recentOrders: (user.orders || []).map((order) => ({
+          orderId: order.id,
+          orderNo: order.orderNo,
+          status: order.status,
+          statusText: getDisplayTextByStatus(order.status, {
+            pending: "待发货",
+            shipping: "待收货",
+            done: "已完成",
+            cancelled: "已取消"
+          }),
+          payableAmount: order.payableAmount,
+          payableAmountText: formatMoney(order.payableAmount),
+          createdAt: formatDateTime(order.createdAt)
+        })),
+        coupons: (user.userCoupons || []).map((uc) => ({
+          userCouponId: uc.id,
+          status: uc.status,
+          statusText: uc.status === "available" ? "可用" : uc.status === "used" ? "已使用" : "已过期",
+          title: (uc.template || {}).title || "",
+          amount: (uc.template || {}).amount || 0,
+          threshold: (uc.template || {}).threshold || 0,
+          expiresAt: uc.expiresAt ? formatDateTime(uc.expiresAt) : null
+        }))
+      };
+    },
+    async updateAdminUserStatus(userId, status) {
+      const prisma = await getPrisma();
+      return prisma.user.update({
+        where: { id: userId },
+        data: { status }
+      });
+    },
+
+    // ── Phase 4: 商品评价管理 ──
+
+    async getAdminProductReviews(options = {}) {
+      const prisma = await getPrisma();
+      const where = {};
+      const status = String(options.status || "").trim();
+      const productId = String(options.productId || "").trim();
+      const minRating = Number(options.minRating) || 0;
+
+      if (status) { where.status = status; }
+      if (productId) { where.productId = productId; }
+      if (minRating > 0) { where.rating = { gte: minRating }; }
+
+      const pagination = getPaginationQuery(options);
+      const [total, reviews] = await Promise.all([
+        prisma.productReview.count({ where }),
+        prisma.productReview.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: pagination.skip,
+          take: pagination.take,
+          include: {
+            user: { select: { id: true, nickname: true, avatarUrl: true } },
+            product: { select: { id: true, title: true } },
+            order: { select: { id: true, orderNo: true } }
+          }
+        })
+      ]);
+
+      return buildPaginatedResult(
+        reviews.map((r) => ({
+          reviewId: r.id,
+          productId: r.productId,
+          productTitle: (r.product || {}).title || "",
+          userId: r.userId,
+          userNickname: (r.user || {}).nickname || "",
+          userAvatarUrl: (r.user || {}).avatarUrl || "",
+          orderId: r.orderId,
+          orderNo: (r.order || {}).orderNo || "",
+          rating: r.rating,
+          content: r.content || "",
+          imageUrl: r.imageUrl || "",
+          status: r.status,
+          statusText: r.status === "visible" ? "显示中" : "已隐藏",
+          adminReply: r.adminReply || "",
+          repliedAt: r.repliedAt ? formatDateTime(r.repliedAt) : null,
+          repliedBy: r.repliedBy || null,
+          createdAt: formatDateTime(r.createdAt),
+          updatedAt: formatDateTime(r.updatedAt)
+        })),
+        total,
+        options
+      );
+    },
+
+    async updateAdminReviewStatus(reviewId, status) {
+      const prisma = await getPrisma();
+      return prisma.productReview.update({
+        where: { id: reviewId },
+        data: { status }
+      });
+    },
+
+    async replyAdminReview(reviewId, reply, actor = {}) {
+      const prisma = await getPrisma();
+      return prisma.productReview.update({
+        where: { id: reviewId },
+        data: {
+          adminReply: reply,
+          repliedAt: new Date(),
+          repliedBy: String(actor.realName || actor.username || "管理员").trim()
+        }
+      });
+    },
+
+    // ── Phase 5: 通知系统 ──
+
+    async getAdminNotifications(options = {}) {
+      const prisma = await getPrisma();
+      const where = {};
+      const isRead = options.isRead;
+      const type = String(options.type || "").trim();
+
+      if (typeof isRead === "boolean") { where.isRead = isRead; }
+      if (type) { where.type = type; }
+
+      const pagination = getPaginationQuery(options);
+      const [total, notifications] = await Promise.all([
+        prisma.adminNotification.count({ where }),
+        prisma.adminNotification.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: pagination.skip,
+          take: pagination.take
+        })
+      ]);
+
+      return buildPaginatedResult(
+        notifications.map((n) => ({
+          notificationId: n.id,
+          type: n.type,
+          title: n.title,
+          content: n.content || "",
+          isRead: n.isRead,
+          targetRole: n.targetRole || null,
+          createdAt: formatDateTime(n.createdAt)
+        })),
+        total,
+        options
+      );
+    },
+
+    async markAdminNotificationRead(notificationId) {
+      const prisma = await getPrisma();
+      return prisma.adminNotification.update({
+        where: { id: notificationId },
+        data: { isRead: true }
+      });
+    },
+
+    async markAllAdminNotificationsRead() {
+      const prisma = await getPrisma();
+      return prisma.adminNotification.updateMany({
+        where: { isRead: false },
+        data: { isRead: true }
+      });
+    },
+
+    async getUnreadAdminNotificationCount() {
+      const prisma = await getPrisma();
+      return prisma.adminNotification.count({ where: { isRead: false } });
+    },
+
+    async createAdminNotification(type, title, content = "") {
+      const prisma = await getPrisma();
+      return prisma.adminNotification.create({
+        data: { type, title, content }
+      });
+    },
+
+    // ── Phase 6: 系统管理 ──
+
+    async getAdminUsersList(options = {}) {
+      const prisma = await getPrisma();
+      const where = {};
+      const status = String(options.status || "").trim();
+      if (status) { where.status = status; }
+
+      const pagination = getPaginationQuery(options);
+      const [total, users] = await Promise.all([
+        prisma.adminUser.count({ where }),
+        prisma.adminUser.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: pagination.skip,
+          take: pagination.take
+        })
+      ]);
+
+      return buildPaginatedResult(
+        users.map((u) => ({
+          adminUserId: u.id,
+          username: u.username,
+          realName: u.realName,
+          mobile: u.mobile || "",
+          roleCodes: JSON.parse(u.roleCodes || "[]"),
+          status: u.status,
+          statusText: u.status === "enabled" ? "正常" : "已禁用",
+          lastLoginAt: u.lastLoginAt ? formatDateTime(u.lastLoginAt) : null,
+          createdAt: formatDateTime(u.createdAt),
+          updatedAt: formatDateTime(u.updatedAt)
+        })),
+        total,
+        options
+      );
+    },
+
+    async createAdminUserRecord(payload = {}) {
+      const prisma = await getPrisma();
+      const bcrypt = require("bcryptjs");
+      const passwordHash = await bcrypt.hash(payload.password || "admin123", 10);
+      return prisma.adminUser.create({
+        data: {
+          username: payload.username,
+          realName: payload.realName || payload.username,
+          mobile: payload.mobile || null,
+          passwordHash,
+          roleCodes: JSON.stringify(payload.roleCodes || []),
+          status: payload.status || "enabled"
+        }
+      });
+    },
+
+    async updateAdminUserRecord(adminUserId, payload = {}) {
+      const prisma = await getPrisma();
+      const data = {};
+      if (payload.realName) data.realName = payload.realName;
+      if (payload.mobile !== undefined) data.mobile = payload.mobile || null;
+      if (payload.roleCodes) data.roleCodes = JSON.stringify(payload.roleCodes);
+      if (payload.status) data.status = payload.status;
+      return prisma.adminUser.update({ where: { id: adminUserId }, data });
+    },
+
+    async updateAdminUserPassword(adminUserId, newPassword) {
+      const prisma = await getPrisma();
+      const bcrypt = require("bcryptjs");
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      return prisma.adminUser.update({
+        where: { id: adminUserId },
+        data: { passwordHash }
+      });
+    },
+
+    async getAdminOperationLogs(options = {}) {
+      const prisma = await getPrisma();
+      const where = {};
+      const module = String(options.module || "").trim();
+      const action = String(options.action || "").trim();
+      if (module) { where.module = module; }
+      if (action) { where.action = action; }
+
+      const pagination = getPaginationQuery(options);
+      const [total, logs] = await Promise.all([
+        prisma.adminOperationLog.count({ where }),
+        prisma.adminOperationLog.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: pagination.skip,
+          take: pagination.take
+        })
+      ]);
+
+      return buildPaginatedResult(
+        logs.map((l) => ({
+          logId: l.id,
+          adminUserId: l.adminUserId,
+          adminName: l.adminName,
+          module: l.module,
+          action: l.action,
+          targetId: l.targetId || "",
+          summary: l.summary || "",
+          ipAddress: l.ipAddress || "",
+          createdAt: formatDateTime(l.createdAt)
+        })),
+        total,
+        options
+      );
+    },
+
+    async createAdminOperationLog(entry = {}) {
+      const prisma = await getPrisma();
+      return prisma.adminOperationLog.create({
+        data: {
+          adminUserId: entry.adminUserId || "",
+          adminName: entry.adminName || "",
+          module: entry.module || "",
+          action: entry.action || "",
+          targetId: entry.targetId || null,
+          summary: entry.summary || null,
+          payloadJson: entry.payloadJson || null,
+          ipAddress: entry.ipAddress || null
+        }
+      });
     }
   };
 }

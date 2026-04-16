@@ -69,6 +69,10 @@
               </div>
               <button class="secondary" id="refresh-all" type="button">刷新全部数据</button>
               <button class="danger" id="logout-button" type="button">退出登录</button>
+              <div id="notification-bell" class="notification-bell hidden">
+                <span class="bell-icon">🔔</span>
+                <span id="notification-badge" class="notification-badge hidden">0</span>
+              </div>
             </div>
             <div id="session-status" class="status-line"></div>
           </section>
@@ -89,11 +93,32 @@
           <section class="panel" id="summary-panel" data-section-key="summary">
             <div class="section-header">
               <div class="section-title-group">
-                <h2>履约概览</h2>
-                <p class="muted">优先盯待发货和待审核售后。</p>
+                <h2>经营概览</h2>
+                <p class="muted">先看今天数据和整体经营指标。</p>
               </div>
             </div>
             <div id="summary-grid" class="summary-grid"></div>
+            <div class="divider"></div>
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>销售趋势</h3>
+                  <p class="muted">近几天的成交额和订单数走势。</p>
+                </div>
+              </div>
+              <div class="toolbar">
+                <label>
+                  天数
+                  <select id="sales-trend-days">
+                    <option value="7">最近 7 天</option>
+                    <option value="14">最近 14 天</option>
+                    <option value="30">最近 30 天</option>
+                  </select>
+                </label>
+                <button class="secondary" id="sales-trend-refresh" type="button">刷新趋势</button>
+              </div>
+              <div id="sales-trend-chart" class="trend-chart"></div>
+            </div>
           </section>
 
           <section class="panel hidden" id="categories-panel" data-section-key="categories">
@@ -148,69 +173,129 @@
                 </div>
               </div>
             </div>
-            <form id="product-form" class="editor-grid">
-              <input id="product-id" type="hidden" />
-              <div class="compact-grid">
-                <label>
-                  商品标题
-                  <input id="product-title" placeholder="例如：每日精选零食礼盒" />
-                </label>
-                <label>
-                  商品分类
-                  <select id="product-category-id"></select>
-                </label>
-                <label>
-                  销售状态
-                  <select id="product-status">
-                    <option value="off_sale">已下架</option>
-                    <option value="on_sale">销售中</option>
-                  </select>
-                </label>
-                <label>
-                  参与分销
-                  <select id="product-distribution-enabled">
-                    <option value="true">是</option>
-                    <option value="false">否</option>
-                  </select>
-                </label>
-                <label>
-                  售价
-                  <input id="product-price" type="number" min="0" step="0.01" value="0" />
-                </label>
-                <label>
-                  划线价
-                  <input id="product-market-price" type="number" min="0" step="0.01" value="0" />
-                </label>
-                <label>
-                  排序
-                  <input id="product-sort-order" type="number" value="0" />
-                </label>
-              </div>
-              <label>
-                封面图
-                <div class="upload-row">
-                  <input id="product-cover-image" placeholder="https://... 或点击右侧上传" />
-                  <button class="secondary" id="product-cover-upload-btn" type="button">上传图片</button>
+            <div class="product-editing-split">
+              <form id="product-form" class="editor-grid">
+                <input id="product-id" type="hidden" />
+                <div class="wizard-steps" id="wizard-steps">
+                  <button type="button" class="wizard-step active" data-wizard-step="1"><span class="wizard-step-num">1</span><span class="wizard-step-label">基本信息</span></button>
+                  <button type="button" class="wizard-step" data-wizard-step="2"><span class="wizard-step-num">2</span><span class="wizard-step-label">商品图片</span></button>
+                  <button type="button" class="wizard-step" data-wizard-step="3"><span class="wizard-step-num">3</span><span class="wizard-step-label">商品详情</span></button>
                 </div>
-                <div id="product-cover-preview" class="cover-preview"></div>
-              </label>
-              <label>
-                卖点摘要
-                <textarea id="product-short-desc" placeholder="会同时作为前台摘要文案"></textarea>
-              </label>
-              <label>
-                副标题
-                <input id="product-sub-title" placeholder="选填；不填时会复用卖点摘要" />
-              </label>
-              <label>
-                详情介绍
-                <textarea id="product-detail-content" placeholder="请输入纯文本详情，换行会保留"></textarea>
-              </label>
-              <div class="action-row">
-                <button class="primary" id="product-save" type="submit">保存商品</button>
-                <button class="secondary" id="product-reset" type="button">新建商品</button>
+                <div class="wizard-panel" data-wizard-panel="1">
+                  <div class="compact-grid">
+                    <label>
+                      商品标题
+                      <input id="product-title" placeholder="例如：每日精选零食礼盒" />
+                    </label>
+                    <label>
+                      商品分类
+                      <select id="product-category-id"></select>
+                    </label>
+                    <label>
+                      销售状态
+                      <select id="product-status">
+                        <option value="off_sale">已下架</option>
+                        <option value="on_sale">销售中</option>
+                      </select>
+                    </label>
+                    <label>
+                      参与分销
+                      <select id="product-distribution-enabled">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      售价
+                      <input id="product-price" type="number" min="0" step="0.01" value="0" />
+                    </label>
+                    <label>
+                      划线价
+                      <input id="product-market-price" type="number" min="0" step="0.01" value="0" />
+                    </label>
+                    <label>
+                      排序
+                      <input id="product-sort-order" type="number" value="0" />
+                    </label>
+                  </div>
+                </div>
+                <div class="wizard-panel hidden" data-wizard-panel="2">
+                  <label>
+                    商品图片（第一张为封面）
+                    <div id="product-image-gallery" class="image-gallery"></div>
+                    <button class="secondary" id="product-cover-upload-btn" type="button">上传图片</button>
+                    <input id="product-cover-image" type="hidden" />
+                  </label>
+                </div>
+                <div class="wizard-panel hidden" data-wizard-panel="3">
+                  <label>
+                    卖点摘要
+                    <textarea id="product-short-desc" placeholder="会同时作为前台摘要文案"></textarea>
+                  </label>
+                  <label>
+                    副标题
+                    <input id="product-sub-title" placeholder="选填；不填时会复用卖点摘要" />
+                  </label>
+                  <label>
+                    详情介绍
+                    <textarea id="product-detail-content" placeholder="请输入纯文本详情，换行会保留"></textarea>
+                  </label>
+                  <label>
+                    详情图片
+                    <div id="detail-image-gallery" class="image-gallery"></div>
+                    <button class="secondary" id="detail-image-upload-btn" type="button">上传详情图片</button>
+                  </label>
+                </div>
+                <div class="action-row">
+                  <button class="secondary hidden" id="wizard-prev" type="button">上一步</button>
+                  <button class="secondary" id="wizard-next" type="button">下一步</button>
+                  <button class="primary" id="product-save" type="submit">保存商品</button>
+                  <button class="secondary" id="product-reset" type="button">新建商品</button>
+                  <button class="secondary hidden" id="goto-sku-btn" type="button">管理商品规格 (SKU)</button>
+                </div>
+                <div id="sku-hint" class="hero-tip">
+                  保存商品后可在商品列表点击「管理 SKU」添加规格（如颜色、尺寸），每个规格可设独立价格和库存。
+                </div>
+              </form>
+              <div class="product-editing-preview">
+                <div class="phone-frame">
+                  <div class="phone-notch"></div>
+                  <div class="phone-screen">
+                    <div class="preview-product-page">
+                      <div class="preview-cover" id="preview-cover">
+                        <span>?</span>
+                      </div>
+                      <div class="preview-main">
+                        <div class="preview-head">
+                          <span class="preview-tag" id="preview-tag">未分类</span>
+                          <span class="preview-sales">预览模式</span>
+                        </div>
+                        <div class="preview-title" id="preview-title">商品标题</div>
+                        <div class="preview-desc" id="preview-desc">卖点摘要</div>
+                        <div class="preview-tags" id="preview-highlights"></div>
+                        <div class="preview-price-row">
+                          <span class="preview-price-now">¥<span id="preview-price">0.00</span></span>
+                          <span class="preview-price-origin" id="preview-market-price"></span>
+                        </div>
+                        <div class="preview-status-row">
+                          <span class="preview-status-chip" id="preview-status">已下架</span>
+                        </div>
+                      </div>
+                      <div class="preview-detail-block">
+                        <div class="preview-block-title">图文详情</div>
+                        <div class="preview-detail-text" id="preview-detail">
+                          <span class="preview-detail-empty">暂无详情内容</span>
+                        </div>
+                      </div>
+                      <div class="preview-bottom-bar">
+                        <span class="preview-btn-ghost">加入购物车</span>
+                        <span class="preview-btn-primary">立即购买</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </form>
+            </div>
 
             <div class="section">
               <div class="section-header">
@@ -276,7 +361,7 @@
             </div>
           </section>
 
-          <section class="panel" id="orders-panel" data-section-key="orders">
+          <section class="panel hidden" id="orders-panel" data-section-key="orders">
             <div class="section-header">
               <div class="section-title-group">
                 <h2>订单处理</h2>
@@ -307,7 +392,7 @@
             <div id="orders-list" class="list"></div>
           </section>
 
-          <section class="panel" id="aftersales-panel" data-section-key="aftersales">
+          <section class="panel hidden" id="aftersales-panel" data-section-key="aftersales">
             <div class="section-header">
               <div class="section-title-group">
                 <h2>售后处理</h2>
@@ -336,6 +421,264 @@
               <button class="secondary" id="aftersales-filter-reset" type="button">清空筛选</button>
             </div>
             <div id="aftersales-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="coupon-templates-panel" data-section-key="coupon-templates">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>优惠券管理</h2>
+                <p class="muted">创建和管理优惠券，控制发放方式和有效天数。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="coupon-templates-count">0 张优惠券</span>
+                </div>
+              </div>
+            </div>
+            <form id="coupon-form" class="editor-grid">
+              <input id="coupon-id" type="hidden" />
+              <div class="compact-grid">
+                <label>
+                  优惠券标题
+                  <input id="coupon-title" placeholder="例如：新用户专享 10 元券" />
+                </label>
+                <label>
+                  券码（选填）
+                  <input id="coupon-code" placeholder="不填系统自动生成" />
+                </label>
+                <label>
+                  面额（元）
+                  <input id="coupon-amount" type="number" min="0.01" step="0.01" value="0" />
+                </label>
+                <label>
+                  使用门槛（元）
+                  <input id="coupon-threshold" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <label>
+                  发放方式
+                  <select id="coupon-issue-type">
+                    <option value="center_claim">领券中心自领</option>
+                    <option value="manual_issue">后台手动发放</option>
+                  </select>
+                </label>
+                <label>
+                  有效天数
+                  <input id="coupon-valid-days" type="number" min="1" step="1" value="30" />
+                </label>
+                <label>
+                  角标文字
+                  <input id="coupon-badge" placeholder="例如：新人券、满减" />
+                </label>
+                <label>
+                  状态
+                  <select id="coupon-status">
+                    <option value="enabled">启用</option>
+                    <option value="disabled">停用</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                描述说明
+                <textarea id="coupon-description" placeholder="选填，用于前台展示优惠券使用规则"></textarea>
+              </label>
+              <div class="action-row">
+                <button class="primary" id="coupon-save" type="submit">保存优惠券</button>
+                <button class="secondary" id="coupon-reset" type="button">新建优惠券</button>
+              </div>
+            </form>
+
+            <div class="section">
+              <div class="section-header">
+                <div>
+                  <h3>优惠券列表</h3>
+                  <p class="muted">可按状态筛选、编辑已有优惠券。</p>
+                </div>
+              </div>
+              <div class="toolbar">
+                <label>
+                  关键词
+                  <input id="coupon-filter-keyword" placeholder="支持标题、券码搜索" />
+                </label>
+                <label>
+                  状态
+                  <select id="coupon-filter-status">
+                    <option value="">全部</option>
+                    <option value="enabled">启用</option>
+                    <option value="disabled">停用</option>
+                  </select>
+                </label>
+                <button class="secondary" id="coupon-filter-submit" type="button">刷新优惠券</button>
+                <button class="secondary" id="coupon-filter-reset" type="button">清空筛选</button>
+              </div>
+              <div id="coupon-templates-list" class="list"></div>
+            </div>
+          </section>
+
+          <section class="panel hidden" id="users-panel" data-section-key="users">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>会员管理</h2>
+                <p class="muted">查看商城用户、消费记录和分销身份，支持启用/禁用操作。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="users-count">0 位用户</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                昵称 / 手机号
+                <input id="users-filter-keyword" placeholder="支持昵称、手机号搜索" />
+              </label>
+              <label>
+                状态
+                <select id="users-filter-status">
+                  <option value="">全部</option>
+                  <option value="active">正常</option>
+                  <option value="disabled">已禁用</option>
+                </select>
+              </label>
+              <button class="secondary" id="users-filter-submit" type="button">刷新用户</button>
+              <button class="secondary" id="users-filter-reset" type="button">清空筛选</button>
+            </div>
+            <div id="users-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="reviews-panel" data-section-key="reviews">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>评价管理</h2>
+                <p class="muted">查看用户评价、隐藏恶意评价、回复用户。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="reviews-count">0 条评价</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                状态
+                <select id="reviews-filter-status">
+                  <option value="">全部</option>
+                  <option value="visible">显示中</option>
+                  <option value="hidden">已隐藏</option>
+                </select>
+              </label>
+              <label>
+                评分
+                <select id="reviews-filter-rating">
+                  <option value="">全部</option>
+                  <option value="1">1 星</option>
+                  <option value="2">2 星及以上</option>
+                  <option value="3">3 星及以上</option>
+                  <option value="4">4 星及以上</option>
+                  <option value="5">5 星</option>
+                </select>
+              </label>
+              <button class="secondary" id="reviews-filter-submit" type="button">刷新评价</button>
+              <button class="secondary" id="reviews-filter-reset" type="button">清空筛选</button>
+            </div>
+            <div id="reviews-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="notifications-panel" data-section-key="notifications">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>通知中心</h2>
+                <p class="muted">新订单、售后、提现等关键事件提醒。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="notifications-count">0 条通知</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                状态
+                <select id="notifications-filter-read">
+                  <option value="">全部</option>
+                  <option value="unread">未读</option>
+                  <option value="read">已读</option>
+                </select>
+              </label>
+              <button class="secondary" id="notifications-mark-all-read" type="button">全部标为已读</button>
+              <button class="secondary" id="notifications-filter-submit" type="button">刷新通知</button>
+            </div>
+            <div id="notifications-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="system-accounts-panel" data-section-key="system-accounts">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>系统账号</h2>
+                <p class="muted">管理后台管理员账号、角色和状态。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="system-accounts-count">0 个账号</span>
+                </div>
+              </div>
+            </div>
+            <form id="admin-user-form" class="editor-grid">
+              <input id="admin-user-id" type="hidden" />
+              <div class="compact-grid">
+                <label>
+                  用户名
+                  <input id="admin-user-username" placeholder="登录用户名" />
+                </label>
+                <label>
+                  姓名
+                  <input id="admin-user-realname" placeholder="真实姓名" />
+                </label>
+                <label>
+                  手机号
+                  <input id="admin-user-mobile" placeholder="选填" />
+                </label>
+                <label>
+                  密码（新建必填，编辑留空不修改）
+                  <input id="admin-user-password" type="password" placeholder="留空不修改密码" />
+                </label>
+                <label>
+                  角色代码（逗号分隔）
+                  <input id="admin-user-roles" placeholder="例如：ops_manager,product_manager" />
+                </label>
+                <label>
+                  状态
+                  <select id="admin-user-status">
+                    <option value="enabled">正常</option>
+                    <option value="disabled">禁用</option>
+                  </select>
+                </label>
+              </div>
+              <div class="action-row">
+                <button class="primary" id="admin-user-save" type="submit">保存账号</button>
+                <button class="secondary" id="admin-user-reset" type="button">新建账号</button>
+              </div>
+            </form>
+            <div id="system-accounts-list" class="list"></div>
+          </section>
+
+          <section class="panel hidden" id="operation-logs-panel" data-section-key="operation-logs">
+            <div class="section-header">
+              <div class="section-title-group">
+                <h2>操作日志</h2>
+                <p class="muted">查看所有管理操作记录，辅助审计与追溯。</p>
+                <div class="section-meta-row">
+                  <span class="section-count" id="operation-logs-count">0 条日志</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>
+                模块
+                <select id="logs-filter-module">
+                  <option value="">全部</option>
+                  <option value="product">商品</option>
+                  <option value="order">订单</option>
+                  <option value="coupon">优惠券</option>
+                  <option value="category">分类</option>
+                  <option value="distribution">分销</option>
+                  <option value="review">评价</option>
+                  <option value="system">系统</option>
+                </select>
+              </label>
+              <button class="secondary" id="logs-filter-submit" type="button">刷新日志</button>
+              <button class="secondary" id="logs-filter-reset" type="button">清空筛选</button>
+            </div>
+            <div id="operation-logs-list" class="list"></div>
           </section>
 
           <section class="panel hidden" id="distribution-overview-panel" data-section-key="distribution-overview">
@@ -639,6 +982,6 @@
       </div>
     </div>
 
-    <script src="/admin-console/admin-console.js"></script>
+    <script src="/admin-console/admin-console.js?v=20260416b"></script>
   </body>
 </html>

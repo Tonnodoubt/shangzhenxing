@@ -65,7 +65,13 @@
     </view>
 
     <view class="feature-story panel" data-id="{{featureStory.id}}" bindtap="openProduct">
-      <view class="feature-story-visual" style="background: {{featureStory.accent}};">
+      <view class="feature-story-visual" wx:if="{{featureStory.coverImage}}">
+        <image class="feature-story-image" src="{{featureStory.coverImage}}" mode="aspectFill" />
+        <view class="feature-story-overlay">
+          <text class="feature-story-kicker">{{featureStory.kicker}}</text>
+        </view>
+      </view>
+      <view class="feature-story-visual" style="background: {{featureStory.accent}};" wx:else>
         <text class="feature-story-kicker">{{featureStory.kicker}}</text>
         <text class="feature-story-seal">{{featureStory.coverLabel}}</text>
       </view>
@@ -78,7 +84,11 @@
     <view class="product-grid">
       <block wx:for="{{productGrid}}" wx:key="id">
         <view class="panel product-card" data-id="{{item.id}}" bindtap="openProduct">
-          <view class="product-cover" style="background: {{item.accent}};">
+          <view class="product-cover" wx:if="{{item.coverImage}}">
+            <image class="product-cover-image" src="{{item.coverImage}}" mode="aspectFill" />
+            <text class="product-cover-badge">{{item.tag}}</text>
+          </view>
+          <view class="product-cover" style="background: {{item.accent}};" wx:else>
             <text class="product-cover-badge">{{item.tag}}</text>
             <text class="product-cover-text">{{item.coverLabel}}</text>
           </view>

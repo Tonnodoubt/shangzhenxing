@@ -3,7 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const UPLOADS_DIR = path.join(__dirname, "../../public/uploads");
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 60 * 1024 * 1024; // 60MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 
@@ -19,7 +19,7 @@ function validateImage(file) {
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return "图片大小不能超过 5MB";
+    return "图片大小不能超过 60MB";
   }
 
   if (!ALLOWED_TYPES.includes(file.mimetype)) {
@@ -55,7 +55,7 @@ function createLocalUploader() {
   };
 }
 
-function createCosUploader() {
+function createCosUploader(prefix) {
   const COS = require("cos-nodejs-sdk-v5");
   const cos = new COS({
     SecretId: process.env.COS_SECRET_ID,
@@ -63,13 +63,10 @@ function createCosUploader() {
   });
   const bucket = process.env.COS_BUCKET;
   const region = process.env.COS_REGION;
-
-  if (!bucket || !region) {
-    return null;
-  }
+  const keyPrefix = prefix || "uploads";
 
   return function uploadToCos(file) {
-    const filename = `banners/${generateFilename(file.originalname)}`;
+    const filename = `${keyPrefix}/${generateFilename(file.originalname)}`;
 
     return new Promise((resolve, reject) => {
       cos.putObject({
@@ -77,7 +74,8 @@ function createCosUploader() {
         Region: region,
         Key: filename,
         Body: file.buffer,
-        ContentLength: file.size
+        ContentLength: file.size,
+        ACL: "public-read"
       }, (err, _data) => {
         if (err) {
           reject(err);
@@ -90,12 +88,16 @@ function createCosUploader() {
   };
 }
 
-function createUploader() {
+function createUploader(prefix) {
   if (process.env.COS_SECRET_ID && process.env.COS_SECRET_KEY) {
-    const cosUploader = createCosUploader();
-    if (cosUploader) {
-      return cosUploader;
+    console.log("[upload] COS credentials found, creating COS uploader for prefix:", prefix);
+    try {
+      return createCosUploader(prefix);
+    } catch (err) {
+      console.error("[upload] COS uploader init failed:", err.message);
     }
+  } else {
+    console.log("[upload] No COS credentials, using local uploader");
   }
 
   return createLocalUploader();

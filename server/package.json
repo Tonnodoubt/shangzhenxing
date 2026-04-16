@@ -26,6 +26,7 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:resolve": "prisma migrate resolve",
     "prisma:studio": "prisma studio",
     "prisma:seed:storefront": "node scripts/bootstrap-prisma-storefront.js",
     "storefront:regression:prisma": "node scripts/run-prisma-regression.js"
@@ -35,7 +36,7 @@
     "@prisma/client": "^7.6.0",
     "bcryptjs": "^3.0.3",
     "cos-nodejs-sdk-v5": "^2.15.4",
-    "dotenv": "^17.3.1",
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "mariadb": "^3.5.2",
     "multer": "^2.1.1",

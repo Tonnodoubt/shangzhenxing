@@ -91,6 +91,7 @@ function createAdminApi(deps) {
       productType: product.productType || deriveProductType(product.categoryId),
       coverImage: product.coverImage || "",
       imageList: cloneData(product.imageList || []),
+      detailImages: cloneData(product.detailImages || []),
       detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       labelTags: cloneData(product.highlights || []),
       status: product.status || "on_sale",
@@ -252,8 +253,9 @@ function createAdminApi(deps) {
       shortDesc: payload.shortDesc || payload.subTitle,
       subTitle: payload.subTitle || payload.shortDesc,
       productType: payload.productType,
-      coverImage: payload.coverImage,
+      coverImage: Array.isArray(payload.imageList) && payload.imageList[0] ? payload.imageList[0] : payload.coverImage,
       imageList: Array.isArray(payload.imageList) ? payload.imageList : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : undefined,
       detailContent: normalizeDetailContent(
         payload.detailContent,
         payload.shortDesc || payload.subTitle || payload.title
@@ -311,6 +313,7 @@ function createAdminApi(deps) {
       productType: payload.productType || deriveProductType(payload.categoryId || "gift"),
       coverImage: payload.coverImage || "",
       imageList: Array.isArray(payload.imageList) ? payload.imageList : payload.coverImage ? [payload.coverImage] : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : [],
       detailContent: normalizeDetailContent(
         payload.detailContent,
         payload.shortDesc || payload.subTitle || payload.title
@@ -992,7 +995,7 @@ function createAdminApi(deps) {
           title: payload.title || current.title,
           imageUrl: payload.imageUrl || current.imageUrl,
           linkType: payload.linkType || current.linkType,
-          linkUrl: payload.linkUrl || current.linkUrl,
+          linkUrl: payload.linkUrl || payload.linkValue || current.linkUrl,
           status: payload.status || current.status || "enabled",
           updatedAt: now
         };
@@ -1007,7 +1010,7 @@ function createAdminApi(deps) {
         title: payload.title || "新轮播图",
         imageUrl: payload.imageUrl || "",
         linkType: payload.linkType || "none",
-        linkUrl: payload.linkUrl || "",
+        linkUrl: payload.linkUrl || payload.linkValue || "",
         sortOrder: Number(payload.sortOrder || (state.pageBanners || []).length * 10 + 10),
         status: payload.status || "enabled",
         createdAt: now,

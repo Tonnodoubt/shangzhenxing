@@ -1,5 +1,17 @@
 const { normalizeDetailContent } = require("../../../shared/utils");
 
+function parseJsonArray(value, fallback) {
+  if (!value) {
+    return fallback || [];
+  }
+  try {
+    var parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.length ? parsed : (fallback || []);
+  } catch (_e) {
+    return fallback || [];
+  }
+}
+
 function createStorefrontPrismaMapperModule({
   accentPalette,
   createStorefrontError
@@ -249,7 +261,8 @@ function createStorefrontPrismaMapperModule({
       productType: "general",
       detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       coverImage: product.coverImage || "",
-      imageList: product.coverImage ? [product.coverImage] : [],
+      imageList: parseJsonArray(product.imageList, product.coverImage ? [product.coverImage] : []),
+      detailImages: parseJsonArray(product.detailImages, []),
       distributionEnabled: typeof product.distributionEnabled === "boolean" ? product.distributionEnabled : true,
       status: product.status || "on_sale",
       statusText: product.status === "off_sale" ? "已下架" : "销售中"

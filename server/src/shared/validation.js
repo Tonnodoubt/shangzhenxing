@@ -40,8 +40,18 @@ const categorySchema = z.object({
 const productSchema = z.object({
   title: z.string().min(1).max(100),
   price: z.number().positive(),
-  categoryId: z.string().min(1)
-});
+  categoryId: z.string().min(1),
+  status: z.string().optional(),
+  coverImage: z.string().optional(),
+  shortDesc: z.string().optional(),
+  subTitle: z.string().optional(),
+  detailContent: z.string().optional(),
+  marketPrice: z.number().nonnegative().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  distributionEnabled: z.boolean().optional(),
+  imageList: z.array(z.string()).optional(),
+  detailImages: z.array(z.string()).optional()
+}).passthrough();
 
 const couponTemplateSchema = z.object({
   title: z.string().min(1).max(50),

@@ -87,6 +87,16 @@ enum DistributionRuleVersionStatus {
   archived
 }
 
+enum ReviewStatus {
+  visible
+  hidden
+}
+
+enum AdminUserStatus {
+  enabled
+  disabled
+}
+
 model User {
   id                    String              @id @default(cuid())
   openId                String?             @unique
@@ -109,6 +119,7 @@ model User {
   receivedReferral      ReferralBinding?    @relation("UserReceivedReferral")
   invitedOrders         Order[]             @relation("OrderInviter")
   invitedOrdersLevelTwo Order[]             @relation("OrderLevelTwoInviter")
+  reviews               ProductReview[]
 }
 
 model UserSession {
@@ -166,6 +177,8 @@ model Product {
   subTitle            String?
   coverImage          String?
   detailContent       String?       @db.LongText
+  imageList           String?       @db.Text
+  detailImages        String?       @db.Text
   price               Decimal       @db.Decimal(10, 2)
   marketPrice         Decimal       @db.Decimal(10, 2)
   salesCount          Int           @default(0)
@@ -179,6 +192,7 @@ model Product {
   skus                ProductSku[]
   cartItems           CartItem[]
   orderItems          OrderItem[]
+  reviews             ProductReview[]
 
   @@index([categoryId, status, sortOrder])
 }
@@ -273,6 +287,7 @@ model Order {
   items                    OrderItem[]
   usedCoupon               UserCoupon?              @relation("OrderUsedCoupon")
   afterSale                AfterSale?
+  reviews                  ProductReview[]
 
   @@index([userId, status, createdAt])
   @@index([inviterUserId, createdAt])
@@ -578,4 +593,71 @@ model DistributionRuleChangeLog {
 
   @@index([ruleVersionId, createdAt])
   @@index([action, createdAt])
+}
+
+model ProductReview {
+  id          String      @id @default(cuid())
+  productId   String
+  userId      String
+  orderId     String
+  rating      Int         @default(5)
+  content     String?
+  imageUrl    String?
+  status      ReviewStatus @default(visible)
+  adminReply  String?     @db.LongText
+  repliedAt   DateTime?
+  repliedBy   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([productId, status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model AdminNotification {
+  id          String    @id @default(cuid())
+  type        String
+  title       String
+  content     String?   @db.MediumText
+  payloadJson String?   @db.MediumText
+  isRead      Boolean   @default(false)
+  targetRole  String?
+  createdAt   DateTime  @default(now())
+
+  @@index([isRead, createdAt])
+  @@index([type, createdAt])
+}
+
+model AdminUser {
+  id           String          @id @default(cuid())
+  username     String          @unique
+  realName     String
+  mobile       String?
+  passwordHash String
+  roleCodes    String          @default("[]")
+  status       AdminUserStatus @default(enabled)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([username, status])
+}
+
+model AdminOperationLog {
+  id          String   @id @default(cuid())
+  adminUserId String
+  adminName   String
+  module      String
+  action      String
+  targetId    String?
+  summary     String?
+  payloadJson String?  @db.MediumText
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminUserId, createdAt])
+  @@index([module, action, createdAt])
 }

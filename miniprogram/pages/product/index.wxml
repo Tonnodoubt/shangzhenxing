@@ -26,7 +26,16 @@
   </view>
 
   <view wx:elif="{{pageState === 'success' && product}}">
-    <view class="detail-cover" style="background: {{product.accent}};">
+    <swiper class="detail-cover" wx:if="{{product.imageList.length > 0}}"
+      indicator-dots="{{product.imageList.length > 1}}" indicator-color="rgba(255,255,255,0.4)"
+      indicator-active-color="#fff" autoplay interval="{{4000}}" circular>
+      <block wx:for="{{product.imageList}}" wx:key="*this">
+        <swiper-item>
+          <image class="detail-cover-image" src="{{item}}" mode="aspectFill" />
+        </swiper-item>
+      </block>
+    </swiper>
+    <view class="detail-cover" wx:elif="{{product.accent}}" style="background: {{product.accent}};">
       <text class="detail-cover-text">{{product.coverLabel}}</text>
     </view>
 
@@ -116,6 +125,11 @@
       <text class="block-title">图文详情</text>
       <block wx:for="{{product.detailParagraphs}}" wx:key="index">
         <text class="detail-paragraph">{{item}}</text>
+      </block>
+      <block wx:if="{{product.detailImages && product.detailImages.length}}">
+        <block wx:for="{{product.detailImages}}" wx:key="*this">
+          <image class="detail-image" src="{{item}}" mode="widthFix" />
+        </block>
       </block>
     </view>
 

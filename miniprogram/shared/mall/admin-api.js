@@ -91,6 +91,7 @@ function createAdminApi(deps) {
       productType: product.productType || deriveProductType(product.categoryId),
       coverImage: product.coverImage || "",
       imageList: cloneData(product.imageList || []),
+      detailImages: cloneData(product.detailImages || []),
       detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       labelTags: cloneData(product.highlights || []),
       status: product.status || "on_sale",
@@ -253,6 +254,7 @@ function createAdminApi(deps) {
       productType: payload.productType,
       coverImage: payload.coverImage,
       imageList: Array.isArray(payload.imageList) ? payload.imageList : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : undefined,
       detailContent: normalizeDetailContent(
         payload.detailContent,
         payload.shortDesc || payload.subTitle || payload.title
@@ -308,6 +310,7 @@ function createAdminApi(deps) {
       productType: payload.productType || deriveProductType(payload.categoryId || "gift"),
       coverImage: payload.coverImage || "",
       imageList: Array.isArray(payload.imageList) ? payload.imageList : payload.coverImage ? [payload.coverImage] : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : [],
       detailContent: normalizeDetailContent(
         payload.detailContent,
         payload.shortDesc || payload.subTitle || payload.title

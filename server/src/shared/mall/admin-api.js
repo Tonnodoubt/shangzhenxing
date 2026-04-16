@@ -162,6 +162,7 @@ function createAdminApi(deps) {
       productType: product.productType || deriveProductType(product.categoryId),
       coverImage: product.coverImage || "",
       imageList: cloneData(product.imageList || []),
+      detailImages: cloneData(product.detailImages || []),
       detailContent: product.detailContent || "",
       labelTags: cloneData(product.highlights || []),
       status: product.status || "on_sale",
@@ -201,6 +202,8 @@ function createAdminApi(deps) {
     const today = formatDateTime().slice(0, 10);
     const todayOrders = (state.orderRecords || []).filter((item) => String(item.createTime || "").startsWith(today));
     const paidOrders = todayOrders.filter((item) => item.status !== "cancelled");
+    const allOrders = (state.orderRecords || []);
+    const allPaidOrders = allOrders.filter((item) => item.status !== "cancelled");
 
     return {
       todayOrderCount: todayOrders.length,
@@ -208,8 +211,46 @@ function createAdminApi(deps) {
       todayPaidAmountText: formatPrice(paidOrders.reduce((sum, item) => sum + Number(item.amount || 0), 0)),
       newUserCount: (state.userRecords || []).filter((item) => String(item.createdAt || "").startsWith(today)).length,
       newDistributorCount: (state.distributorProfiles || []).filter((item) => String(item.joinedAt || "").startsWith(today)).length,
-      pendingShipmentCount: (state.orderRecords || []).filter((item) => item.status === "pending").length
+      pendingShipmentCount: allOrders.filter((item) => item.status === "pending").length,
+      shippingOrderCount: allOrders.filter((item) => item.status === "shipping").length,
+      pendingAftersaleCount: 0,
+      processedAftersaleCount: 0,
+      totalOrderCount: allOrders.length,
+      totalPaidAmountCent: allPaidOrders.reduce((sum, item) => sum + Math.round(Number(item.amount || 0) * 100), 0),
+      totalPaidAmountText: formatPrice(allPaidOrders.reduce((sum, item) => sum + Number(item.amount || 0), 0)),
+      totalUserCount: (state.userRecords || []).length,
+      totalProductCount: (state.productRecords || []).filter((item) => item.status === "on_sale").length
     };
+  }
+
+  function getAdminSalesStatistics(options = {}) {
+    const state = getState();
+    const days = Math.min(Math.max(Number(options.days) || 7, 1), 90);
+    const now = new Date();
+    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const allOrders = (state.orderRecords || []).filter((item) => item.status !== "cancelled");
+
+    const buckets = {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      buckets[key] = { date: key, orderCount: 0, salesAmount: 0 };
+    }
+
+    for (const order of allOrders) {
+      const dateStr = String(order.createTime || "").slice(0, 10);
+      if (buckets[dateStr]) {
+        buckets[dateStr].orderCount += 1;
+        buckets[dateStr].salesAmount += Number(order.amount || 0);
+      }
+    }
+
+    return Object.values(buckets).map((item) => ({
+      date: item.date,
+      orderCount: item.orderCount,
+      salesAmount: item.salesAmount,
+      salesAmountText: formatPrice(item.salesAmount)
+    }));
   }
 
   function getAdminCategories(options = {}) {
@@ -325,6 +366,7 @@ function createAdminApi(deps) {
       productType: payload.productType,
       coverImage: payload.coverImage,
       imageList: Array.isArray(payload.imageList) ? payload.imageList : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : undefined,
       detailContent: payload.detailContent,
       price: typeof payload.price === "undefined" ? undefined : Number(payload.price || 0),
       marketPrice: typeof payload.marketPrice === "undefined" ? undefined : Number(payload.marketPrice || payload.price || 0),
@@ -379,6 +421,7 @@ function createAdminApi(deps) {
       productType: payload.productType || deriveProductType(payload.categoryId || "gift"),
       coverImage: payload.coverImage || "",
       imageList: Array.isArray(payload.imageList) ? payload.imageList : payload.coverImage ? [payload.coverImage] : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : [],
       detailContent: payload.detailContent || "",
       price: Number(payload.price || 0),
       marketPrice: Number(payload.marketPrice || payload.price || 0),
@@ -1028,8 +1071,322 @@ function createAdminApi(deps) {
     });
   }
 
+  function getAdminUsers(options = {}) {
+    const state = getState();
+    const keyword = String(options.keyword || "").trim().toLowerCase();
+    const status = String(options.status || "").trim();
+    let list = (state.userRecords || []).map((item) => ({
+      userId: item.id,
+      nickname: item.nickname || "",
+      avatarUrl: item.avatarUrl || "",
+      mobile: item.mobile || "",
+      status: item.status || "active",
+      statusText: item.status === "disabled" ? "已禁用" : "正常",
+      isAuthorized: !!item.isAuthorized,
+      isDistributor: !!(state.distributorProfiles || []).find((dp) => dp.userId === item.id),
+      distributorStatus: ((state.distributorProfiles || []).find((dp) => dp.userId === item.id) || {}).status || null,
+      orderCount: (state.orderRecords || []).filter((o) => o.userId === item.id).length,
+      couponCount: 0,
+      createdAt: item.createdAt || formatDateTime(),
+      updatedAt: item.updatedAt || formatDateTime()
+    }));
+
+    if (status) {
+      list = list.filter((item) => item.status === status);
+    }
+    if (keyword) {
+      list = list.filter((item) => (item.nickname || "").toLowerCase().includes(keyword) || (item.mobile || "").includes(keyword));
+    }
+
+    return paginateList(list, options);
+  }
+
+  function getAdminUserDetail(userId) {
+    const state = getState();
+    const user = (state.userRecords || []).find((item) => item.id === userId);
+    if (!user) { return null; }
+    const dist = (state.distributorProfiles || []).find((dp) => dp.userId === userId);
+
+    return {
+      userId: user.id,
+      nickname: user.nickname || "",
+      avatarUrl: user.avatarUrl || "",
+      mobile: user.mobile || "",
+      status: user.status || "active",
+      statusText: user.status === "disabled" ? "已禁用" : "正常",
+      isAuthorized: !!user.isAuthorized,
+      openId: "",
+      createdAt: user.createdAt || formatDateTime(),
+      updatedAt: user.updatedAt || formatDateTime(),
+      distributor: dist ? buildAdminDistributorRecord(dist) : null,
+      recentOrders: (state.orderRecords || []).filter((o) => o.userId === userId).slice(0, 10).map((order) => ({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        status: order.status,
+        statusText: order.statusText || order.status,
+        payableAmount: Number(order.amount || 0),
+        payableAmountText: formatPrice(Number(order.amount || 0)),
+        createdAt: order.createTime || formatDateTime()
+      })),
+      coupons: []
+    };
+  }
+
+  function updateAdminUserStatus(userId, status) {
+    return withState((state) => {
+      const user = (state.userRecords || []).find((item) => item.id === userId);
+      if (!user) { return null; }
+      user.status = status;
+      return user;
+    });
+  }
+
+  // ── Phase 4: 商品评价管理 ──
+
+  function getAdminProductReviews(options = {}) {
+    const state = getState();
+    const status = String(options.status || "").trim();
+    const productId = String(options.productId || "").trim();
+    const minRating = Number(options.minRating) || 0;
+
+    let list = (state.productReviews || []).filter((item) => {
+      if (status && item.status !== status) { return false; }
+      if (productId && item.productId !== productId) { return false; }
+      if (minRating > 0 && Number(item.rating || 0) < minRating) { return false; }
+      return true;
+    });
+
+    list = list.map((r) => ({
+      reviewId: r.id,
+      productId: r.productId,
+      productTitle: r.productTitle || "",
+      userId: r.userId,
+      userNickname: r.userNickname || "",
+      userAvatarUrl: r.userAvatarUrl || "",
+      orderId: r.orderId,
+      orderNo: r.orderNo || "",
+      rating: r.rating,
+      content: r.content || "",
+      imageUrl: r.imageUrl || "",
+      status: r.status,
+      statusText: r.status === "visible" ? "显示中" : "已隐藏",
+      adminReply: r.adminReply || "",
+      repliedAt: r.repliedAt || null,
+      repliedBy: r.repliedBy || null,
+      createdAt: r.createdAt || formatDateTime(),
+      updatedAt: r.updatedAt || formatDateTime()
+    }));
+
+    return paginateList(list, options);
+  }
+
+  function updateAdminReviewStatus(reviewId, status) {
+    return withState((state) => {
+      const review = (state.productReviews || []).find((item) => item.id === reviewId);
+      if (!review) { return null; }
+      review.status = status;
+      review.updatedAt = formatDateTime();
+      return review;
+    });
+  }
+
+  function replyAdminReview(reviewId, reply, actor = {}) {
+    return withState((state) => {
+      const review = (state.productReviews || []).find((item) => item.id === reviewId);
+      if (!review) { return null; }
+      review.adminReply = reply;
+      review.repliedAt = formatDateTime();
+      review.repliedBy = String(actor.realName || actor.username || "管理员").trim();
+      review.updatedAt = formatDateTime();
+      return review;
+    });
+  }
+
+  // ── Phase 5: 通知系统 ──
+
+  function getAdminNotifications(options = {}) {
+    const state = getState();
+    const isRead = options.isRead;
+    const type = String(options.type || "").trim();
+
+    let list = (state.adminNotifications || []).filter((item) => {
+      if (typeof isRead === "boolean" && item.isRead !== isRead) { return false; }
+      if (type && item.type !== type) { return false; }
+      return true;
+    });
+
+    list = list.map((n) => ({
+      notificationId: n.id,
+      type: n.type,
+      title: n.title,
+      content: n.content || "",
+      isRead: n.isRead,
+      targetRole: n.targetRole || null,
+      createdAt: n.createdAt || formatDateTime()
+    }));
+
+    return paginateList(list, options);
+  }
+
+  function markAdminNotificationRead(notificationId) {
+    return withState((state) => {
+      const notification = (state.adminNotifications || []).find((item) => item.id === notificationId);
+      if (!notification) { return null; }
+      notification.isRead = true;
+      return notification;
+    });
+  }
+
+  function markAllAdminNotificationsRead() {
+    return withState((state) => {
+      (state.adminNotifications || []).forEach((item) => {
+        item.isRead = true;
+      });
+      return { updated: true };
+    });
+  }
+
+  function getUnreadAdminNotificationCount() {
+    const state = getState();
+    return (state.adminNotifications || []).filter((item) => !item.isRead).length;
+  }
+
+  function createAdminNotification(type, title, content = "") {
+    return withState((state) => {
+      if (!state.adminNotifications) { state.adminNotifications = []; }
+      const notification = {
+        id: generateId("notif"),
+        type,
+        title,
+        content,
+        isRead: false,
+        targetRole: null,
+        createdAt: formatDateTime()
+      };
+      state.adminNotifications.unshift(notification);
+      return notification;
+    });
+  }
+
+  // ── Phase 6: 系统管理 ──
+
+  function getAdminUsersList(options = {}) {
+    const state = getState();
+    const status = String(options.status || "").trim();
+
+    let list = (state.adminUserRecords || []).filter((item) => {
+      if (status && item.status !== status) { return false; }
+      return true;
+    });
+
+    list = list.map((u) => ({
+      adminUserId: u.id,
+      username: u.username,
+      realName: u.realName,
+      mobile: u.mobile || "",
+      roleCodes: u.roleCodes || [],
+      status: u.status,
+      statusText: u.status === "enabled" ? "正常" : "已禁用",
+      lastLoginAt: u.lastLoginAt || null,
+      createdAt: u.createdAt || formatDateTime(),
+      updatedAt: u.updatedAt || formatDateTime()
+    }));
+
+    return paginateList(list, options);
+  }
+
+  function createAdminUserRecord(payload = {}) {
+    return withState((state) => {
+      if (!state.adminUserRecords) { state.adminUserRecords = []; }
+      const record = {
+        id: generateId("admin"),
+        username: payload.username,
+        realName: payload.realName || payload.username,
+        mobile: payload.mobile || "",
+        passwordHash: "hashed_" + (payload.password || "admin123"),
+        roleCodes: payload.roleCodes || [],
+        status: payload.status || "enabled",
+        lastLoginAt: null,
+        createdAt: formatDateTime(),
+        updatedAt: formatDateTime()
+      };
+      state.adminUserRecords.push(record);
+      return record;
+    });
+  }
+
+  function updateAdminUserRecord(adminUserId, payload = {}) {
+    return withState((state) => {
+      const user = (state.adminUserRecords || []).find((item) => item.id === adminUserId);
+      if (!user) { return null; }
+      if (payload.realName) user.realName = payload.realName;
+      if (payload.mobile !== undefined) user.mobile = payload.mobile || "";
+      if (payload.roleCodes) user.roleCodes = payload.roleCodes;
+      if (payload.status) user.status = payload.status;
+      user.updatedAt = formatDateTime();
+      return user;
+    });
+  }
+
+  function updateAdminUserPassword(adminUserId, newPassword) {
+    return withState((state) => {
+      const user = (state.adminUserRecords || []).find((item) => item.id === adminUserId);
+      if (!user) { return null; }
+      user.passwordHash = "hashed_" + newPassword;
+      user.updatedAt = formatDateTime();
+      return user;
+    });
+  }
+
+  function getAdminOperationLogs(options = {}) {
+    const state = getState();
+    const module = String(options.module || "").trim();
+    const action = String(options.action || "").trim();
+
+    let list = (state.adminOperationLogs || []).filter((item) => {
+      if (module && item.module !== module) { return false; }
+      if (action && item.action !== action) { return false; }
+      return true;
+    });
+
+    list = list.map((l) => ({
+      logId: l.id,
+      adminUserId: l.adminUserId,
+      adminName: l.adminName,
+      module: l.module,
+      action: l.action,
+      targetId: l.targetId || "",
+      summary: l.summary || "",
+      ipAddress: l.ipAddress || "",
+      createdAt: l.createdAt || formatDateTime()
+    }));
+
+    return paginateList(list, options);
+  }
+
+  function createAdminOperationLog(entry = {}) {
+    return withState((state) => {
+      if (!state.adminOperationLogs) { state.adminOperationLogs = []; }
+      const log = {
+        id: generateId("log"),
+        adminUserId: entry.adminUserId || "",
+        adminName: entry.adminName || "",
+        module: entry.module || "",
+        action: entry.action || "",
+        targetId: entry.targetId || "",
+        summary: entry.summary || "",
+        payloadJson: entry.payloadJson || null,
+        ipAddress: entry.ipAddress || "",
+        createdAt: formatDateTime()
+      };
+      state.adminOperationLogs.unshift(log);
+      return log;
+    });
+  }
+
   return {
     getAdminDashboardSummary,
+    getAdminSalesStatistics,
     getAdminCategories,
     saveAdminCategory,
     deleteAdminCategory,
@@ -1053,7 +1410,24 @@ function createAdminApi(deps) {
     updateAdminDistributionRules,
     getAdminDistributors,
     getAdminDistributorDetail,
-    updateAdminDistributorStatus
+    updateAdminDistributorStatus,
+    getAdminUsers,
+    getAdminUserDetail,
+    updateAdminUserStatus,
+    getAdminProductReviews,
+    updateAdminReviewStatus,
+    replyAdminReview,
+    getAdminNotifications,
+    markAdminNotificationRead,
+    markAllAdminNotificationsRead,
+    getUnreadAdminNotificationCount,
+    createAdminNotification,
+    getAdminUsersList,
+    createAdminUserRecord,
+    updateAdminUserRecord,
+    updateAdminUserPassword,
+    getAdminOperationLogs,
+    createAdminOperationLog
   };
 }
 

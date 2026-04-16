@@ -105,6 +105,37 @@ router.get("/admin/v1/dashboard/summary", requirePermission("dashboard.view"), w
   });
 }));
 
+router.get("/admin/v1/statistics/sales", requirePermission("statistics.sales.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getSalesStatistics({
+    days: req.query.days
+  }), { requestId: req.requestId });
+}));
+
+router.get("/admin/v1/users", requirePermission("user.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getUsers({
+    page: req.query.page,
+    pageSize: req.query.pageSize,
+    keyword: req.query.keyword,
+    status: req.query.status
+  }), { requestId: req.requestId });
+}));
+
+router.get("/admin/v1/users/:userId", requirePermission("user.view"), wrap(async (req, res) => {
+  const result = await adminService.getUserDetail(req.params.userId);
+  if (!result) {
+    return sendError(res, "用户不存在", { code: 40401, statusCode: 404 });
+  }
+  sendData(res, result, { requestId: req.requestId });
+}));
+
+router.post("/admin/v1/users/:userId/status", requirePermission("user.status"), wrap(async (req, res) => {
+  const status = req.body.status;
+  if (!status) {
+    return sendError(res, "status 参数缺失", { code: 40001 });
+  }
+  sendData(res, await adminService.updateUserStatus(req.params.userId, status), { requestId: req.requestId });
+}));
+
 router.get("/admin/v1/auth/me", wrap((req, res) => {
   const session = getAdminSession(readAdminToken(req));
 
@@ -735,8 +766,9 @@ router.put("/admin/v1/store-theme/:themeKey", requirePermission("theme.edit"), w
 
 // ── 图片上传 ──
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-const uploader = createUploader();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 60 * 1024 * 1024 } });
+const bannerUploader = createUploader("banners");
+const productUploader = createUploader("products");
 
 router.post("/admin/v1/upload/image", requirePermission("upload.image"), upload.single("image"), wrap(async (req, res) => {
   const file = req.file;
@@ -751,9 +783,156 @@ router.post("/admin/v1/upload/image", requirePermission("upload.image"), upload.
     return;
   }
 
+  const uploadType = (req.body.type || "product");
+  const uploader = uploadType === "banner" ? bannerUploader : productUploader;
   const imageUrl = await uploader(file);
 
   sendData(res, { imageUrl }, {
+    requestId: req.requestId
+  });
+}));
+
+// ── Phase 4: 商品评价管理 ──
+
+router.get("/admin/v1/reviews", requirePermission("review.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getProductReviews(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/reviews/:reviewId/status", requirePermission("review.status"), wrap(async (req, res) => {
+  const status = requireString((req.body || {}).status, "visible");
+  const record = await adminService.updateReviewStatus(req.params.reviewId, status);
+
+  if (!record) {
+    sendError(res, "评价不存在", {
+      code: 40412,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/reviews/:reviewId/reply", requirePermission("review.reply"), wrap(async (req, res) => {
+  const reply = requireString((req.body || {}).reply);
+  const record = await adminService.replyReview(
+    req.params.reviewId,
+    reply,
+    req.adminSession.adminUser || {}
+  );
+
+  if (!record) {
+    sendError(res, "评价不存在", {
+      code: 40412,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+// ── Phase 5: 通知系统 ──
+
+router.get("/admin/v1/notifications", requirePermission("notification.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getNotifications(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/notifications/unread-count", requirePermission("notification.view"), wrap(async (req, res) => {
+  const count = await adminService.getUnreadNotificationCount();
+  sendData(res, { count }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/notifications/:notificationId/read", requirePermission("notification.view"), wrap(async (req, res) => {
+  const record = await adminService.markNotificationRead(req.params.notificationId);
+
+  if (!record) {
+    sendError(res, "通知不存在", {
+      code: 40413,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/notifications/read-all", requirePermission("notification.view"), wrap(async (req, res) => {
+  await adminService.markAllNotificationsRead();
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+// ── Phase 6: 系统管理 ──
+
+router.get("/admin/v1/system/admin-users", requirePermission("system.admin.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getAdminUsersList(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/system/admin-users", requirePermission("system.admin.create"), wrap(async (req, res) => {
+  sendData(res, await adminService.createAdminUser(req.body || {}), {
+    statusCode: 201,
+    requestId: req.requestId
+  });
+}));
+
+router.put("/admin/v1/system/admin-users/:adminUserId", requirePermission("system.admin.edit"), wrap(async (req, res) => {
+  const record = await adminService.updateAdminUser(req.params.adminUserId, req.body || {});
+
+  if (!record) {
+    sendError(res, "管理员不存在", {
+      code: 40414,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/system/admin-users/:adminUserId/reset-password", requirePermission("system.admin.edit"), wrap(async (req, res) => {
+  const record = await adminService.updateAdminUserPassword(
+    req.params.adminUserId,
+    requireString((req.body || {}).password)
+  );
+
+  if (!record) {
+    sendError(res, "管理员不存在", {
+      code: 40414,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/system/operation-logs", requirePermission("system.log.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getOperationLogs(req.query || {}), {
     requestId: req.requestId
   });
 }));
