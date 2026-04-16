@@ -3,6 +3,25 @@ const bcrypt = require("bcryptjs");
 const { sendAdminError } = require("./http");
 const { formatDateTime } = require("../../shared/utils");
 
+// 数据库可用时使用 Prisma 持久化 session，否则回退到内存（本地开发）
+let _prisma = null;
+function getSessionPrisma() {
+  if (_prisma !== undefined && _prisma !== null) {
+    return _prisma;
+  }
+  try {
+    const { getPrismaClient } = require("../lib/prisma");
+    _prisma = getPrismaClient();
+    return _prisma;
+  } catch (_err) {
+    _prisma = null;
+    return null;
+  }
+}
+
+// 内存回退（仅当数据库不可用时使用）
+const memorySessions = new Map();
+
 const ROLE_PRESETS = {
   super_admin: {
     permissions: ["*"],
@@ -285,15 +304,25 @@ function loadAdminUsers() {
 }
 
 const adminUsers = loadAdminUsers();
-const sessions = new Map();
 
-// 定期清理过期会话，防止无界内存增长
-const sessionCleanupTimer = setInterval(() => {
-  const now = Date.now();
-  for (const [token, session] of sessions) {
-    if (session.expiresAt && now > session.expiresAt) {
-      sessions.delete(token);
+// 定期清理过期会话
+const sessionCleanupTimer = setInterval(async () => {
+  try {
+    const prisma = getSessionPrisma();
+    if (prisma) {
+      await prisma.adminSession.deleteMany({
+        where: { expiresAt: { lt: new Date() } }
+      });
+    } else {
+      const now = Date.now();
+      for (const [token, session] of memorySessions) {
+        if (session.expiresAt && now > session.expiresAt) {
+          memorySessions.delete(token);
+        }
+      }
     }
+  } catch (_err) {
+    // 静默跳过
   }
 }, 60 * 60 * 1000);
 if (typeof sessionCleanupTimer.unref === "function") {
@@ -390,9 +419,23 @@ async function loginAdmin(username, password) {
 
   const sessionToken = createSessionToken();
   const session = buildSession(user);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
-  session.expiresAt = Date.now() + SESSION_TTL_MS;
-  sessions.set(sessionToken, session);
+  const prisma = getSessionPrisma();
+  if (prisma) {
+    await prisma.adminSession.create({
+      data: {
+        adminUserId: user.id,
+        sessionToken,
+        permissions: JSON.stringify(session.permissions),
+        roleCodes: JSON.stringify(session.roleCodes),
+        dataScopes: JSON.stringify(session.dataScopes),
+        expiresAt
+      }
+    });
+  } else {
+    memorySessions.set(sessionToken, { ...session, expiresAt: expiresAt.getTime() });
+  }
 
   return {
     ok: true,
@@ -401,28 +444,56 @@ async function loginAdmin(username, password) {
   };
 }
 
-function getAdminSession(token) {
+async function getAdminSession(token) {
   const normalizedToken = String(token || "").trim();
 
   if (!normalizedToken) {
     return null;
   }
 
-  const session = sessions.get(normalizedToken);
+  const prisma = getSessionPrisma();
 
+  if (prisma) {
+    const record = await prisma.adminSession.findUnique({
+      where: { sessionToken: normalizedToken }
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    if (new Date() > record.expiresAt) {
+      await prisma.adminSession.delete({ where: { id: record.id } }).catch(() => {});
+      return null;
+    }
+
+    const user = adminUsers.find((u) => u.id === record.adminUserId);
+    const permissions = JSON.parse(record.permissions);
+    const roleCodes = JSON.parse(record.roleCodes);
+    const dataScopes = JSON.parse(record.dataScopes);
+
+    return {
+      adminUser: user ? formatAdminUser(user) : { id: record.adminUserId },
+      roleCodes,
+      permissions,
+      _permissionSet: new Set(permissions),
+      dataScopes
+    };
+  }
+
+  // 内存回退
+  const session = memorySessions.get(normalizedToken);
   if (!session) {
     return null;
   }
-
   if (session.expiresAt && Date.now() > session.expiresAt) {
-    sessions.delete(normalizedToken);
+    memorySessions.delete(normalizedToken);
     return null;
   }
-
   return session;
 }
 
-function logoutAdmin(token) {
+async function logoutAdmin(token) {
   const normalizedToken = String(token || "").trim();
 
   if (!normalizedToken) {
@@ -431,7 +502,14 @@ function logoutAdmin(token) {
     };
   }
 
-  sessions.delete(normalizedToken);
+  const prisma = getSessionPrisma();
+  if (prisma) {
+    await prisma.adminSession.deleteMany({
+      where: { sessionToken: normalizedToken }
+    });
+  } else {
+    memorySessions.delete(normalizedToken);
+  }
 
   return {
     ok: true
@@ -467,21 +545,29 @@ function clearAdminTokenCookie(res) {
   res.setHeader("Set-Cookie", "admin_token=; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=0");
 }
 
-function adminAuth(req, res, next) {
-  const token = readAdminToken(req);
-  const session = getAdminSession(token);
+async function adminAuth(req, res, next) {
+  try {
+    const token = readAdminToken(req);
+    const session = await getAdminSession(token);
 
-  if (!token || !session) {
-    sendAdminError(res, "登录已失效，请重新登录", {
-      code: 40101,
-      statusCode: 401,
+    if (!token || !session) {
+      sendAdminError(res, "登录已失效，请重新登录", {
+        code: 40101,
+        statusCode: 401,
+        requestId: req.requestId
+      });
+      return;
+    }
+
+    req.adminSession = session;
+    next();
+  } catch (err) {
+    sendAdminError(res, "认证服务异常，请稍后重试", {
+      code: 50001,
+      statusCode: 500,
       requestId: req.requestId
     });
-    return;
   }
-
-  req.adminSession = session;
-  next();
 }
 
 function hasPermission(session, permission) {

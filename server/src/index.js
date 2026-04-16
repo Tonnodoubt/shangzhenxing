@@ -6,6 +6,7 @@ const adminRouter = require("./admin/router");
 const { createRequestId, sendCaughtError, sendData, sendError } = require("./shared/http");
 const { createStorefrontService } = require("./modules/storefront/service");
 const { createStorefrontRouter } = require("./modules/storefront/router");
+const { autoMigrate } = require("./lib/auto-migrate");
 const {
   readRuntimeEnv,
   validateRuntimeEnv,
@@ -145,6 +146,15 @@ if (require.main === module) {
   }
 
   startServer();
+
+  // Prisma 模式下自动同步 schema 变更（幂等，字段已存在则跳过）
+  if (process.env.STOREFRONT_DATA_SOURCE === "prisma") {
+    const { getPrismaClient } = require("./lib/prisma");
+    const prisma = getPrismaClient();
+    autoMigrate(prisma).catch((err) => {
+      console.warn("[auto-migrate] failed:", err && err.message ? err.message : err);
+    });
+  }
 }
 
 module.exports = {

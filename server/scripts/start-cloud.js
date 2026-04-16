@@ -186,7 +186,9 @@ async function main() {
     } catch (migrateError) {
       console.log("[cloud-start] migrate deploy failed, resolving dirty migrations...");
       const pendingMigrations = [
-        "20260415090000_add_product_images"
+        "20260415090000_add_product_images",
+        "20260416100000_add_sku_image",
+        "20260416120000_add_admin_session"
       ];
       for (const migrationName of pendingMigrations) {
         try {
@@ -199,6 +201,16 @@ async function main() {
       await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
     }
     console.log(`[cloud-start] prisma migrate deploy completed in ${Date.now() - startedAt}ms`);
+
+    // auto-migrate: 幂等同步 schema 变更（字段已存在则跳过）
+    try {
+      const { autoMigrate } = require("../src/lib/auto-migrate");
+      const { getPrismaClient } = require("../src/lib/prisma");
+      const prisma = getPrismaClient();
+      await autoMigrate(prisma);
+    } catch (amErr) {
+      console.warn("[cloud-start] auto-migrate warning:", amErr && amErr.message ? amErr.message : amErr);
+    }
 
     setRuntimeState({
       ready: true,

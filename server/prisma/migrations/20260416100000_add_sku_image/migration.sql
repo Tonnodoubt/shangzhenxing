@@ -1,0 +1,1 @@
+ALTER TABLE `ProductSku` ADD COLUMN `image` VARCHAR(191) NULL;

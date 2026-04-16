@@ -136,8 +136,8 @@ router.post("/admin/v1/users/:userId/status", requirePermission("user.status"), 
   sendData(res, await adminService.updateUserStatus(req.params.userId, status), { requestId: req.requestId });
 }));
 
-router.get("/admin/v1/auth/me", wrap((req, res) => {
-  const session = getAdminSession(readAdminToken(req));
+router.get("/admin/v1/auth/me", wrap(async (req, res) => {
+  const session = await getAdminSession(readAdminToken(req));
 
   if (!session) {
     sendError(res, "登录已失效，请重新登录", {
@@ -153,8 +153,8 @@ router.get("/admin/v1/auth/me", wrap((req, res) => {
   });
 }));
 
-router.post("/admin/v1/auth/logout", wrap((req, res) => {
-  logoutAdmin(readAdminToken(req));
+router.post("/admin/v1/auth/logout", wrap(async (req, res) => {
+  await logoutAdmin(readAdminToken(req));
   clearAdminTokenCookie(res);
   sendData(res, { ok: true }, {
     requestId: req.requestId
@@ -279,6 +279,23 @@ router.post("/admin/v1/products/:productId/status", requirePermission("product.s
   }
 
   sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.delete("/admin/v1/products/:productId", requirePermission("product.delete"), wrap(async (req, res) => {
+  const result = await adminService.deleteProduct(req.params.productId);
+
+  if (!result) {
+    sendError(res, "商品不存在", {
+      code: 40402,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
     requestId: req.requestId
   });
 }));

@@ -202,6 +202,7 @@ model ProductSku {
   productId   String
   skuCode     String      @unique
   specText    String
+  image       String?
   price       Decimal     @db.Decimal(10, 2)
   originPrice Decimal     @db.Decimal(10, 2)
   stock       Int         @default(0)
@@ -660,4 +661,18 @@ model AdminOperationLog {
 
   @@index([adminUserId, createdAt])
   @@index([module, action, createdAt])
+}
+
+model AdminSession {
+  id           String   @id @default(cuid())
+  adminUserId  String
+  sessionToken String   @unique
+  permissions  String   @db.Text
+  roleCodes    String   @db.Text
+  dataScopes   String   @db.Text
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([sessionToken])
+  @@index([expiresAt])
 }
