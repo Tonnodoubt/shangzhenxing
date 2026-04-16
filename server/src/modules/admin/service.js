@@ -14,6 +14,16 @@ function requireBoolean(value, fallback = false) {
   return fallback;
 }
 
+function normalizeStringArray(value, fallback = []) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+
+  return value
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
 function normalizeSkuPayloadList(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -65,13 +75,19 @@ function createAdminService(repository = createStorefrontRepository()) {
       return repository.getAdminProductDetail(requireString(productId));
     },
     saveProduct(payload = {}) {
+      const imageList = normalizeStringArray(payload.imageList);
+      const detailImages = normalizeStringArray(payload.detailImages);
+      const normalizedCoverImage = requireString(payload.coverImage || imageList[0]);
+
       return repository.saveAdminProduct({
         productId: requireString(payload.productId || payload.id),
         categoryId: requireString(payload.categoryId),
         title: requireString(payload.title),
         shortDesc: requireString(payload.shortDesc),
         subTitle: requireString(payload.subTitle),
-        coverImage: requireString(payload.coverImage),
+        coverImage: normalizedCoverImage,
+        imageList,
+        detailImages,
         detailContent: normalizeDetailContent(
           requireString(payload.detailContent),
           requireString(payload.shortDesc || payload.subTitle || payload.title)
@@ -104,6 +120,24 @@ function createAdminService(repository = createStorefrontRepository()) {
     },
     getDashboardSummary() {
       return repository.getAdminDashboardSummary();
+    },
+    getSalesStatistics(options = {}) {
+      return repository.getAdminSalesStatistics({
+        days: Number(options.days) || 7
+      });
+    },
+    getUsers(options = {}) {
+      return repository.getAdminUsers({
+        ...normalizePageOptions(options),
+        keyword: requireString(options.keyword),
+        status: requireString(options.status)
+      });
+    },
+    getUserDetail(userId) {
+      return repository.getAdminUserDetail(requireString(userId));
+    },
+    updateUserStatus(userId, status) {
+      return repository.updateAdminUserStatus(requireString(userId), requireString(status));
     },
     getOrders(options = {}) {
       return repository.getAdminOrders({
@@ -181,11 +215,35 @@ function createAdminService(repository = createStorefrontRepository()) {
     getDistributionRules() {
       return repository.getAdminDistributionRules();
     },
+    getDistributionRuleVersions(options = {}) {
+      return repository.getAdminDistributionRuleVersions({
+        ...normalizePageOptions(options),
+        keyword: requireString(options.keyword),
+        status: requireString(options.status)
+      });
+    },
+    createDistributionRuleVersion(payload = {}, actor = {}) {
+      return repository.createAdminDistributionRuleVersion(payload, actor);
+    },
+    publishDistributionRuleVersion(ruleVersionId, payload = {}, actor = {}) {
+      return repository.publishAdminDistributionRuleVersion(requireString(ruleVersionId), payload, actor);
+    },
+    getDistributionRuleChangeLogs(options = {}) {
+      return repository.getAdminDistributionRuleChangeLogs({
+        ...normalizePageOptions(options),
+        action: requireString(options.action),
+        ruleVersionId: requireString(options.ruleVersionId)
+      });
+    },
     updateDistributionRules(payload = {}, actor = {}) {
       return repository.updateAdminDistributionRules(payload, actor);
     },
     getDistributors(options = {}) {
-      return repository.getAdminDistributors(normalizePageOptions(options));
+      return repository.getAdminDistributors({
+        ...normalizePageOptions(options),
+        keyword: requireString(options.keyword),
+        status: requireString(options.status)
+      });
     },
     getDistributorDetail(distributorId) {
       return repository.getAdminDistributorDetail(requireString(distributorId));
@@ -195,6 +253,172 @@ function createAdminService(repository = createStorefrontRepository()) {
         requireString(distributorId),
         requireString(status, "disabled")
       );
+    },
+    getWithdrawalRequests(options = {}) {
+      return repository.getAdminWithdrawalRequests({
+        ...normalizePageOptions(options),
+        keyword: requireString(options.keyword),
+        status: requireString(options.status)
+      });
+    },
+    getWithdrawalDetail(withdrawalId) {
+      return repository.getAdminWithdrawalDetail(requireString(withdrawalId));
+    },
+    reviewWithdrawal(withdrawalId, payload = {}, actor = {}) {
+      return repository.reviewAdminWithdrawalRequest(
+        requireString(withdrawalId),
+        payload,
+        actor || {}
+      );
+    },
+    payoutWithdrawal(withdrawalId, payload = {}, actor = {}) {
+      return repository.payoutAdminWithdrawalRequest(
+        requireString(withdrawalId),
+        payload,
+        actor || {}
+      );
+    },
+
+    // ── 页面装修管理 ──
+
+    getBanners() {
+      return repository.getAdminBanners();
+    },
+    saveBanner(payload = {}) {
+      return repository.saveBanner({
+        bannerId: requireString(payload.bannerId || payload.id),
+        title: requireString(payload.title),
+        subtitle: requireString(payload.subtitle),
+        imageUrl: requireString(payload.imageUrl),
+        linkType: requireString(payload.linkType, "none"),
+        linkValue: requireString(payload.linkValue),
+        sortOrder: Number(payload.sortOrder || 0),
+        status: requireString(payload.status, "enabled")
+      });
+    },
+    deleteBanner(bannerId) {
+      return repository.deleteBanner(requireString(bannerId));
+    },
+    reorderBanners(items = []) {
+      if (!Array.isArray(items) || items.length === 0) {
+        throw createStorefrontError("排序数据不能为空", 400, "REORDER_ITEMS_EMPTY");
+      }
+
+      return repository.reorderBanners(items);
+    },
+    getPageSections() {
+      return repository.getPageSections();
+    },
+    updatePageSection(sectionKey, payload = {}) {
+      return repository.updatePageSection(requireString(sectionKey), {
+        visible: payload.visible !== undefined ? Boolean(payload.visible) : undefined,
+        sortOrder: payload.sortOrder !== undefined ? Number(payload.sortOrder) : undefined,
+        config: payload.config
+      });
+    },
+    reorderPageSections(items = []) {
+      if (!Array.isArray(items) || items.length === 0) {
+        throw createStorefrontError("排序数据不能为空", 400, "REORDER_ITEMS_EMPTY");
+      }
+
+      return repository.reorderPageSections(items);
+    },
+    getStoreTheme() {
+      return repository.getStoreTheme();
+    },
+    updateStoreTheme(themeKey, themeValue) {
+      return repository.updateStoreTheme(requireString(themeKey), String(themeValue || ""));
+    },
+
+    // ── Phase 4: 商品评价管理 ──
+
+    getProductReviews(options = {}) {
+      return repository.getAdminProductReviews({
+        ...normalizePageOptions(options),
+        status: requireString(options.status),
+        productId: requireString(options.productId),
+        minRating: Number(options.minRating) || 0
+      });
+    },
+    updateReviewStatus(reviewId, status) {
+      return repository.updateAdminReviewStatus(
+        requireString(reviewId),
+        requireString(status, "visible")
+      );
+    },
+    replyReview(reviewId, reply, actor = {}) {
+      return repository.replyAdminReview(
+        requireString(reviewId),
+        requireString(reply),
+        actor || {}
+      );
+    },
+
+    // ── Phase 5: 通知系统 ──
+
+    getNotifications(options = {}) {
+      return repository.getAdminNotifications({
+        ...normalizePageOptions(options),
+        isRead: options.isRead,
+        type: requireString(options.type)
+      });
+    },
+    markNotificationRead(notificationId) {
+      return repository.markAdminNotificationRead(requireString(notificationId));
+    },
+    markAllNotificationsRead() {
+      return repository.markAllAdminNotificationsRead();
+    },
+    getUnreadNotificationCount() {
+      return repository.getUnreadAdminNotificationCount();
+    },
+    createNotification(type, title, content = "") {
+      return repository.createAdminNotification(
+        requireString(type),
+        requireString(title),
+        String(content || "")
+      );
+    },
+
+    // ── Phase 6: 系统管理 ──
+
+    getAdminUsersList(options = {}) {
+      return repository.getAdminUsersList({
+        ...normalizePageOptions(options),
+        status: requireString(options.status)
+      });
+    },
+    createAdminUser(payload = {}) {
+      return repository.createAdminUserRecord({
+        username: requireString(payload.username),
+        realName: requireString(payload.realName),
+        mobile: payload.mobile,
+        password: payload.password,
+        roleCodes: payload.roleCodes || [],
+        status: requireString(payload.status, "enabled")
+      });
+    },
+    updateAdminUser(adminUserId, payload = {}) {
+      return repository.updateAdminUserRecord(
+        requireString(adminUserId),
+        payload
+      );
+    },
+    updateAdminUserPassword(adminUserId, newPassword) {
+      return repository.updateAdminUserPassword(
+        requireString(adminUserId),
+        requireString(newPassword)
+      );
+    },
+    getOperationLogs(options = {}) {
+      return repository.getAdminOperationLogs({
+        ...normalizePageOptions(options),
+        module: requireString(options.module),
+        action: requireString(options.action)
+      });
+    },
+    createOperationLog(entry = {}) {
+      return repository.createAdminOperationLog(entry);
     }
   };
 }

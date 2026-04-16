@@ -2,13 +2,13 @@ const banners = [
   {
     id: "banner-1",
     title: "新人福利专区",
-    subtitle: "先领券再下单，首页直接就能进入",
+    subtitle: "领券下单享优惠，好物一站直达",
     accent: "linear-gradient(135deg, #F4D9C9, #F7F1E8)"
   },
   {
     id: "banner-2",
-    title: "分享爆款赚佣金",
-    subtitle: "推广主推商品后，团队和佣金进度都能追踪",
+    title: "臻泉精选好物",
+    subtitle: "品质饮品、精致礼盒，为你用心甄选",
     accent: "linear-gradient(135deg, #D8E6DF, #F6F1E7)"
   }
 ];
@@ -59,7 +59,7 @@ const products = [
     id: "p1",
     categoryId: "gift",
     title: "每日精选零食礼盒",
-    shortDesc: "适合作为首版商城的标准商品模板",
+    shortDesc: "严选多款人气零食，搭配精美礼盒包装，送礼自用皆宜。",
     price: 129,
     marketPrice: 169,
     tag: "热销",
@@ -67,13 +67,13 @@ const products = [
     accent: "#F6D4C8",
     salesText: "月销 238",
     specs: ["标准装", "升级装"],
-    highlights: ["可做多规格", "适合活动页", "适合作为首发商品"]
+    highlights: ["多种口味组合，满足不同偏好", "精美礼盒包装，送礼体面", "新鲜生产，品质保证"]
   },
   {
     id: "p2",
     categoryId: "drink",
     title: "轻饮系列组合装",
-    shortDesc: "可以替换为任何快消品类",
+    shortDesc: "低糖清爽饮品组合，精选水果风味，畅饮无负担。",
     price: 89,
     marketPrice: 119,
     tag: "新品",
@@ -81,13 +81,13 @@ const products = [
     accent: "#D7E7DE",
     salesText: "月销 152",
     specs: ["6 瓶装", "12 瓶装"],
-    highlights: ["适合秒杀", "适合满减", "适合复购"]
+    highlights: ["低糖配方，健康无负担", "天然果味，清爽解渴", "便携包装，随时随地享受"]
   },
   {
     id: "p3",
     categoryId: "home",
     title: "日常家居收纳套组",
-    shortDesc: "适合验证图文详情和多图展示结构",
+    shortDesc: "简约实用收纳方案，帮您轻松整理居家空间。",
     price: 149,
     marketPrice: 199,
     tag: "推荐",
@@ -95,13 +95,13 @@ const products = [
     accent: "#E8DFC8",
     salesText: "月销 96",
     specs: ["基础套组", "完整套组"],
-    highlights: ["适合大图详情", "适合搭配推荐", "适合组合销售"]
+    highlights: ["多场景适用，分类收纳更高效", "环保材质，结实耐用", "简约设计，美观不占地"]
   },
   {
     id: "p4",
     categoryId: "digital",
     title: "便携数码周边单品",
-    shortDesc: "用于测试高客单价商品展示方式",
+    shortDesc: "出行好伴侣，小巧便携，日常使用更方便。",
     price: 219,
     marketPrice: 269,
     tag: "精选",
@@ -109,13 +109,13 @@ const products = [
     accent: "#D8E0F0",
     salesText: "月销 84",
     specs: ["标准版", "高配版"],
-    highlights: ["适合规格切换", "适合权益说明", "适合活动价格"]
+    highlights: ["小巧轻便，随身携带", "兼容多设备，即插即用", "高品质做工，持久耐用"]
   },
   {
     id: "p5",
     categoryId: "gift",
     title: "节日限定心意礼袋",
-    shortDesc: "适合未来接入节日营销专题",
+    shortDesc: "节日专属定制礼袋，传递温暖心意，让每一份祝福更有仪式感。",
     price: 99,
     marketPrice: 139,
     tag: "活动",
@@ -123,13 +123,13 @@ const products = [
     accent: "#F2D2DB",
     salesText: "月销 178",
     specs: ["心意装", "分享装"],
-    highlights: ["适合限时活动", "适合优惠券", "适合送礼场景"]
+    highlights: ["节日限定，限量发售", "精美定制包装，仪式感满满", "超值组合，物超所值"]
   },
   {
     id: "p6",
     categoryId: "drink",
     title: "冷萃风味尝鲜组合",
-    shortDesc: "可替换成任何饮品或食品 SKU",
+    shortDesc: "精选冷萃工艺，保留原味醇香，一包体验多种风味。",
     price: 69,
     marketPrice: 89,
     tag: "爆款",
@@ -137,7 +137,7 @@ const products = [
     accent: "#CFE2EA",
     salesText: "月销 301",
     specs: ["尝鲜包", "家庭包"],
-    highlights: ["适合爆品测试", "适合推荐位", "适合复购模型"]
+    highlights: ["冷萃工艺，口感醇厚顺滑", "多种风味，一次尝遍", "高性价比入门首选"]
   }
 ];
 

@@ -1,4 +1,6 @@
-const { resolveStorefrontSessionLoginType } = require("./session-login");
+const {
+  resolveStorefrontSessionLoginType
+} = require("./session-login");
 
 function createStorefrontPrismaSessionModule({
   buildSessionToken,
@@ -268,8 +270,13 @@ function createStorefrontPrismaSessionModule({
           return createDemoSession(prisma, payload);
         }
 
-        const authPayload = await exchangeMiniProgramCode(payload.code);
-        const user = await ensureWechatUser(prisma, authPayload);
+        let user = null;
+
+        if (loginType === "wechat_miniprogram") {
+          const authPayload = await exchangeMiniProgramCode(payload.code);
+
+          user = await ensureWechatUser(prisma, authPayload);
+        }
 
         await bindInviterForUserIfNeeded(prisma, user, payload);
 

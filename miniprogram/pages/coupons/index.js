@@ -209,12 +209,11 @@ Page({
 
     wx.showToast({
       title: "优惠券已选择",
-      icon: "success"
+      icon: "success",
+      complete() {
+        wx.navigateBack();
+      }
     });
-
-    setTimeout(() => {
-      wx.navigateBack();
-    }, 250);
   },
   async clearCoupon() {
     if (this.data.actionLoadingId || this.data.pageState !== "success") {
@@ -242,12 +241,11 @@ Page({
 
     wx.showToast({
       title: "已取消使用优惠券",
-      icon: "success"
+      icon: "success",
+      complete() {
+        wx.navigateBack();
+      }
     });
-
-    setTimeout(() => {
-      wx.navigateBack();
-    }, 250);
   },
   retryLoad() {
     this.loadCoupons();

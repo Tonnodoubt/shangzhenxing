@@ -1,10 +1,21 @@
 # 环境变量梳理
 
-更新时间：2026-04-08
+更新时间：2026-04-13
 
 这份文档只回答一件事：
 
 - 当前这个项目到底有哪些环境变量或运行配置要管
+
+现在服务端已经提供统一校验入口（2026-04-13 起）：
+
+```bash
+cd server
+npm run env:check
+npm run env:check:strict
+```
+
+- `env:check`：本地日常检查（错误会失败，警告仅提示）
+- `env:check:strict`：切云环境前建议执行，校验更严格
 
 它不区分“代码里怎么写”和“部署时怎么配”的视角，而是按实际使用场景来整理：
 
@@ -47,6 +58,10 @@
 | `CORS_ORIGINS` | 已使用 | 需要浏览器跨域访问接口时 | `https://admin.example.com` | API 允许跨域的来源白名单，多个用逗号分隔 |
 | `ADMIN_SESSION_TTL_MS` | 已使用 | 可选 | `28800000` | 后台登录态有效期，默认 8 小时 |
 | `DATABASE_TCP_PROBE_TIMEOUT_MS` | 已使用 | 可选 | `2000` | 云托管启动前数据库 TCP 探测超时时间（毫秒） |
+| `COS_SECRET_ID` | 已使用（可选） | 后台图片上传到 COS | 空字符串 | COS 访问凭证 ID |
+| `COS_SECRET_KEY` | 已使用（可选） | 后台图片上传到 COS | 空字符串 | COS 访问凭证 Key |
+| `COS_BUCKET` | 已使用（可选） | 后台图片上传到 COS | 空字符串 | COS 存储桶名称 |
+| `COS_REGION` | 已使用（可选） | 后台图片上传到 COS | 空字符串 | COS 存储桶地域 |
 | `NODE_ENV` | 已使用 | 云托管生产建议显式配置 | `production` | 当前 Dockerfile 会设置，用于运行环境标识 |
 
 ### 小程序端运行配置
@@ -302,6 +317,36 @@ ADMIN_SESSION_TTL_MS=28800000
 DATABASE_TCP_PROBE_TIMEOUT_MS=2000
 ```
 
+### `COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET / COS_REGION`
+
+当前用途：
+
+- `server/src/lib/upload.js`
+- `server/src/admin/router.js`
+
+什么时候需要：
+
+- 后台页面装修里要上传轮播图，并且希望图片长期持久化时
+
+规则：
+
+- 这 4 个变量要么全部不填（走容器本地 `/uploads`）
+- 要么 4 个都填（走腾讯云 COS）
+
+示例：
+
+```bash
+COS_SECRET_ID="AKID..."
+COS_SECRET_KEY="..."
+COS_BUCKET="your-bucket-1250000000"
+COS_REGION="ap-shanghai"
+```
+
+补充说明：
+
+- 生产环境建议优先配置 COS，避免容器重启导致本地上传图片丢失
+- 可以通过 `npm run env:check:strict` 快速发现是否只填了一部分 `COS_*`
+
 ## 三种场景怎么配
 
 ### 场景 A：本地前台演示
@@ -428,6 +473,14 @@ STOREFRONT_DATA_SOURCE=memory
 WECHAT_APP_ID=""
 WECHAT_APP_SECRET=""
 ALLOW_MOCK_WECHAT_LOGIN=true
+PAYMENT_PROVIDER=mock
+WECHAT_PAY_MCH_ID=""
+WECHAT_PAY_SERIAL_NO=""
+WECHAT_PAY_PRIVATE_KEY=""
+WECHAT_PAY_NOTIFY_URL=""
+WECHAT_PAY_API_V3_KEY=""
+WECHAT_PAY_PLATFORM_PUBLIC_KEY=""
+WECHAT_PAY_PLATFORM_SERIAL=""
 ```
 
 ### 2. 小程序运行配置继续显式放在 `miniprogram/config/env.js`
@@ -449,12 +502,13 @@ ALLOW_MOCK_WECHAT_LOGIN=true
 
 基于当前代码状态，下面这些变量现在还不用急着新增：
 
-- 支付商户相关变量
 - 自定义公网域名相关变量
 - Redis、消息队列、对象存储等扩展基础设施变量
 - BI、埋点、Sentry 之类的监控变量
 
-等这些能力真正进入关键路径，再补也不晚。
+补充说明：
+
+- 支付商户相关变量已经进入代码关键路径（`wechat_jsapi` 模式必填），可先留空并保持 `PAYMENT_PROVIDER=mock`。
 
 ## 当前最值得马上做的动作
 

@@ -1,10 +1,34 @@
+const { getSellableStock } = require("./prisma-utils");
+
 function createStorefrontPrismaCatalogModule({
-  banners,
+  getBanners,
+  getPageSections,
+  getStoreTheme,
   quickEntries,
   buildCategoryRows,
   getPrisma,
   mapProduct
 }) {
+
+  function normalizeSellableProduct(product) {
+    if (!product || product.status !== "on_sale") {
+      return null;
+    }
+
+    const sellableSkus = (product.skus || []).filter((item) => {
+      return item.status === "enabled" && getSellableStock(item) > 0;
+    });
+
+    if (!sellableSkus.length) {
+      return null;
+    }
+
+    return {
+      ...product,
+      skus: sellableSkus
+    };
+  }
+
   async function getHomeData() {
     const prisma = await getPrisma();
     const products = await prisma.product.findMany({
@@ -13,6 +37,9 @@ function createStorefrontPrismaCatalogModule({
       },
       include: {
         skus: {
+          where: {
+            status: "enabled"
+          },
           orderBy: {
             createdAt: "asc"
           }
@@ -26,15 +53,21 @@ function createStorefrontPrismaCatalogModule({
           createdAt: "desc"
         }
       ],
-      take: 8
+      take: 12
     });
-    const mappedProducts = products.map((item) => mapProduct(item));
+    const mappedProducts = products
+      .map((item) => normalizeSellableProduct(item))
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((item) => mapProduct(item));
 
     return {
-      banners,
+      banners: await getBanners(),
       quickEntries,
       featuredProducts: mappedProducts.slice(0, 4),
-      recommendedProducts: mappedProducts.slice(4, 8)
+      recommendedProducts: mappedProducts.slice(4, 8),
+      pageSections: await getPageSections(),
+      theme: await getStoreTheme()
     };
   }
 
@@ -88,6 +121,9 @@ function createStorefrontPrismaCatalogModule({
       },
       include: {
         skus: {
+          where: {
+            status: "enabled"
+          },
           orderBy: {
             createdAt: "asc"
           }
@@ -100,10 +136,14 @@ function createStorefrontPrismaCatalogModule({
         {
           createdAt: "desc"
         }
-      ]
+      ],
+      take: 50
     });
 
-    return products.map((item) => mapProduct(item));
+    return products
+      .map((item) => normalizeSellableProduct(item))
+      .filter(Boolean)
+      .map((item) => mapProduct(item));
   }
 
   async function getProductsByCategory(categoryId) {
@@ -120,6 +160,9 @@ function createStorefrontPrismaCatalogModule({
       where,
       include: {
         skus: {
+          where: {
+            status: "enabled"
+          },
           orderBy: {
             createdAt: "asc"
           }
@@ -132,10 +175,14 @@ function createStorefrontPrismaCatalogModule({
         {
           createdAt: "desc"
         }
-      ]
+      ],
+      take: (!categoryId || categoryId === "all") ? 100 : undefined
     });
 
-    return products.map((item) => mapProduct(item));
+    return products
+      .map((item) => normalizeSellableProduct(item))
+      .filter(Boolean)
+      .map((item) => mapProduct(item));
   }
 
   async function getProductDetail(productId) {
@@ -160,7 +207,13 @@ function createStorefrontPrismaCatalogModule({
       return null;
     }
 
-    return mapProduct(product);
+    const sellableProduct = normalizeSellableProduct(product);
+
+    if (!sellableProduct) {
+      return null;
+    }
+
+    return mapProduct(sellableProduct);
   }
 
   return {

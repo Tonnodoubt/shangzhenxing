@@ -26,10 +26,10 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">搜索失败</text>
-    <text class="state-title">搜索页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">搜索页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
-      <button class="ghost-button state-button" bindtap="openCategory">先看分类</button>
+      <button class="ghost-button state-button" bindtap="openCategory">查看分类</button>
       <button class="primary-button state-button" bindtap="retrySearch" disabled="{{!canSearch}}">重新搜索</button>
     </view>
   </view>
@@ -37,7 +37,7 @@
   <view wx:else>
     <view class="section-head">
       <text class="section-title">搜索结果</text>
-      <text class="section-subtitle">先做基础关键词搜索，后面再补搜索历史和推荐词。</text>
+      <text class="section-subtitle">根据关键词快速查找你想要的商品。</text>
     </view>
 
     <view class="product-list" wx:if="{{pageState === 'success'}}">
@@ -69,7 +69,7 @@
 
     <view class="panel empty-box" wx:else>
       <text class="empty-title">先输入关键词开始搜索</text>
-      <text class="empty-copy">当前会从本地商品数据里筛结果，后续可以继续补搜索历史和推荐词。</text>
+      <text class="empty-copy">输入关键词后可搜索商品名称、卖点和分类。</text>
     </view>
   </view>
 </view>

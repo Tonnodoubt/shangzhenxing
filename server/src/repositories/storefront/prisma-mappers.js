@@ -1,5 +1,17 @@
 const { normalizeDetailContent } = require("../../../shared/utils");
 
+function parseJsonArray(value, fallback) {
+  if (!value) {
+    return fallback || [];
+  }
+  try {
+    var parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.length ? parsed : (fallback || []);
+  } catch (_e) {
+    return fallback || [];
+  }
+}
+
 function createStorefrontPrismaMapperModule({
   accentPalette,
   createStorefrontError
@@ -29,13 +41,16 @@ function createStorefrontPrismaMapperModule({
       return "";
     }
 
-    const pad = (value) => String(value).padStart(2, "0");
-
-    return [
-      current.getFullYear(),
-      pad(current.getMonth() + 1),
-      pad(current.getDate())
-    ].join("-") + " " + [pad(current.getHours()), pad(current.getMinutes())].join(":");
+    return current.toLocaleString("sv-SE", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).replace(",", "");
   }
 
   function formatDate(date) {
@@ -176,7 +191,7 @@ function createStorefrontPrismaMapperModule({
   function mapSession(session = {}) {
     return {
       sessionToken: session.sessionToken || "",
-      expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : "",
+      expiresAt: session.expiresAt ? formatDateTime(session.expiresAt) : "",
       status: session.status || "active"
     };
   }
@@ -246,7 +261,8 @@ function createStorefrontPrismaMapperModule({
       productType: "general",
       detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       coverImage: product.coverImage || "",
-      imageList: product.coverImage ? [product.coverImage] : [],
+      imageList: parseJsonArray(product.imageList, product.coverImage ? [product.coverImage] : []),
+      detailImages: parseJsonArray(product.detailImages, []),
       distributionEnabled: typeof product.distributionEnabled === "boolean" ? product.distributionEnabled : true,
       status: product.status || "on_sale",
       statusText: product.status === "off_sale" ? "已下架" : "销售中"

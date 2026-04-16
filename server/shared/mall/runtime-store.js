@@ -360,6 +360,8 @@ function createRuntimeStore(deps) {
         totalCommission: 368,
         pendingCommission: 129,
         settledCommission: 239,
+        withdrawingCommission: 20,
+        withdrawnCommission: 88,
         teamCount: 12,
         todayInviteCount: 3
       },
@@ -408,6 +410,59 @@ function createRuntimeStore(deps) {
           status: "settled",
           statusText: "已结算",
           createdAt: "2026-03-25 11:08"
+        }
+      ],
+      withdrawalRequests: [
+        {
+          id: "wd-1",
+          requestNo: "WD20260412093000123",
+          userId: "user-1",
+          status: "submitted",
+          amount: 20,
+          serviceFee: 0,
+          netAmount: 20,
+          channel: "manual_bank",
+          accountName: "张三",
+          accountNoMask: "****6699",
+          remark: "本周提现",
+          reviewRemark: "",
+          reviewedBy: "",
+          reviewedAt: "",
+          paidAt: "",
+          createdAt: "2026-04-12 09:30:00",
+          updatedAt: "2026-04-12 09:30:00",
+          payouts: []
+        },
+        {
+          id: "wd-2",
+          requestNo: "WD20260410091000456",
+          userId: "user-1",
+          status: "paid",
+          amount: 18,
+          serviceFee: 0,
+          netAmount: 18,
+          channel: "manual_bank",
+          accountName: "张三",
+          accountNoMask: "****6699",
+          remark: "",
+          reviewRemark: "审核通过",
+          reviewedBy: "王财务",
+          reviewedAt: "2026-04-10 09:20:00",
+          paidAt: "2026-04-10 10:10:00",
+          createdAt: "2026-04-10 09:10:00",
+          updatedAt: "2026-04-10 10:10:00",
+          payouts: [
+            {
+              id: "wdp-2",
+              channel: "manual_bank",
+              channelBillNo: "BANK20260410001",
+              status: "paid",
+              remark: "人工打款",
+              paidBy: "王财务",
+              paidAt: "2026-04-10 10:10:00",
+              createdAt: "2026-04-10 10:10:00"
+            }
+          ]
         }
       ],
       distributorProfiles: buildSeedDistributorProfiles()

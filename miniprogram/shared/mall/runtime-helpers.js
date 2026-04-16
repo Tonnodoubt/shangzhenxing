@@ -131,35 +131,35 @@ function createRuntimeHelpers(deps) {
   }
 
   function syncPendingOrderLifecycle(state) {
-    state.orderRecords = (state.orderRecords || []).map((item, index) => {
-      if (!shouldAutoShipOrder(item)) {
-        return decorateOrder(item, index);
+    for (let i = 0; i < (state.orderRecords || []).length; i++) {
+      const item = state.orderRecords[i];
+
+      if (shouldAutoShipOrder(item)) {
+        state.orderRecords[i] = decorateOrder(
+          {
+            ...item,
+            status: "shipping",
+            statusText: getStatusText("shipping")
+          },
+          i
+        );
       }
+    }
 
-      return decorateOrder(
-        {
-          ...item,
-          status: "shipping",
-          statusText: getStatusText("shipping")
-        },
-        index
-      );
-    });
+    for (let i = 0; i < (state.runtimeOrders || []).length; i++) {
+      const item = state.runtimeOrders[i];
 
-    state.runtimeOrders = (state.runtimeOrders || []).map((item, index) => {
-      if (!shouldAutoShipOrder(item)) {
-        return decorateOrder(item, index);
+      if (shouldAutoShipOrder(item)) {
+        state.runtimeOrders[i] = decorateOrder(
+          {
+            ...item,
+            status: "shipping",
+            statusText: getStatusText("shipping")
+          },
+          i
+        );
       }
-
-      return decorateOrder(
-        {
-          ...item,
-          status: "shipping",
-          statusText: getStatusText("shipping")
-        },
-        index
-      );
-    });
+    }
   }
 
   function findOrderById(state, orderId) {
@@ -255,7 +255,7 @@ function createRuntimeHelpers(deps) {
 
     state.orderRecords = (state.orderRecords || []).map((item, index) => {
       if (item.id !== orderId) {
-        return decorateOrder(item, index);
+        return item;
       }
 
       targetOrder = decorateOrder(
@@ -272,7 +272,7 @@ function createRuntimeHelpers(deps) {
 
     state.runtimeOrders = (state.runtimeOrders || []).map((item, index) => {
       if (item.id !== orderId) {
-        return decorateOrder(item, index);
+        return item;
       }
 
       return decorateOrder(

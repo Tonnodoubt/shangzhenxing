@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">优惠券页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">优惠券页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -18,7 +18,7 @@
   <view wx:else>
     <view class="coupon-page-head">
       <text class="coupon-page-title">领取优惠券</text>
-      <text class="coupon-page-copy">把新人券、满减券和已领取优惠券统一放在这里，样式会更接近图里的券面感。</text>
+      <text class="coupon-page-copy">新人券、满减券和活动券统一管理，领券后下单可自动抵扣。</text>
     </view>
 
     <view class="panel coupon-select-summary" wx:if="{{mode === 'select'}}">
@@ -29,7 +29,7 @@
 
     <view class="coupon-section-head">
       <text class="section-title">可领取优惠券</text>
-      <text class="section-subtitle">先把券领下来，结算页会直接识别。</text>
+      <text class="section-subtitle">领取后可在结算页直接使用。</text>
     </view>
 
     <view class="coupon-ticket-list" wx:if="{{centerTemplates.length}}">
@@ -69,12 +69,12 @@
 
     <view class="panel content-empty" wx:else>
       <text class="content-empty-title">当前没有可领取的券</text>
-      <text class="content-empty-copy">后面接活动配置后，这里可以继续扩新人券、满减券和节日券。</text>
+      <text class="content-empty-copy">当前暂无可领取优惠券，可稍后再来看看。</text>
     </view>
 
     <view class="coupon-section-head">
       <text class="section-title">我的优惠券</text>
-      <text class="section-subtitle">当前可用 {{availableCouponCount}} 张，领完后会沉淀到这里。</text>
+      <text class="section-subtitle">当前可用 {{availableCouponCount}} 张，已领取优惠券都会展示在这里。</text>
     </view>
 
     <view class="coupon-ticket-list" wx:if="{{coupons.length}}">
@@ -114,7 +114,7 @@
 
     <view class="panel empty-box" wx:else>
       <text class="empty-title">你还没有优惠券</text>
-      <text class="empty-copy">先去上面的领券区领一张，新人券和满减券都已经接好了。</text>
+      <text class="empty-copy">先到上方领券区领取优惠券，领取成功后会显示在这里。</text>
     </view>
   </view>
 </view>

@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">团队页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">团队页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -18,7 +18,7 @@
   <view wx:else>
     <view class="panel team-hero">
       <text class="section-title">团队概览</text>
-      <text class="section-subtitle">当前基础版已经能把团队数据展示出来，后面再接真实分销关系。</text>
+      <text class="section-subtitle">查看团队人数、今日新增与成员贡献，掌握分销增长情况。</text>
     </view>
 
     <view class="team-stats">
@@ -47,7 +47,7 @@
 
     <view class="panel content-empty" wx:else>
       <text class="content-empty-title">团队里还没有成员</text>
-      <text class="content-empty-copy">后面接真实分销关系后，这里会展示邀请进来的下级成员和贡献情况。</text>
+      <text class="content-empty-copy">暂时还没有团队成员，分享商品后可在这里查看邀请结果。</text>
     </view>
   </view>
   </view>

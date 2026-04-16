@@ -18,10 +18,12 @@
     "pages/team/index",
     "pages/commissions/index",
     "pages/poster/index",
-    "pages/auth/index"
+    "pages/auth/index",
+    "pages/privacy-policy/index",
+    "pages/service-terms/index"
   ],
   "window": {
-    "navigationBarTitleText": "微信商城",
+    "navigationBarTitleText": "臻泉商城",
     "navigationBarBackgroundColor": "#F7F4ED",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F7F4ED",
@@ -51,5 +53,6 @@
       }
     ]
   },
+  "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json"
 }

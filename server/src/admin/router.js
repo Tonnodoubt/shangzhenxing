@@ -1,7 +1,15 @@
 const express = require("express");
+const multer = require("multer");
 const { createAdminService } = require("../modules/admin/service");
 const { sendData, sendError, wrap } = require("../shared/http");
 const { requireString } = require("../../shared/utils");
+const { createUploader, validateImage } = require("../lib/upload");
+const {
+  categorySchema,
+  productSchema,
+  couponTemplateSchema,
+  validateBody
+} = require("../shared/validation");
 const {
   adminAuth,
   requirePermission,
@@ -20,6 +28,19 @@ const adminService = createAdminService();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 分钟窗口
 const LOGIN_MAX_ATTEMPTS = 10;           // 窗口内最多 10 次
 const loginAttempts = new Map();
+
+// 定期清理过期的登录限流记录
+const loginAttemptsCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of loginAttempts) {
+    if (now > record.resetAt) {
+      loginAttempts.delete(ip);
+    }
+  }
+}, 15 * 60 * 1000);
+if (typeof loginAttemptsCleanupTimer.unref === "function") {
+  loginAttemptsCleanupTimer.unref();
+}
 
 function loginRateLimit(req, res, next) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
@@ -49,8 +70,8 @@ function loginRateLimit(req, res, next) {
   next();
 }
 
-router.post("/admin/v1/auth/login", loginRateLimit, wrap((req, res) => {
-  const result = loginAdmin(
+router.post("/admin/v1/auth/login", loginRateLimit, wrap(async (req, res) => {
+  const result = await loginAdmin(
     requireString((req.body || {}).username),
     requireString((req.body || {}).password)
   );
@@ -84,8 +105,39 @@ router.get("/admin/v1/dashboard/summary", requirePermission("dashboard.view"), w
   });
 }));
 
-router.get("/admin/v1/auth/me", wrap((req, res) => {
-  const session = getAdminSession(readAdminToken(req));
+router.get("/admin/v1/statistics/sales", requirePermission("statistics.sales.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getSalesStatistics({
+    days: req.query.days
+  }), { requestId: req.requestId });
+}));
+
+router.get("/admin/v1/users", requirePermission("user.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getUsers({
+    page: req.query.page,
+    pageSize: req.query.pageSize,
+    keyword: req.query.keyword,
+    status: req.query.status
+  }), { requestId: req.requestId });
+}));
+
+router.get("/admin/v1/users/:userId", requirePermission("user.view"), wrap(async (req, res) => {
+  const result = await adminService.getUserDetail(req.params.userId);
+  if (!result) {
+    return sendError(res, "用户不存在", { code: 40401, statusCode: 404 });
+  }
+  sendData(res, result, { requestId: req.requestId });
+}));
+
+router.post("/admin/v1/users/:userId/status", requirePermission("user.status"), wrap(async (req, res) => {
+  const status = req.body.status;
+  if (!status) {
+    return sendError(res, "status 参数缺失", { code: 40001 });
+  }
+  sendData(res, await adminService.updateUserStatus(req.params.userId, status), { requestId: req.requestId });
+}));
+
+router.get("/admin/v1/auth/me", wrap(async (req, res) => {
+  const session = await getAdminSession(readAdminToken(req));
 
   if (!session) {
     sendError(res, "登录已失效，请重新登录", {
@@ -101,8 +153,8 @@ router.get("/admin/v1/auth/me", wrap((req, res) => {
   });
 }));
 
-router.post("/admin/v1/auth/logout", wrap((req, res) => {
-  logoutAdmin(readAdminToken(req));
+router.post("/admin/v1/auth/logout", wrap(async (req, res) => {
+  await logoutAdmin(readAdminToken(req));
   clearAdminTokenCookie(res);
   sendData(res, { ok: true }, {
     requestId: req.requestId
@@ -115,14 +167,14 @@ router.get("/admin/v1/categories", requirePermission("category.view"), wrap(asyn
   });
 }));
 
-router.post("/admin/v1/categories", requirePermission("category.create"), wrap(async (req, res) => {
+router.post("/admin/v1/categories", requirePermission("category.create"), validateBody(categorySchema), wrap(async (req, res) => {
   sendData(res, await adminService.saveCategory(req.body || {}), {
     statusCode: 201,
     requestId: req.requestId
   });
 }));
 
-router.put("/admin/v1/categories/:categoryId", requirePermission("category.edit"), wrap(async (req, res) => {
+router.put("/admin/v1/categories/:categoryId", requirePermission("category.edit"), validateBody(categorySchema), wrap(async (req, res) => {
   const record = await adminService.saveCategory({
     ...(req.body || {}),
     categoryId: req.params.categoryId
@@ -184,14 +236,14 @@ router.get("/admin/v1/products/:productId", requirePermission("product.view"), w
   });
 }));
 
-router.post("/admin/v1/products", requirePermission("product.create"), wrap(async (req, res) => {
+router.post("/admin/v1/products", requirePermission("product.create"), validateBody(productSchema), wrap(async (req, res) => {
   sendData(res, await adminService.saveProduct(req.body || {}), {
     statusCode: 201,
     requestId: req.requestId
   });
 }));
 
-router.put("/admin/v1/products/:productId", requirePermission("product.edit"), wrap(async (req, res) => {
+router.put("/admin/v1/products/:productId", requirePermission("product.edit"), validateBody(productSchema), wrap(async (req, res) => {
   const record = await adminService.saveProduct({
     ...(req.body || {}),
     productId: req.params.productId
@@ -227,6 +279,23 @@ router.post("/admin/v1/products/:productId/status", requirePermission("product.s
   }
 
   sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.delete("/admin/v1/products/:productId", requirePermission("product.delete"), wrap(async (req, res) => {
+  const result = await adminService.deleteProduct(req.params.productId);
+
+  if (!result) {
+    sendError(res, "商品不存在", {
+      code: 40402,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
     requestId: req.requestId
   });
 }));
@@ -390,14 +459,14 @@ router.get("/admin/v1/coupon-templates", requirePermission("coupon.view"), wrap(
   });
 }));
 
-router.post("/admin/v1/coupon-templates", requirePermission("coupon.create"), wrap(async (req, res) => {
+router.post("/admin/v1/coupon-templates", requirePermission("coupon.create"), validateBody(couponTemplateSchema), wrap(async (req, res) => {
   sendData(res, await adminService.saveCouponTemplate(req.body || {}), {
     statusCode: 201,
     requestId: req.requestId
   });
 }));
 
-router.put("/admin/v1/coupon-templates/:templateId", requirePermission("coupon.edit"), wrap(async (req, res) => {
+router.put("/admin/v1/coupon-templates/:templateId", requirePermission("coupon.edit"), validateBody(couponTemplateSchema), wrap(async (req, res) => {
   const record = await adminService.saveCouponTemplate({
     ...(req.body || {}),
     templateId: req.params.templateId
@@ -441,6 +510,50 @@ router.post("/admin/v1/coupon-templates/:templateId/status", requirePermission("
 
 router.get("/admin/v1/distribution/rules", requirePermission("distribution.rule.view"), wrap(async (req, res) => {
   sendData(res, await adminService.getDistributionRules(), {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/distribution/rule-versions", requirePermission("distribution.rule.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getDistributionRuleVersions(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/distribution/rule-versions", requirePermission("distribution.rule.edit"), wrap(async (req, res) => {
+  sendData(res, await adminService.createDistributionRuleVersion(req.body || {}, {
+    adminUserId: req.adminSession.adminUser.id,
+    realName: req.adminSession.adminUser.realName,
+    username: req.adminSession.adminUser.username
+  }), {
+    statusCode: 201,
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/distribution/rule-versions/:ruleVersionId/publish", requirePermission("distribution.rule.edit"), wrap(async (req, res) => {
+  const record = await adminService.publishDistributionRuleVersion(req.params.ruleVersionId, req.body || {}, {
+    adminUserId: req.adminSession.adminUser.id,
+    realName: req.adminSession.adminUser.realName,
+    username: req.adminSession.adminUser.username
+  });
+
+  if (!record) {
+    sendError(res, "规则版本不存在", {
+      code: 40411,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/distribution/rule-change-logs", requirePermission("distribution.rule.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getDistributionRuleChangeLogs(req.query || {}), {
     requestId: req.requestId
   });
 }));
@@ -493,6 +606,350 @@ router.post("/admin/v1/distributors/:distributorId/status", requirePermission("d
   }
 
   sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/distribution/withdrawals", requirePermission("distribution.distributor.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getWithdrawalRequests(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/distribution/withdrawals/:withdrawalId", requirePermission("distribution.distributor.view"), wrap(async (req, res) => {
+  const record = await adminService.getWithdrawalDetail(req.params.withdrawalId);
+
+  if (!record) {
+    sendError(res, "提现单不存在", {
+      code: 40410,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/distribution/withdrawals/:withdrawalId/review", requirePermission("distribution.withdraw.review"), wrap(async (req, res) => {
+  const record = await adminService.reviewWithdrawal(req.params.withdrawalId, req.body || {}, req.adminSession.adminUser || {});
+
+  if (!record) {
+    sendError(res, "提现单不存在", {
+      code: 40410,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/distribution/withdrawals/:withdrawalId/payout", requirePermission("distribution.withdraw.review"), wrap(async (req, res) => {
+  const record = await adminService.payoutWithdrawal(req.params.withdrawalId, req.body || {}, req.adminSession.adminUser || {});
+
+  if (!record) {
+    sendError(res, "提现单不存在", {
+      code: 40410,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+// ── 页面装修管理 ──
+
+router.get("/admin/v1/banners", requirePermission("banner.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getBanners(), {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/banners", requirePermission("banner.create"), wrap(async (req, res) => {
+  sendData(res, await adminService.saveBanner(req.body || {}), {
+    statusCode: 201,
+    requestId: req.requestId
+  });
+}));
+
+router.put("/admin/v1/banners/:bannerId", requirePermission("banner.edit"), wrap(async (req, res) => {
+  const record = await adminService.saveBanner({
+    ...(req.body || {}),
+    bannerId: req.params.bannerId
+  });
+
+  if (!record) {
+    sendError(res, "轮播图不存在", {
+      code: 40408,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.delete("/admin/v1/banners/:bannerId", requirePermission("banner.delete"), wrap(async (req, res) => {
+  const result = await adminService.deleteBanner(req.params.bannerId);
+
+  if (!result) {
+    sendError(res, "轮播图不存在", {
+      code: 40408,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/banners/sort", requirePermission("banner.edit"), wrap(async (req, res) => {
+  sendData(res, await adminService.reorderBanners((req.body || {}).items || []), {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/page-sections", requirePermission("page_decoration.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getPageSections(), {
+    requestId: req.requestId
+  });
+}));
+
+router.put("/admin/v1/page-sections/:sectionKey", requirePermission("page_decoration.edit"), wrap(async (req, res) => {
+  const record = await adminService.updatePageSection(req.params.sectionKey, req.body || {});
+
+  if (!record) {
+    sendError(res, "版块不存在", {
+      code: 40409,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/page-sections/sort", requirePermission("page_decoration.edit"), wrap(async (req, res) => {
+  sendData(res, await adminService.reorderPageSections((req.body || {}).items || []), {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/store-theme", requirePermission("theme.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getStoreTheme(), {
+    requestId: req.requestId
+  });
+}));
+
+router.put("/admin/v1/store-theme/:themeKey", requirePermission("theme.edit"), wrap(async (req, res) => {
+  const body = req.body || {};
+  const record = await adminService.updateStoreTheme(
+    req.params.themeKey,
+    body.themeValue || body.primaryColor || body.value
+  );
+
+  if (!record) {
+    sendError(res, "主题值不能为空", {
+      code: 40001,
+      statusCode: 400,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+// ── 图片上传 ──
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 60 * 1024 * 1024 } });
+const bannerUploader = createUploader("banners");
+const productUploader = createUploader("products");
+
+router.post("/admin/v1/upload/image", requirePermission("upload.image"), upload.single("image"), wrap(async (req, res) => {
+  const file = req.file;
+  const validationError = validateImage(file);
+
+  if (validationError) {
+    sendError(res, validationError, {
+      code: 40002,
+      statusCode: 400,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  const uploadType = (req.body.type || "product");
+  const uploader = uploadType === "banner" ? bannerUploader : productUploader;
+  const imageUrl = await uploader(file);
+
+  sendData(res, { imageUrl }, {
+    requestId: req.requestId
+  });
+}));
+
+// ── Phase 4: 商品评价管理 ──
+
+router.get("/admin/v1/reviews", requirePermission("review.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getProductReviews(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/reviews/:reviewId/status", requirePermission("review.status"), wrap(async (req, res) => {
+  const status = requireString((req.body || {}).status, "visible");
+  const record = await adminService.updateReviewStatus(req.params.reviewId, status);
+
+  if (!record) {
+    sendError(res, "评价不存在", {
+      code: 40412,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/reviews/:reviewId/reply", requirePermission("review.reply"), wrap(async (req, res) => {
+  const reply = requireString((req.body || {}).reply);
+  const record = await adminService.replyReview(
+    req.params.reviewId,
+    reply,
+    req.adminSession.adminUser || {}
+  );
+
+  if (!record) {
+    sendError(res, "评价不存在", {
+      code: 40412,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+// ── Phase 5: 通知系统 ──
+
+router.get("/admin/v1/notifications", requirePermission("notification.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getNotifications(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/notifications/unread-count", requirePermission("notification.view"), wrap(async (req, res) => {
+  const count = await adminService.getUnreadNotificationCount();
+  sendData(res, { count }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/notifications/:notificationId/read", requirePermission("notification.view"), wrap(async (req, res) => {
+  const record = await adminService.markNotificationRead(req.params.notificationId);
+
+  if (!record) {
+    sendError(res, "通知不存在", {
+      code: 40413,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/notifications/read-all", requirePermission("notification.view"), wrap(async (req, res) => {
+  await adminService.markAllNotificationsRead();
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+// ── Phase 6: 系统管理 ──
+
+router.get("/admin/v1/system/admin-users", requirePermission("system.admin.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getAdminUsersList(req.query || {}), {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/system/admin-users", requirePermission("system.admin.create"), wrap(async (req, res) => {
+  sendData(res, await adminService.createAdminUser(req.body || {}), {
+    statusCode: 201,
+    requestId: req.requestId
+  });
+}));
+
+router.put("/admin/v1/system/admin-users/:adminUserId", requirePermission("system.admin.edit"), wrap(async (req, res) => {
+  const record = await adminService.updateAdminUser(req.params.adminUserId, req.body || {});
+
+  if (!record) {
+    sendError(res, "管理员不存在", {
+      code: 40414,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, record, {
+    requestId: req.requestId
+  });
+}));
+
+router.post("/admin/v1/system/admin-users/:adminUserId/reset-password", requirePermission("system.admin.edit"), wrap(async (req, res) => {
+  const record = await adminService.updateAdminUserPassword(
+    req.params.adminUserId,
+    requireString((req.body || {}).password)
+  );
+
+  if (!record) {
+    sendError(res, "管理员不存在", {
+      code: 40414,
+      statusCode: 404,
+      requestId: req.requestId
+    });
+    return;
+  }
+
+  sendData(res, { success: true }, {
+    requestId: req.requestId
+  });
+}));
+
+router.get("/admin/v1/system/operation-logs", requirePermission("system.log.view"), wrap(async (req, res) => {
+  sendData(res, await adminService.getOperationLogs(req.query || {}), {
     requestId: req.requestId
   });
 }));

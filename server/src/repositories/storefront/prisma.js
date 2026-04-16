@@ -1,11 +1,12 @@
 const crypto = require("crypto");
-const { banners, quickEntries } = require("../../shared/mock");
+const { getMockQuickEntries } = require("../../mock");
 const { getPrismaClient } = require("../../lib/prisma");
-const { exchangeMiniProgramCode } = require("../../lib/wechat-auth");
+const { exchangeMiniProgramCode, getWechatPhoneNumber } = require("../../lib/wechat-auth");
 const { createStorefrontPrismaAdminRepository } = require("./prisma-admin");
 const { createStorefrontPrismaCartModule } = require("./prisma-cart");
 const { createStorefrontPrismaCatalogModule } = require("./prisma-catalog");
 const { createStorefrontPrismaCouponModule } = require("./prisma-coupon");
+const { createStorefrontPrismaDecorationModule } = require("./prisma-decoration");
 const { createStorefrontPrismaDistributionModule } = require("./prisma-distribution");
 const { createStorefrontPrismaMapperModule } = require("./prisma-mappers");
 const { createStorefrontPrismaOrderModule } = require("./prisma-order");
@@ -18,6 +19,7 @@ const {
 
 const DEMO_OPEN_ID = "demo-openid";
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const quickEntries = getMockQuickEntries();
 const ACCENT_PALETTE = [
   "#F6D4C8",
   "#D7E7DE",
@@ -98,17 +100,29 @@ function buildSessionToken() {
 }
 
 function buildPublicOrderNo(date = new Date()) {
-  const pad = (value) => String(value).padStart(2, "0");
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    fractionalSecondDigits: 3,
+    hour12: false
+  }).formatToParts(date);
+
+  const get = (type) => (parts.find((p) => p.type === type) || {}).value || "00";
 
   return [
     "NO",
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-    pad(date.getHours()),
-    pad(date.getMinutes()),
-    pad(date.getSeconds()),
-    String(date.getMilliseconds()).padStart(3, "0")
+    get("year"),
+    get("month"),
+    get("day"),
+    get("hour"),
+    get("minute"),
+    get("second"),
+    get("fractionalSecond").padEnd(3, "0")
   ].join("");
 }
 
@@ -146,6 +160,9 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
     return clientFactory();
   }
 
+  // ── 基础设施层：DB 连接、错误构造 ──
+  const coreCtx = { getPrisma, createStorefrontError, createUnauthorizedError };
+
   const mapperModule = createStorefrontPrismaMapperModule({
     accentPalette: ACCENT_PALETTE,
     createStorefrontError
@@ -174,19 +191,21 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
   } = mapperModule.helpers;
 
   const sessionModule = createStorefrontPrismaSessionModule({
+    ...coreCtx,
     buildSessionToken,
-    createStorefrontError,
-    createUnauthorizedError,
     demoOpenId: DEMO_OPEN_ID,
     exchangeMiniProgramCode,
-    getPrisma,
     mapSession,
     mapUser,
     sessionDurationMs: SESSION_DURATION_MS
   });
 
+  const decorationModule = createStorefrontPrismaDecorationModule({ getPrisma });
+
   const catalogModule = createStorefrontPrismaCatalogModule({
-    banners,
+    getBanners: decorationModule.methods.getBanners,
+    getPageSections: decorationModule.methods.getPageSections,
+    getStoreTheme: decorationModule.methods.getStoreTheme,
     quickEntries,
     buildCategoryRows,
     getPrisma,
@@ -194,6 +213,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
   });
 
   const cartModule = createStorefrontPrismaCartModule({
+    ...coreCtx,
     buildCartPageData,
     getCurrentUserContext: sessionModule.helpers.getCurrentUserContext,
     mapAddress,
@@ -217,11 +237,13 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
   });
 
   const distributionModule = createStorefrontPrismaDistributionModule({
+    createStorefrontError,
     defaultDistributorProfile: DEFAULT_DISTRIBUTOR_PROFILE,
     buildCoverLabel,
     ensureCouponFeatureData: couponModule.helpers.ensureCouponFeatureData,
     formatDate,
     formatDateTime,
+    getPrisma,
     getCurrentUserContext: sessionModule.helpers.getCurrentUserContext,
     getReferralBindingByInvitee: sessionModule.helpers.getReferralBindingByInvitee,
     mapUser: sessionModule.helpers.mapUser,
@@ -238,6 +260,8 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
     couponHelpers: couponModule.helpers,
     createStorefrontError,
     distributionHelpers: distributionModule.helpers,
+    formatDateTime,
+    getPrisma,
     getPaginationQuery,
     getCartItems: cartModule.helpers.getCartItems,
     getCartRecord: cartModule.helpers.getCartRecord,
@@ -253,6 +277,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
     couponHelpers: couponModule.helpers,
     distributionHelpers: distributionModule.helpers,
     getCurrentUserContext: sessionModule.helpers.getCurrentUserContext,
+    getWechatPhoneNumber,
     mapAddress,
     mapUser: sessionModule.helpers.mapUser,
     mapUserCoupon
@@ -270,6 +295,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
     ...orderModule.methods,
     ...profileModule.methods,
     ...distributionModule.methods,
+    ...decorationModule.methods,
     ...createStorefrontPrismaAdminRepository({
       getPrisma,
       assertUserOrderStatusTransition,
@@ -279,6 +305,7 @@ function createStorefrontPrismaRepository(clientFactory = getPrismaClient) {
       formatMoney,
       getPaginationQuery,
       getStatusText,
+      restoreOrderStock: orderModule.helpers.restoreOrderStock,
       restoreUsedCouponForOrder: couponModule.helpers.restoreUsedCouponForOrder,
       toNumber
     })

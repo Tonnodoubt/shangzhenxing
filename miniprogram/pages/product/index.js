@@ -10,6 +10,59 @@ const PRODUCT_TYPE_TEXT = {
   general: "通用商品"
 };
 
+function hasFiniteStock(value) {
+  return value !== "" && value !== null && typeof value !== "undefined" && Number.isFinite(Number(value));
+}
+
+function normalizeSkuOptions(product = {}) {
+  const source = Array.isArray(product.skuOptions) && product.skuOptions.length
+    ? product.skuOptions
+    : (Array.isArray(product.specs) ? product.specs.map((item) => ({
+        skuId: "",
+        specText: item,
+        availableStock: null
+      })) : []);
+
+  return source.map((item, index) => ({
+    skuId: item.skuId || "",
+    specText: String(item.specText || `规格${index + 1}`).trim() || `规格${index + 1}`,
+    availableStock: hasFiniteStock(item.availableStock) ? Math.max(0, Number(item.availableStock)) : null,
+    price: typeof item.price !== "undefined" ? Number(item.price || 0) : null
+  }));
+}
+
+function getSelectedSku(product = {}, selectedSpec = "") {
+  const skuOptions = Array.isArray(product.skuOptions) ? product.skuOptions : [];
+  const normalizedSpec = String(selectedSpec || "").trim();
+
+  if (!skuOptions.length) {
+    return null;
+  }
+
+  return skuOptions.find((item) => item.specText === normalizedSpec) || skuOptions[0];
+}
+
+function getSelectedSpecMaxQuantity(product = {}, selectedSpec = "") {
+  const selectedSku = getSelectedSku(product, selectedSpec);
+
+  if (!selectedSku || !hasFiniteStock(selectedSku.availableStock)) {
+    return MAX_QUANTITY;
+  }
+
+  return Math.max(0, Math.min(MAX_QUANTITY, Number(selectedSku.availableStock)));
+}
+
+function buildQuantityHint(product = {}, selectedSpec = "") {
+  const selectedSku = getSelectedSku(product, selectedSpec);
+  const maxQuantity = getSelectedSpecMaxQuantity(product, selectedSpec);
+
+  if (selectedSku && hasFiniteStock(selectedSku.availableStock)) {
+    return `当前规格最多可买 ${maxQuantity} 件`;
+  }
+
+  return `当前单次最多先买 ${MAX_QUANTITY} 件，避免误操作。`;
+}
+
 function parseSalesCount(product = {}) {
   if (typeof product.salesCount !== "undefined") {
     return Number(product.salesCount || 0);
@@ -77,34 +130,51 @@ function buildServicePromises(product = {}) {
     {
       id: "aftersale",
       title: "支持基础售后申请",
-      copy: "待收货和已完成订单支持发起售后，当前版本先走文本申请流程。"
+      copy: "待收货和已完成订单支持发起售后，提交后可跟踪处理进度。"
     },
     {
       id: "distribution",
       title: product.distributionEnabled === false ? "当前偏自购展示" : "支持分销分享",
       copy: product.distributionEnabled === false
-        ? "这类商品更适合先验证自购下单链路，后面再补推广策略。"
-        : "商品卡和海报可以继续复用到分销中心，方便演示分享赚佣。"
+        ? "该商品暂不参与分销，支持直接下单购买。"
+        : "支持分享商品给好友，成交后可获得对应佣金。"
     }
   ];
 }
 
 function buildProductViewModel(product = {}) {
-  const specs = Array.isArray(product.specs) ? product.specs : [];
+  const skuOptions = normalizeSkuOptions(product);
+  const specs = skuOptions.length ? skuOptions.map((item) => item.specText) : [];
   const highlights = Array.isArray(product.highlights) ? product.highlights : [];
+  const selectedSpec = specs[0] || "";
+  const maxQuantity = getSelectedSpecMaxQuantity({
+    ...product,
+    skuOptions
+  }, selectedSpec);
 
   return {
     product: {
       ...product,
-      metricList: buildProductMetrics(product),
+      skuOptions,
+      specs,
+      metricList: buildProductMetrics({
+        ...product,
+        specs
+      }),
       detailParagraphs: buildDetailParagraphs(product),
       servicePromises: buildServicePromises(product),
       highlightTags: highlights.slice(0, 3),
       selectedSpecHint: specs.length ? `${specs.length} 个规格可选` : "默认规格已就绪",
       statusHint: product.statusText || "销售中"
     },
-    selectedSpec: specs[0] || "",
-    quantity: 1
+    selectedSpec,
+    quantity: maxQuantity > 0 ? 1 : 0,
+    maxQuantity,
+    quantityHint: buildQuantityHint({
+      ...product,
+      skuOptions,
+      specs
+    }, selectedSpec)
   };
 }
 
@@ -116,6 +186,8 @@ Page({
     errorMessage: "",
     selectedSpec: "",
     quantity: 1,
+    maxQuantity: MAX_QUANTITY,
+    quantityHint: `当前单次最多先买 ${MAX_QUANTITY} 件，避免误操作。`,
     addingAction: ""
   },
   async onLoad(options) {
@@ -135,6 +207,8 @@ Page({
         errorMessage: "缺少商品参数",
         selectedSpec: "",
         quantity: 1,
+        maxQuantity: MAX_QUANTITY,
+        quantityHint: `当前单次最多先买 ${MAX_QUANTITY} 件，避免误操作。`,
         addingAction: ""
       });
       return;
@@ -147,6 +221,8 @@ Page({
         errorMessage: "",
         selectedSpec: "",
         quantity: 1,
+        maxQuantity: MAX_QUANTITY,
+        quantityHint: `当前单次最多先买 ${MAX_QUANTITY} 件，避免误操作。`,
         addingAction: ""
       });
 
@@ -159,7 +235,9 @@ Page({
           pageState: "notFound",
           errorMessage: "商品不存在",
           selectedSpec: "",
-          quantity: 1
+          quantity: 1,
+          maxQuantity: MAX_QUANTITY,
+          quantityHint: `当前单次最多先买 ${MAX_QUANTITY} 件，避免误操作。`
         });
         return;
       }
@@ -178,7 +256,9 @@ Page({
         pageState,
         errorMessage: message,
         selectedSpec: "",
-        quantity: 1
+        quantity: 1,
+        maxQuantity: MAX_QUANTITY,
+        quantityHint: `当前单次最多先买 ${MAX_QUANTITY} 件，避免误操作。`
       });
     } finally {
       wx.hideNavigationBarLoading();
@@ -191,8 +271,16 @@ Page({
       return;
     }
 
+    const maxQuantity = getSelectedSpecMaxQuantity(this.data.product, spec);
+    const nextQuantity = maxQuantity > 0
+      ? Math.max(1, Math.min(Number(this.data.quantity || 1), maxQuantity))
+      : 0;
+
     this.setData({
-      selectedSpec: spec
+      selectedSpec: spec,
+      quantity: nextQuantity,
+      maxQuantity,
+      quantityHint: buildQuantityHint(this.data.product, spec)
     });
   },
   increaseQuantity() {
@@ -200,9 +288,9 @@ Page({
       return;
     }
 
-    if (this.data.quantity >= MAX_QUANTITY) {
+    if (this.data.quantity >= this.data.maxQuantity) {
       wx.showToast({
-        title: `单次最多购买 ${MAX_QUANTITY} 件`,
+        title: `当前规格最多购买 ${this.data.maxQuantity} 件`,
         icon: "none"
       });
       return;
@@ -226,7 +314,7 @@ Page({
     });
   },
   async addCurrentProductToCart(action) {
-    const { product, selectedSpec, quantity } = this.data;
+    const { product, selectedSpec, quantity, maxQuantity } = this.data;
 
     if (!product || this.data.pageState !== "success") {
       wx.showToast({
@@ -240,6 +328,19 @@ Page({
       return false;
     }
 
+    const selectedSku = getSelectedSku(product, selectedSpec);
+
+    if (quantity > maxQuantity) {
+      this.setData({
+        quantity: maxQuantity
+      });
+      wx.showToast({
+        title: `当前规格最多购买 ${maxQuantity} 件`,
+        icon: "none"
+      });
+      return false;
+    }
+
     this.setData({
       addingAction: action
     });
@@ -248,7 +349,8 @@ Page({
       await mallService.addToCart({
         id: product.id,
         title: product.title,
-        price: product.price,
+        skuId: selectedSku ? selectedSku.skuId : "",
+        price: selectedSku && typeof selectedSku.price === "number" ? selectedSku.price : product.price,
         quantity,
         specText: selectedSpec,
         coverLabel: product.coverLabel,
@@ -257,7 +359,14 @@ Page({
 
       wx.showToast({
         title: "已加入购物车",
-        icon: "success"
+        icon: "success",
+        complete: () => {
+          if (action === "buy") {
+            wx.navigateTo({
+              url: "/pages/checkout/index"
+            });
+          }
+        }
       });
 
       return true;
@@ -278,17 +387,7 @@ Page({
     await this.addCurrentProductToCart("cart");
   },
   async buyNow() {
-    const ok = await this.addCurrentProductToCart("buy");
-
-    if (!ok) {
-      return;
-    }
-
-    setTimeout(() => {
-      wx.navigateTo({
-        url: "/pages/checkout/index"
-      });
-    }, 300);
+    await this.addCurrentProductToCart("buy");
   },
   retryLoad() {
     this.loadProduct();

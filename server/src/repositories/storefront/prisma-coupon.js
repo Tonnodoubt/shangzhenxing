@@ -111,9 +111,17 @@ function createStorefrontPrismaCouponModule({
     }
   }
 
+  const ensuredUsers = new Set();
+
   async function ensureCouponFeatureData(prisma, userId) {
+    if (ensuredUsers.has(userId)) {
+      await syncExpiredCoupons(prisma, userId);
+      return;
+    }
+
     await ensureUserCouponExperienceData(prisma, userId);
     await syncExpiredCoupons(prisma, userId);
+    ensuredUsers.add(userId);
   }
 
   async function findUserCouponById(prisma, userId, couponId) {
@@ -236,33 +244,45 @@ function createStorefrontPrismaCouponModule({
           })
         ]);
         const centerTemplates = [];
+        const templateIds = templates.map((t) => t.id);
+
+        // 批量聚合替代 N+1 查询
+        const [receivedCounts, usedCounts, claimedCounts] = await Promise.all([
+          prisma.userCoupon.groupBy({
+            by: ["templateId"],
+            where: {
+              templateId: { in: templateIds }
+            },
+            _count: { _all: true }
+          }),
+          prisma.userCoupon.groupBy({
+            by: ["templateId"],
+            where: {
+              templateId: { in: templateIds },
+              status: "used"
+            },
+            _count: { _all: true }
+          }),
+          prisma.userCoupon.groupBy({
+            by: ["templateId"],
+            where: {
+              templateId: { in: templateIds },
+              userId: user.id,
+              sourceType: "center_claim"
+            },
+            _count: { _all: true }
+          })
+        ]);
+
+        const receivedMap = new Map(receivedCounts.map((r) => [r.templateId, r._count._all]));
+        const usedMap = new Map(usedCounts.map((r) => [r.templateId, r._count._all]));
+        const claimedMap = new Map(claimedCounts.map((r) => [r.templateId, r._count._all]));
 
         for (const template of templates) {
-          const [receivedCount, usedCount, claimedCount] = await Promise.all([
-            prisma.userCoupon.count({
-              where: {
-                templateId: template.id
-              }
-            }),
-            prisma.userCoupon.count({
-              where: {
-                templateId: template.id,
-                status: "used"
-              }
-            }),
-            prisma.userCoupon.count({
-              where: {
-                templateId: template.id,
-                userId: user.id,
-                sourceType: "center_claim"
-              }
-            })
-          ]);
-
           centerTemplates.push(mapCouponTemplate(template, {
-            receivedCount,
-            usedCount,
-            claimed: claimedCount > 0
+            receivedCount: receivedMap.get(template.id) || 0,
+            usedCount: usedMap.get(template.id) || 0,
+            claimed: (claimedMap.get(template.id) || 0) > 0
           }));
         }
 

@@ -333,6 +333,71 @@ function createStorefrontApi(deps) {
     return buildCheckoutPageData(getState());
   }
 
+  function getPaymentStatusText(status = "") {
+    const normalized = String(status || "").trim();
+
+    if (normalized === "paid") {
+      return "支付成功";
+    }
+
+    if (normalized === "failed") {
+      return "支付失败";
+    }
+
+    if (normalized === "closed") {
+      return "已关闭";
+    }
+
+    if (normalized === "paying") {
+      return "支付中";
+    }
+
+    if (normalized === "prepared") {
+      return "待支付";
+    }
+
+    return "待发起";
+  }
+
+  function mapPaymentRecord(record = {}, order = null) {
+    const status = String(record.status || "unprepared").trim() || "unprepared";
+    const provider = String(record.provider || "mock").trim() || "mock";
+
+    return {
+      orderId: (order || {}).id || record.orderId || "",
+      orderNo: (order || {}).id || record.orderNo || "",
+      paymentNo: record.paymentNo || "",
+      provider,
+      status,
+      statusText: getPaymentStatusText(status),
+      amount: Number(record.amount || ((order || {}).amount || 0)),
+      currency: record.currency || "CNY",
+      mockFlow: provider === "mock",
+      mockToken: provider === "mock" && status !== "paid" ? (record.mockToken || "") : "",
+      preparedAt: record.preparedAt || "",
+      paidAt: record.paidAt || "",
+      expiresAt: record.expiresAt || "",
+      requestPayment: provider === "mock"
+        ? {
+            timeStamp: String(Math.floor(Date.now() / 1000)),
+            nonceStr: record.mockToken || "",
+            package: `prepay_id=mock_${record.paymentNo || "pending"}`,
+            signType: "RSA",
+            paySign: "MOCK_SIGN"
+          }
+        : null,
+      order: order ? cloneData(order) : null
+    };
+  }
+
+  function getPaymentOrderList(state) {
+    if (!Array.isArray(state.paymentOrders)) {
+      state.paymentOrders = [];
+    }
+
+    return state.paymentOrders;
+  }
+
   function createOrder(order) {
     return withState((state) => {
       const nextOrder = decorateOrder(order, 0);
@@ -386,6 +451,192 @@ function createStorefrontApi(deps) {
       return {
         ok: true,
         order: cloneData(nextOrder)
+      };
+    });
+  }
+
+  function prepareOrderPayment(orderId, payload = {}) {
+    return withState((state) => {
+      syncPendingOrderLifecycle(state);
+      const order = findOrderById(state, orderId);
+
+      if (!order) {
+        return null;
+      }
+
+      if (order.status === "cancelled") {
+        const err = new Error("已取消订单不支持发起支付");
+        err.code = "ORDER_PAYMENT_NOT_ALLOWED";
+        throw err;
+      }
+
+      const paymentOrders = getPaymentOrderList(state);
+      const now = formatDateTime();
+      const expiresAt = formatDateTime(Date.now() + 15 * 60 * 1000);
+      const existingIndex = paymentOrders.findIndex((item) => item.orderId === orderId);
+      const existing = existingIndex > -1 ? paymentOrders[existingIndex] : null;
+
+      if (existing && existing.status === "paid") {
+        return mapPaymentRecord(existing, order);
+      }
+
+      const nextRecord = {
+        id: existing ? existing.id : generateId("pay"),
+        orderId,
+        orderNo: order.id,
+        provider: "mock",
+        status: "prepared",
+        amount: Number(order.amount || 0),
+        currency: "CNY",
+        paymentNo: existing && existing.paymentNo ? existing.paymentNo : `MP${Date.now()}${String(Math.floor(Math.random() * 1000000)).padStart(6, "0")}`,
+        mockToken: `mock_${Math.random().toString(36).slice(2, 14)}`,
+        preparedAt: now,
+        paidAt: "",
+        expiresAt,
+        requestPayload: {
+          scene: String(payload.scene || "checkout").trim() || "checkout"
+        }
+      };
+
+      if (existingIndex > -1) {
+        paymentOrders[existingIndex] = nextRecord;
+      } else {
+        paymentOrders.unshift(nextRecord);
+      }
+
+      return mapPaymentRecord(nextRecord, order);
+    });
+  }
+
+  function getOrderPayment(orderId) {
+    return withState((state) => {
+      syncPendingOrderLifecycle(state);
+      const order = findOrderById(state, orderId);
+
+      if (!order) {
+        return null;
+      }
+
+      const current = getPaymentOrderList(state).find((item) => item.orderId === orderId);
+
+      if (!current) {
+        return mapPaymentRecord({
+          provider: "mock",
+          status: "unprepared",
+          amount: Number(order.amount || 0)
+        }, order);
+      }
+
+      return mapPaymentRecord(current, order);
+    });
+  }
+
+  function confirmMockOrderPayment(orderId, payload = {}) {
+    return withState((state) => {
+      syncPendingOrderLifecycle(state);
+      const order = findOrderById(state, orderId);
+
+      if (!order) {
+        return null;
+      }
+
+      const paymentOrders = getPaymentOrderList(state);
+      const currentIndex = paymentOrders.findIndex((item) => item.orderId === orderId);
+      const current = currentIndex > -1 ? paymentOrders[currentIndex] : null;
+
+      if (!current) {
+        const err = new Error("请先发起支付");
+        err.code = "PAYMENT_NOT_PREPARED";
+        throw err;
+      }
+
+      if (current.provider !== "mock") {
+        const err = new Error("当前支付单不支持 mock 确认");
+        err.code = "PAYMENT_PROVIDER_NOT_READY";
+        throw err;
+      }
+
+      const incomingToken = String(payload.mockToken || "").trim();
+
+      if (incomingToken && current.mockToken && incomingToken !== current.mockToken) {
+        const err = new Error("支付确认凭证无效，请重试");
+        err.code = "PAYMENT_TOKEN_INVALID";
+        throw err;
+      }
+
+      if (current.status !== "paid") {
+        paymentOrders[currentIndex] = {
+          ...current,
+          status: "paid",
+          paidAt: formatDateTime(),
+          resultPayload: {
+            scene: String(payload.scene || "checkout").trim() || "checkout",
+            confirmedBy: "mock_confirm"
+          }
+        };
+      }
+
+      return mapPaymentRecord(paymentOrders[currentIndex], order);
+    });
+  }
+
+  function handleWechatPayNotify(payload = {}) {
+    return withState((state) => {
+      const outTradeNo = String(payload.outTradeNo || payload.orderNo || "").trim();
+
+      if (!outTradeNo) {
+        return {
+          ok: true,
+          ignored: true
+        };
+      }
+
+      syncPendingOrderLifecycle(state);
+      const order = findOrderById(state, outTradeNo);
+
+      if (!order) {
+        return {
+          ok: true,
+          ignored: true
+        };
+      }
+
+      const paymentOrders = getPaymentOrderList(state);
+      const currentIndex = paymentOrders.findIndex((item) => item.orderId === order.id);
+
+      if (currentIndex < 0) {
+        paymentOrders.unshift({
+          id: generateId("pay"),
+          orderId: order.id,
+          orderNo: order.id,
+          provider: "wechat_jsapi",
+          status: "paid",
+          amount: Number(order.amount || 0),
+          currency: "CNY",
+          paymentNo: String(payload.transactionId || "").trim(),
+          mockToken: "",
+          preparedAt: formatDateTime(),
+          paidAt: formatDateTime(),
+          expiresAt: "",
+          resultPayload: {
+            eventType: String(payload.eventType || "").trim() || "TRANSACTION.SUCCESS"
+          }
+        });
+      } else if (paymentOrders[currentIndex].status !== "paid") {
+        paymentOrders[currentIndex] = {
+          ...paymentOrders[currentIndex],
+          provider: "wechat_jsapi",
+          status: "paid",
+          paidAt: formatDateTime(),
+          paymentNo: String(payload.transactionId || "").trim() || paymentOrders[currentIndex].paymentNo || "",
+          resultPayload: {
+            eventType: String(payload.eventType || "").trim() || "TRANSACTION.SUCCESS"
+          }
+        };
+      }
+
+      return {
+        ok: true
       };
     });
   }
@@ -504,11 +755,17 @@ function createStorefrontApi(deps) {
     return cloneData(getState().user);
   }
 
-  function authorizeUser() {
+  function authorizeUser(payload = {}) {
+    const phoneNumber = String(payload.phoneNumber || "").trim();
+    const nickname = String(payload.nickname || "").trim();
+    const avatarUrl = String(payload.avatarUrl || "").trim();
+
     return withState((state) => {
       state.user = {
         ...state.user,
-        nickname: state.user.nickname || "微信用户",
+        nickname: nickname || state.user.nickname || "微信用户",
+        avatarUrl: avatarUrl || state.user.avatarUrl || "",
+        phone: phoneNumber || state.user.phone || "138****6699",
         isAuthorized: true
       };
 
@@ -588,6 +845,10 @@ function createStorefrontApi(deps) {
     getCheckoutPageData,
     createOrder,
     submitOrder,
+    prepareOrderPayment,
+    getOrderPayment,
+    confirmMockOrderPayment,
+    handleWechatPayNotify,
     getAllOrders,
     getOrderById,
     getOrderDetailData,

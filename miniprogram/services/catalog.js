@@ -1,6 +1,6 @@
 const envConfig = require("../config/env");
 const request = require("./request");
-const mallService = require("./mall");
+const mallService = require("../shared/mall-core");
 
 function shouldUseApi() {
   return envConfig.mallDataSource === "api";
@@ -11,7 +11,7 @@ async function getHomeData() {
     return mallService.getHomeData();
   }
 
-  return request.get("/api/home");
+  return request.get("/api/v1/home");
 }
 
 async function getCategories() {
@@ -19,7 +19,7 @@ async function getCategories() {
     return mallService.getCategories();
   }
 
-  return request.get("/api/categories");
+  return request.get("/api/v1/categories");
 }
 
 async function getProducts(params = {}) {
@@ -31,7 +31,7 @@ async function getProducts(params = {}) {
     return mallService.getProductsByCategory(params.categoryId || "all");
   }
 
-  return request.get("/api/products", params);
+  return request.get("/api/v1/products", params);
 }
 
 async function getProductDetail(id) {
@@ -39,7 +39,7 @@ async function getProductDetail(id) {
     return mallService.getProductDetail(id);
   }
 
-  return request.get(`/api/products/${id}`);
+  return request.get(`/api/v1/products/${id}`);
 }
 
 module.exports = {

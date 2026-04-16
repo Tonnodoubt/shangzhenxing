@@ -1,5 +1,10 @@
-const { categories: mockCategories, products: mockProducts } = require("../../shared/mock");
+const { getMockCatalogFixtures } = require("../../mock");
 const { normalizeDetailContent } = require("../../../shared/utils");
+
+const {
+  categories: mockCategories,
+  products: mockProducts
+} = getMockCatalogFixtures();
 
 function parseSalesCount(salesText) {
   const matched = String(salesText || "").match(/\d+/);

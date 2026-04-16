@@ -1,6 +1,26 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { sendAdminError } = require("./http");
+const { formatDateTime } = require("../../shared/utils");
+
+// 数据库可用时使用 Prisma 持久化 session，否则回退到内存（本地开发）
+let _prisma = null;
+function getSessionPrisma() {
+  if (_prisma !== undefined && _prisma !== null) {
+    return _prisma;
+  }
+  try {
+    const { getPrismaClient } = require("../lib/prisma");
+    _prisma = getPrismaClient();
+    return _prisma;
+  } catch (_err) {
+    _prisma = null;
+    return null;
+  }
+}
+
+// 内存回退（仅当数据库不可用时使用）
+const memorySessions = new Map();
 
 const ROLE_PRESETS = {
   super_admin: {
@@ -16,6 +36,7 @@ const ROLE_PRESETS = {
     permissions: [
       "dashboard.page",
       "dashboard.view",
+      "statistics.sales.view",
       "product.page",
       "product.view",
       "category.page",
@@ -25,9 +46,24 @@ const ROLE_PRESETS = {
       "coupon.create",
       "coupon.edit",
       "coupon.status",
+      "user.view",
+      "user.status",
       "order.page",
       "order.view",
-      "order.detail"
+      "order.detail",
+      "banner.view",
+      "banner.create",
+      "banner.edit",
+      "banner.delete",
+      "page_decoration.view",
+      "page_decoration.edit",
+      "theme.view",
+      "theme.edit",
+      "upload.image",
+      "review.view",
+      "review.status",
+      "review.reply",
+      "notification.view"
     ],
     dataScopes: {
       product: "all",
@@ -51,7 +87,18 @@ const ROLE_PRESETS = {
       "sku.page",
       "sku.view",
       "sku.edit",
-      "stock.adjust"
+      "stock.adjust",
+      "banner.view",
+      "banner.create",
+      "banner.edit",
+      "banner.delete",
+      "page_decoration.view",
+      "page_decoration.edit",
+      "theme.view",
+      "theme.edit",
+      "upload.image",
+      "review.view",
+      "notification.view"
     ],
     dataScopes: {
       product: "all"
@@ -61,6 +108,7 @@ const ROLE_PRESETS = {
     permissions: [
       "dashboard.page",
       "dashboard.view",
+      "statistics.sales.view",
       "order.page",
       "order.view",
       "order.detail",
@@ -71,7 +119,8 @@ const ROLE_PRESETS = {
       "shipment.create",
       "shipment.confirm",
       "aftersale.page",
-      "aftersale.view"
+      "aftersale.view",
+      "notification.view"
     ],
     dataScopes: {
       order: "all",
@@ -89,7 +138,8 @@ const ROLE_PRESETS = {
       "aftersale.view",
       "aftersale.review",
       "aftersale.approve",
-      "aftersale.reject"
+      "aftersale.reject",
+      "notification.view"
     ],
     dataScopes: {
       order: "readonly_all",
@@ -107,7 +157,8 @@ const ROLE_PRESETS = {
       "distribution.distributor.view",
       "distribution.distributor.review",
       "distribution.distributor.status",
-      "distribution.commission.view"
+      "distribution.commission.view",
+      "notification.view"
     ],
     dataScopes: {
       distribution: "all"
@@ -118,6 +169,7 @@ const ROLE_PRESETS = {
       "dashboard.page",
       "dashboard.view",
       "dashboard.export",
+      "statistics.sales.view",
       "order.page",
       "order.view",
       "order.detail",
@@ -125,7 +177,8 @@ const ROLE_PRESETS = {
       "distribution.distributor.page",
       "distribution.distributor.view",
       "distribution.commission.view",
-      "distribution.withdraw.review"
+      "distribution.withdraw.review",
+      "notification.view"
     ],
     dataScopes: {
       order: "readonly_all",
@@ -136,6 +189,7 @@ const ROLE_PRESETS = {
     permissions: [
       "dashboard.page",
       "dashboard.view",
+      "statistics.sales.view",
       "product.page",
       "product.view",
       "category.page",
@@ -145,10 +199,15 @@ const ROLE_PRESETS = {
       "order.detail",
       "coupon.page",
       "coupon.view",
-      "distribution.rule.page",
+      "user.view",
       "distribution.rule.view",
       "distribution.distributor.page",
-      "distribution.distributor.view"
+      "distribution.distributor.view",
+      "banner.view",
+      "page_decoration.view",
+      "theme.view",
+      "review.view",
+      "notification.view"
     ],
     dataScopes: {
       product: "readonly_all",
@@ -203,7 +262,7 @@ function loadAdminUsers() {
     }
   }
 
-  // 开发环境回退：使用 bcrypt hash 代替明文
+  // 开发环境回退：使用预计算的 bcrypt hash 代替运行时 hashSync
   if (process.env.NODE_ENV === "production") {
     console.error("[auth] 生产环境必须设置 ADMIN_USERS 环境变量");
     process.exit(1);
@@ -245,7 +304,30 @@ function loadAdminUsers() {
 }
 
 const adminUsers = loadAdminUsers();
-const sessions = new Map();
+
+// 定期清理过期会话
+const sessionCleanupTimer = setInterval(async () => {
+  try {
+    const prisma = getSessionPrisma();
+    if (prisma) {
+      await prisma.adminSession.deleteMany({
+        where: { expiresAt: { lt: new Date() } }
+      });
+    } else {
+      const now = Date.now();
+      for (const [token, session] of memorySessions) {
+        if (session.expiresAt && now > session.expiresAt) {
+          memorySessions.delete(token);
+        }
+      }
+    }
+  } catch (_err) {
+    // 静默跳过
+  }
+}, 60 * 60 * 1000);
+if (typeof sessionCleanupTimer.unref === "function") {
+  sessionCleanupTimer.unref();
+}
 
 function formatAdminUser(user) {
   return {
@@ -292,11 +374,13 @@ function mergeDataScopes(roleCodes) {
 
 function buildSession(user) {
   const roleCodes = user.roleCodes || [];
+  const permissions = mergePermissions(roleCodes);
 
   return {
     adminUser: formatAdminUser(user),
     roleCodes,
-    permissions: mergePermissions(roleCodes),
+    permissions,
+    _permissionSet: new Set(permissions),
     dataScopes: mergeDataScopes(roleCodes)
   };
 }
@@ -305,10 +389,19 @@ function createSessionToken() {
   return crypto.randomBytes(16).toString("hex");
 }
 
-function loginAdmin(username, password) {
+async function loginAdmin(username, password) {
   const user = adminUsers.find((item) => item.username === username);
 
-  if (!user || !bcrypt.compareSync(String(password || ""), user.passwordHash)) {
+  if (!user) {
+    return {
+      ok: false,
+      message: "账号或密码错误"
+    };
+  }
+
+  const isPasswordValid = await bcrypt.compare(String(password || ""), user.passwordHash);
+
+  if (!isPasswordValid) {
     return {
       ok: false,
       message: "账号或密码错误"
@@ -322,13 +415,27 @@ function loginAdmin(username, password) {
     };
   }
 
-  user.lastLoginAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+  user.lastLoginAt = formatDateTime();
 
   const sessionToken = createSessionToken();
   const session = buildSession(user);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
-  session.expiresAt = Date.now() + SESSION_TTL_MS;
-  sessions.set(sessionToken, session);
+  const prisma = getSessionPrisma();
+  if (prisma) {
+    await prisma.adminSession.create({
+      data: {
+        adminUserId: user.id,
+        sessionToken,
+        permissions: JSON.stringify(session.permissions),
+        roleCodes: JSON.stringify(session.roleCodes),
+        dataScopes: JSON.stringify(session.dataScopes),
+        expiresAt
+      }
+    });
+  } else {
+    memorySessions.set(sessionToken, { ...session, expiresAt: expiresAt.getTime() });
+  }
 
   return {
     ok: true,
@@ -337,28 +444,56 @@ function loginAdmin(username, password) {
   };
 }
 
-function getAdminSession(token) {
+async function getAdminSession(token) {
   const normalizedToken = String(token || "").trim();
 
   if (!normalizedToken) {
     return null;
   }
 
-  const session = sessions.get(normalizedToken);
+  const prisma = getSessionPrisma();
 
+  if (prisma) {
+    const record = await prisma.adminSession.findUnique({
+      where: { sessionToken: normalizedToken }
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    if (new Date() > record.expiresAt) {
+      await prisma.adminSession.delete({ where: { id: record.id } }).catch(() => {});
+      return null;
+    }
+
+    const user = adminUsers.find((u) => u.id === record.adminUserId);
+    const permissions = JSON.parse(record.permissions);
+    const roleCodes = JSON.parse(record.roleCodes);
+    const dataScopes = JSON.parse(record.dataScopes);
+
+    return {
+      adminUser: user ? formatAdminUser(user) : { id: record.adminUserId },
+      roleCodes,
+      permissions,
+      _permissionSet: new Set(permissions),
+      dataScopes
+    };
+  }
+
+  // 内存回退
+  const session = memorySessions.get(normalizedToken);
   if (!session) {
     return null;
   }
-
   if (session.expiresAt && Date.now() > session.expiresAt) {
-    sessions.delete(normalizedToken);
+    memorySessions.delete(normalizedToken);
     return null;
   }
-
   return session;
 }
 
-function logoutAdmin(token) {
+async function logoutAdmin(token) {
   const normalizedToken = String(token || "").trim();
 
   if (!normalizedToken) {
@@ -367,33 +502,27 @@ function logoutAdmin(token) {
     };
   }
 
-  sessions.delete(normalizedToken);
+  const prisma = getSessionPrisma();
+  if (prisma) {
+    await prisma.adminSession.deleteMany({
+      where: { sessionToken: normalizedToken }
+    });
+  } else {
+    memorySessions.delete(normalizedToken);
+  }
 
   return {
     ok: true
   };
 }
 
-function parseCookieHeader(header) {
-  const result = {};
-
-  String(header || "").split(";").forEach((pair) => {
-    const idx = pair.indexOf("=");
-
-    if (idx > 0) {
-      result[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
-    }
-  });
-
-  return result;
-}
-
 function readAdminToken(req) {
-  // 优先从 httpOnly cookie 读取（防 XSS）
-  const cookies = parseCookieHeader(req.headers.cookie);
+  // 优先从 httpOnly cookie 读取（防 XSS）- 正则直接提取，避免构建完整 cookie 对象
+  const cookieHeader = String(req.headers.cookie || "");
+  const match = cookieHeader.match(/(?:^|;\s*)admin_token=([^;]*)/);
 
-  if (cookies.admin_token) {
-    return cookies.admin_token;
+  if (match) {
+    return match[1].trim();
   }
 
   // 兼容 Authorization header（API 调用场景）
@@ -409,36 +538,44 @@ function readAdminToken(req) {
 function setAdminTokenCookie(res, token) {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
 
-  res.setHeader("Set-Cookie", `admin_token=${token}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${maxAge}`);
+  res.setHeader("Set-Cookie", `admin_token=${token}; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=${maxAge}`);
 }
 
 function clearAdminTokenCookie(res) {
-  res.setHeader("Set-Cookie", "admin_token=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0");
+  res.setHeader("Set-Cookie", "admin_token=; HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=0");
 }
 
-function adminAuth(req, res, next) {
-  const token = readAdminToken(req);
-  const session = getAdminSession(token);
+async function adminAuth(req, res, next) {
+  try {
+    const token = readAdminToken(req);
+    const session = await getAdminSession(token);
 
-  if (!token || !session) {
-    sendAdminError(res, "登录已失效，请重新登录", {
-      code: 40101,
-      statusCode: 401,
+    if (!token || !session) {
+      sendAdminError(res, "登录已失效，请重新登录", {
+        code: 40101,
+        statusCode: 401,
+        requestId: req.requestId
+      });
+      return;
+    }
+
+    req.adminSession = session;
+    next();
+  } catch (err) {
+    sendAdminError(res, "认证服务异常，请稍后重试", {
+      code: 50001,
+      statusCode: 500,
       requestId: req.requestId
     });
-    return;
   }
-
-  req.adminSession = session;
-  next();
 }
 
 function hasPermission(session, permission) {
-  if (!session) {
+  if (!session || !session._permissionSet) {
     return false;
   }
 
-  return session.permissions.includes("*") || session.permissions.includes(permission);
+  return session._permissionSet.has("*") || session._permissionSet.has(permission);
 }
 
 function requirePermission(permission) {

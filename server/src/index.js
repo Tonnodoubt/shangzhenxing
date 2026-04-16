@@ -6,6 +6,12 @@ const adminRouter = require("./admin/router");
 const { createRequestId, sendCaughtError, sendData, sendError } = require("./shared/http");
 const { createStorefrontService } = require("./modules/storefront/service");
 const { createStorefrontRouter } = require("./modules/storefront/router");
+const { autoMigrate } = require("./lib/auto-migrate");
+const {
+  readRuntimeEnv,
+  validateRuntimeEnv,
+  formatValidationReport
+} = require("./config/env");
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT || 3000);
@@ -26,7 +32,15 @@ const storefrontService = createStorefrontService();
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "http://127.0.0.1:3000,http://localhost:3000")
   .split(",").map((s) => s.trim()).filter(Boolean);
 
-app.use(express.json());
+app.use(express.json({
+  verify(req, _res, buffer) {
+    if (buffer && buffer.length) {
+      req.rawBody = buffer.toString("utf8");
+    } else {
+      req.rawBody = "";
+    }
+  }
+}));
 app.use((req, res, next) => {
   const requestPrefix = req.path.startsWith("/admin/") ? "ADMIN" : "API";
 
@@ -63,6 +77,7 @@ app.use((req, res, next) => {
 storefrontService.bootstrap();
 
 app.use("/admin-console", express.static(path.join(__dirname, "../public/admin-console")));
+app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
 
 app.get("/health", (req, res) => {
   sendData(res, { ok: runtimeState.ready }, {
@@ -117,7 +132,29 @@ function startServer(port = DEFAULT_PORT) {
 }
 
 if (require.main === module) {
+  const runtimeEnv = readRuntimeEnv(process.env);
+  const validation = validateRuntimeEnv(runtimeEnv, {
+    strict: false,
+    context: "server-startup"
+  });
+
+  if (validation.errors.length || validation.warnings.length) {
+    const report = formatValidationReport(validation, {
+      context: "server-startup"
+    });
+    console.warn(report);
+  }
+
   startServer();
+
+  // Prisma 模式下自动同步 schema 变更（幂等，字段已存在则跳过）
+  if (process.env.STOREFRONT_DATA_SOURCE === "prisma") {
+    const { getPrismaClient } = require("./lib/prisma");
+    const prisma = getPrismaClient();
+    autoMigrate(prisma).catch((err) => {
+      console.warn("[auto-migrate] failed:", err && err.message ? err.message : err);
+    });
+  }
 }
 
 module.exports = {

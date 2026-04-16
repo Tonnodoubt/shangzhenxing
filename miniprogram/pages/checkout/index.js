@@ -168,16 +168,55 @@ Page({
       submitting: false
     });
 
-    wx.showToast({
-      title: "订单已创建",
-      icon: "success"
-    });
-
-    setTimeout(() => {
-      wx.redirectTo({
-        url: `/pages/pay-result/index?orderId=${result.order.id}`
+    try {
+      const payResult = await mallService.payOrder(result.order.id, {
+        scene: "checkout"
       });
-    }, 500);
+
+      if (payResult && payResult.pendingConfirmation) {
+        wx.showModal({
+          title: "支付结果确认中",
+          content: "已发起微信支付，订单状态正在等待服务端回调确认，可先到订单详情查看。",
+          confirmText: "去查看",
+          showCancel: false,
+          success: () => {
+            wx.redirectTo({
+              url: `/pages/order-detail/index?id=${result.order.id}`
+            });
+          }
+        });
+        return;
+      }
+    } catch (error) {
+      wx.showModal({
+        title: "支付未完成",
+        content: `${error.message || "这笔订单已创建，可在订单详情继续处理"}`,
+        confirmText: "看订单",
+        success: (modalResult) => {
+          if (modalResult && modalResult.confirm) {
+            wx.redirectTo({
+              url: `/pages/order-detail/index?id=${result.order.id}`
+            });
+            return;
+          }
+
+          wx.redirectTo({
+            url: `/pages/orders/index`
+          });
+        }
+      });
+      return;
+    }
+
+    wx.showToast({
+      title: "支付成功",
+      icon: "success",
+      complete() {
+        wx.redirectTo({
+          url: `/pages/pay-result/index?orderId=${result.order.id}`
+        });
+      }
+    });
   },
   retryLoad() {
     this.loadCheckoutData();

@@ -7,8 +7,8 @@
 
   <view class="panel state-card" wx:elif="{{pageState === 'error'}}">
     <text class="state-tag">加载失败</text>
-    <text class="state-title">地址页暂时没打开</text>
-    <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+    <text class="state-title">地址页暂时不可用</text>
+    <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
     <view class="state-actions">
       <button class="ghost-button state-button" bindtap="backProfile">返回我的</button>
       <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -42,7 +42,7 @@
 
     <view class="panel empty-box" wx:else>
       <text class="empty-title">你还没有添加地址</text>
-      <text class="empty-copy">先把地址补上，结算页就可以直接选择了。</text>
+      <text class="empty-copy">还没有收货地址，新增后下单会更快捷。</text>
     </view>
 
     <button class="primary-button add-button" bindtap="openCreate" disabled="{{actionLoadingId ? true : false}}">新增地址</button>

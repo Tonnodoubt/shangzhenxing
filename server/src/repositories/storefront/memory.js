@@ -1,14 +1,31 @@
 const crypto = require("crypto");
-const mallService = require("../../shared/mall");
 const {
   createStorefrontError,
   createUnauthorizedError
 } = require("../../modules/storefront/errors");
 const { ERROR_CODES } = require("../../../shared/error-codes");
-const { resolveStorefrontSessionLoginType } = require("./session-login");
+const { formatDateTime } = require("../../../shared/utils");
+const {
+  resolveStorefrontSessionLoginType
+} = require("./session-login");
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const sessionStore = new Map();
+const sessionStates = new Map();
+
+// 定期清理过期的用户会话和隔离状态
+const memorySessionCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [token, record] of sessionStore) {
+    if (record.expiresAt instanceof Date && record.expiresAt.getTime() <= now) {
+      sessionStore.delete(token);
+      sessionStates.delete(token);
+    }
+  }
+}, 60 * 60 * 1000);
+if (typeof memorySessionCleanupTimer.unref === "function") {
+  memorySessionCleanupTimer.unref();
+}
 
 function buildSessionToken() {
   return `memory_${crypto.randomBytes(24).toString("hex")}`;
@@ -17,7 +34,7 @@ function buildSessionToken() {
 function toSessionData(record = {}, user = {}) {
   const payload = {
     sessionToken: record.sessionToken || "",
-    expiresAt: record.expiresAt instanceof Date ? record.expiresAt.toISOString() : "",
+    expiresAt: record.expiresAt instanceof Date ? formatDateTime(record.expiresAt) : "",
     status: record.status || "active"
   };
 
@@ -59,7 +76,15 @@ function requireSession(sessionToken) {
   return record;
 }
 
-function createStorefrontMemoryRepository(source = mallService) {
+function getDefaultMockSource() {
+  return require("../../mock").createMockStorefrontSource();
+}
+
+function createStorefrontMemoryRepository(source = getDefaultMockSource()) {
+  const supportsSessionStateIsolation =
+    typeof source.dumpState === "function" &&
+    typeof source.loadState === "function";
+
   function normalizeSourceError(error) {
     if (!error) {
       return createStorefrontError("服务异常", 500, "UNKNOWN_ERROR");
@@ -89,15 +114,35 @@ function createStorefrontMemoryRepository(source = mallService) {
 
   function withSession(sessionToken, callback) {
     requireSession(sessionToken);
-    return runSource(callback);
+
+    if (!supportsSessionStateIsolation) {
+      return runSource(callback);
+    }
+
+    if (!sessionStates.has(sessionToken)) {
+      sessionStates.set(sessionToken, source.dumpState());
+    }
+
+    const savedState = sessionStates.get(sessionToken);
+    source.loadState(savedState);
+
+    try {
+      return runSource(callback);
+    } finally {
+      sessionStates.set(sessionToken, source.dumpState());
+    }
   }
 
   return {
     mode: "memory",
     bootstrap() {
       sessionStore.clear();
+      sessionStates.clear();
       source.bootstrap();
     },
+    // 公共只读接口：首页/分类/搜索/商品详情不依赖用户会话，
+    // 所有用户共享同一份数据源，这是 demo 场景下的有意设计。
+    // 管理员操作同样使用共享状态（runSource），以保证后台修改立即对所有用户可见。
     getHomeData() {
       return source.getHomeData();
     },
@@ -127,6 +172,9 @@ function createStorefrontMemoryRepository(source = mallService) {
       };
 
       sessionStore.set(record.sessionToken, record);
+      if (supportsSessionStateIsolation) {
+        sessionStates.set(record.sessionToken, source.dumpState());
+      }
 
       return toSessionData(record, source.getUser());
     },
@@ -142,6 +190,7 @@ function createStorefrontMemoryRepository(source = mallService) {
       const session = requireSession(sessionToken);
 
       sessionStore.delete(session.sessionToken);
+      sessionStates.delete(session.sessionToken);
 
       return {
         ok: true
@@ -204,6 +253,25 @@ function createStorefrontMemoryRepository(source = mallService) {
     submitOrder(sessionToken, payload = {}) {
       return withSession(sessionToken, () => source.submitOrder(payload));
     },
+    prepareOrderPayment(sessionToken, orderId, payload = {}) {
+      return withSession(sessionToken, () => source.prepareOrderPayment(orderId, payload));
+    },
+    getOrderPayment(sessionToken, orderId) {
+      return withSession(sessionToken, () => source.getOrderPayment(orderId));
+    },
+    confirmMockOrderPayment(sessionToken, orderId, payload = {}) {
+      return withSession(sessionToken, () => source.confirmMockOrderPayment(orderId, payload));
+    },
+    handleWechatPayNotify(payload = {}) {
+      if (typeof source.handleWechatPayNotify !== "function") {
+        return {
+          ok: true,
+          ignored: true
+        };
+      }
+
+      return runSource(() => source.handleWechatPayNotify(payload));
+    },
     getAllOrders(sessionToken, options = {}) {
       return withSession(sessionToken, () => source.getAllOrders(options));
     },
@@ -219,8 +287,8 @@ function createStorefrontMemoryRepository(source = mallService) {
     getProfileData(sessionToken) {
       return withSession(sessionToken, () => source.getProfileData());
     },
-    authorizeUser(sessionToken) {
-      return withSession(sessionToken, () => source.authorizeUser());
+    authorizeUser(sessionToken, payload = {}) {
+      return withSession(sessionToken, () => source.authorizeUser(payload));
     },
     getDistributionData(sessionToken) {
       return withSession(sessionToken, () => source.getDistributionData());
@@ -233,6 +301,18 @@ function createStorefrontMemoryRepository(source = mallService) {
     },
     getPosterData(sessionToken) {
       return withSession(sessionToken, () => source.getPosterData());
+    },
+    getWithdrawalRequests(sessionToken) {
+      return withSession(sessionToken, () => source.getWithdrawalRequests());
+    },
+    createWithdrawalRequest(sessionToken, payload = {}) {
+      return withSession(sessionToken, () => source.createWithdrawalRequest(payload));
+    },
+    getWithdrawalDetail(sessionToken, withdrawalId) {
+      return withSession(sessionToken, () => source.getWithdrawalDetail(withdrawalId));
+    },
+    cancelWithdrawalRequest(sessionToken, withdrawalId) {
+      return withSession(sessionToken, () => source.cancelWithdrawalRequest(withdrawalId));
     },
     getAdminCategories(options = {}) {
       return source.getAdminCategories(options);
@@ -306,6 +386,18 @@ function createStorefrontMemoryRepository(source = mallService) {
     getAdminDistributionRules() {
       return source.getAdminDistributionRules();
     },
+    getAdminDistributionRuleVersions(options = {}) {
+      return source.getAdminDistributionRuleVersions(options);
+    },
+    createAdminDistributionRuleVersion(payload = {}, actor = {}) {
+      return runSource(() => source.createAdminDistributionRuleVersion(payload, actor));
+    },
+    publishAdminDistributionRuleVersion(ruleVersionId, payload = {}, actor = {}) {
+      return runSource(() => source.publishAdminDistributionRuleVersion(ruleVersionId, payload, actor));
+    },
+    getAdminDistributionRuleChangeLogs(options = {}) {
+      return source.getAdminDistributionRuleChangeLogs(options);
+    },
     updateAdminDistributionRules(payload = {}, actor = {}) {
       return runSource(() => source.updateAdminDistributionRules(payload, actor));
     },
@@ -317,6 +409,48 @@ function createStorefrontMemoryRepository(source = mallService) {
     },
     updateAdminDistributorStatus(distributorId, status) {
       return runSource(() => source.updateAdminDistributorStatus(distributorId, status));
+    },
+    getAdminWithdrawalRequests(options = {}) {
+      return source.getAdminWithdrawalRequests(options);
+    },
+    getAdminWithdrawalDetail(withdrawalId) {
+      return source.getAdminWithdrawalDetail(withdrawalId);
+    },
+    reviewAdminWithdrawalRequest(withdrawalId, payload = {}, actor = {}) {
+      return runSource(() => source.reviewAdminWithdrawalRequest(withdrawalId, payload, actor));
+    },
+    payoutAdminWithdrawalRequest(withdrawalId, payload = {}, actor = {}) {
+      return runSource(() => source.payoutAdminWithdrawalRequest(withdrawalId, payload, actor));
+    },
+
+    // ── 页面装修 / 主题 ──
+
+    getAdminBanners() {
+      return source.getAdminBanners();
+    },
+    saveBanner(payload = {}) {
+      return runSource(() => source.saveAdminBanner(payload));
+    },
+    deleteBanner(bannerId) {
+      return runSource(() => source.deleteAdminBanner(bannerId));
+    },
+    reorderBanners(items) {
+      return runSource(() => source.reorderAdminBanners(items));
+    },
+    getPageSections() {
+      return source.getAdminPageSections();
+    },
+    updatePageSection(sectionKey, payload = {}) {
+      return runSource(() => source.saveAdminPageSection(sectionKey, payload));
+    },
+    reorderPageSections(items) {
+      return runSource(() => source.reorderAdminPageSections(items));
+    },
+    getStoreTheme() {
+      return source.getAdminStoreTheme();
+    },
+    updateStoreTheme(themeKey, value) {
+      return runSource(() => source.saveAdminStoreTheme(themeKey, value));
     }
   };
 }

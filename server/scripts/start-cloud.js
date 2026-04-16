@@ -2,6 +2,10 @@ const path = require("path");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const dotenv = require("dotenv");
+const {
+  readRuntimeEnv,
+  assertRuntimeEnv
+} = require("../src/config/env");
 
 dotenv.config({
   path: path.resolve(__dirname, "../.env")
@@ -9,10 +13,6 @@ dotenv.config({
 
 const SERVER_DIR = path.resolve(__dirname, "..");
 const NPM_COMMAND = process.platform === "win32" ? "npm.cmd" : "npm";
-const DATABASE_TCP_PROBE_TIMEOUT_MS = Math.max(
-  500,
-  Number(process.env.DATABASE_TCP_PROBE_TIMEOUT_MS || 2000)
-);
 let activeServer = null;
 
 function normalizeDatabaseUrl(value) {
@@ -20,12 +20,6 @@ function normalizeDatabaseUrl(value) {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .trim()
     .replace(/^[\s"'`“”‘’]+|[\s"'`“”‘’]+$/g, "");
-}
-
-function resolveStorefrontMode() {
-  const requestedMode = String(process.env.STOREFRONT_DATA_SOURCE || "memory").trim().toLowerCase();
-
-  return requestedMode === "prisma" ? "prisma" : "memory";
 }
 
 function readDatabaseTarget(databaseUrl) {
@@ -52,7 +46,7 @@ function summarizeDatabaseTarget(databaseUrl) {
   return `${target.host}:${target.port}/${target.database}`;
 }
 
-function probeDatabaseTcp(target, timeoutMs = DATABASE_TCP_PROBE_TIMEOUT_MS) {
+function probeDatabaseTcp(target, timeoutMs) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     const socket = net.createConnection({
@@ -124,8 +118,15 @@ function runCommand(command, args) {
 }
 
 async function main() {
-  const storefrontMode = resolveStorefrontMode();
-  const serverPort = Number(process.env.PORT || 3000);
+  const runtimeEnv = readRuntimeEnv(process.env);
+  const { config } = assertRuntimeEnv({
+    config: runtimeEnv,
+    strict: true,
+    context: "cloud-start"
+  });
+  const storefrontMode = config.storefrontDataSource;
+  const serverPort = config.port;
+  const databaseTcpProbeTimeoutMs = Math.max(500, Number(config.databaseTcpProbeTimeoutMs || 2000));
 
   console.log(`[cloud-start] storefront mode: ${storefrontMode}`);
 
@@ -142,7 +143,7 @@ async function main() {
   activeServer = startServer(serverPort);
 
   if (storefrontMode === "prisma") {
-    const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+    const databaseUrl = normalizeDatabaseUrl(config.databaseUrl);
     const startedAt = Date.now();
 
     if (!databaseUrl) {
@@ -159,10 +160,10 @@ async function main() {
 
     console.log(
       `[cloud-start] probing database tcp ${databaseTarget.host}:${databaseTarget.port}`
-      + ` timeout=${DATABASE_TCP_PROBE_TIMEOUT_MS}ms`
+      + ` timeout=${databaseTcpProbeTimeoutMs}ms`
     );
 
-    const probeResult = await probeDatabaseTcp(databaseTarget);
+    const probeResult = await probeDatabaseTcp(databaseTarget, databaseTcpProbeTimeoutMs);
 
     if (!probeResult.ok) {
       throw new Error(
@@ -180,8 +181,36 @@ async function main() {
 
     console.log(`[cloud-start] running prisma migrate deploy for ${summarizeDatabaseTarget(databaseUrl)}`);
 
-    await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
+    try {
+      await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
+    } catch (migrateError) {
+      console.log("[cloud-start] migrate deploy failed, resolving dirty migrations...");
+      const pendingMigrations = [
+        "20260415090000_add_product_images",
+        "20260416100000_add_sku_image",
+        "20260416120000_add_admin_session"
+      ];
+      for (const migrationName of pendingMigrations) {
+        try {
+          await runCommand(NPM_COMMAND, ["run", "prisma:migrate:resolve", "--", "--applied", migrationName]);
+          console.log(`[cloud-start] resolved migration ${migrationName} as applied`);
+        } catch (_resolveError) {
+          console.log(`[cloud-start] could not resolve ${migrationName}, continuing`);
+        }
+      }
+      await runCommand(NPM_COMMAND, ["run", "prisma:migrate:deploy"]);
+    }
     console.log(`[cloud-start] prisma migrate deploy completed in ${Date.now() - startedAt}ms`);
+
+    // auto-migrate: 幂等同步 schema 变更（字段已存在则跳过）
+    try {
+      const { autoMigrate } = require("../src/lib/auto-migrate");
+      const { getPrismaClient } = require("../src/lib/prisma");
+      const prisma = getPrismaClient();
+      await autoMigrate(prisma);
+    } catch (amErr) {
+      console.warn("[cloud-start] auto-migrate warning:", amErr && amErr.message ? amErr.message : amErr);
+    }
 
     setRuntimeState({
       ready: true,

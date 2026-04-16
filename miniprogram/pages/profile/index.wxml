@@ -12,8 +12,8 @@
   <view class="page-block" wx:elif="{{pageState === 'error'}}">
     <view class="state-card">
       <text class="state-tag">加载失败</text>
-      <text class="state-title">个人中心暂时没打开</text>
-      <text class="state-copy">{{errorMessage || '可能是网络波动，也可能是本地服务暂时不可用。'}}</text>
+      <text class="state-title">个人中心暂时不可用</text>
+      <text class="state-copy">{{errorMessage || '网络异常，请稍后重试。'}}</text>
       <view class="state-actions">
         <button class="ghost-button state-button" bindtap="openHome">返回首页</button>
         <button class="primary-button state-button" bindtap="retryLoad">重新加载</button>
@@ -49,21 +49,7 @@
             <view class="profile-tool-mark profile-tool-mark-setting"></view>
             <text class="profile-tool-text">设置</text>
           </view>
-          <view class="profile-tool" catchtap="handleHeaderActionTap" data-label="消息">
-            <view class="profile-tool-mark profile-tool-mark-message">
-              <view class="profile-tool-mark-dot"></view>
-            </view>
-            <text class="profile-tool-text">消息</text>
-          </view>
         </view>
-      </view>
-
-      <view class="partner-banner">
-        <view class="partner-banner-main">
-          <view class="partner-banner-icon"></view>
-          <text class="partner-banner-copy">开通会员，享合伙人特权</text>
-        </view>
-        <button class="partner-banner-btn" catchtap="handleWalletActionTap" data-label="会员权益">去解锁</button>
       </view>
 
       <view class="wallet-card">
@@ -75,17 +61,6 @@
             </view>
           </block>
         </view>
-
-        <view class="wallet-actions">
-          <button class="wallet-action-btn" catchtap="handleWalletActionTap" data-label="充值">充值</button>
-          <button class="wallet-action-btn" catchtap="handleWalletActionTap" data-label="提现">提现</button>
-        </view>
-      </view>
-
-      <view class="coupon-bar" catchtap="openCoupons">
-        <view class="coupon-badge">尊享礼遇卡</view>
-        <text class="coupon-copy">充值再购物 享受折上折</text>
-        <view class="coupon-action">{{couponHint}}</view>
       </view>
 
       <view class="feature-card">

@@ -107,6 +107,26 @@ function createStorefrontService(repository = createStorefrontRepository()) {
     submitOrder(sessionToken, payload = {}) {
       return repository.submitOrder(requireString(sessionToken), payload);
     },
+    prepareOrderPayment(sessionToken, orderId, payload = {}) {
+      return repository.prepareOrderPayment(
+        requireString(sessionToken),
+        requireString(orderId),
+        payload
+      );
+    },
+    getOrderPayment(sessionToken, orderId) {
+      return repository.getOrderPayment(requireString(sessionToken), requireString(orderId));
+    },
+    confirmMockOrderPayment(sessionToken, orderId, payload = {}) {
+      return repository.confirmMockOrderPayment(
+        requireString(sessionToken),
+        requireString(orderId),
+        payload
+      );
+    },
+    handleWechatPayNotify(payload = {}) {
+      return repository.handleWechatPayNotify(payload);
+    },
     getAllOrders(sessionToken, options = {}) {
       return repository.getAllOrders(requireString(sessionToken), {
         ...normalizePageOptions(options),
@@ -134,8 +154,13 @@ function createStorefrontService(repository = createStorefrontRepository()) {
     getProfileData(sessionToken) {
       return repository.getProfileData(requireString(sessionToken));
     },
-    authorizeUser(sessionToken) {
-      return repository.authorizeUser(requireString(sessionToken));
+    authorizeUser(sessionToken, payload = {}) {
+      return repository.authorizeUser(requireString(sessionToken), {
+        phoneCode: requireString(payload.phoneCode),
+        phoneNumber: requireString(payload.phoneNumber),
+        nickname: requireString(payload.nickname),
+        avatarUrl: requireString(payload.avatarUrl)
+      });
     },
     getDistributionData(sessionToken) {
       return repository.getDistributionData(requireString(sessionToken));
@@ -148,6 +173,18 @@ function createStorefrontService(repository = createStorefrontRepository()) {
     },
     getPosterData(sessionToken) {
       return repository.getPosterData(requireString(sessionToken));
+    },
+    getWithdrawalRequests(sessionToken) {
+      return repository.getWithdrawalRequests(requireString(sessionToken));
+    },
+    createWithdrawalRequest(sessionToken, payload = {}) {
+      return repository.createWithdrawalRequest(requireString(sessionToken), payload);
+    },
+    getWithdrawalDetail(sessionToken, withdrawalId) {
+      return repository.getWithdrawalDetail(requireString(sessionToken), requireString(withdrawalId));
+    },
+    cancelWithdrawalRequest(sessionToken, withdrawalId) {
+      return repository.cancelWithdrawalRequest(requireString(sessionToken), requireString(withdrawalId));
     }
   };
 }

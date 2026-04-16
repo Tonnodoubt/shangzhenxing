@@ -1,5 +1,12 @@
 function cloneData(value) {
-  return JSON.parse(JSON.stringify(value));
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => cloneData(item));
+  const result = {};
+  for (const key of Object.keys(value)) {
+    const v = value[key];
+    result[key] = v && typeof v === "object" ? cloneData(v) : v;
+  }
+  return result;
 }
 
 function decodeHtmlEntities(value = "") {
@@ -53,7 +60,10 @@ function formatDateTime(date = new Date()) {
 }
 
 function generateId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const random = typeof crypto !== "undefined" && typeof crypto.randomBytes === "function"
+    ? crypto.randomBytes(4).toString("hex")
+    : Math.floor(Math.random() * 1000000).toString(36);
+  return `${prefix}-${Date.now()}-${random}`;
 }
 
 function requireString(value, fallback = "") {

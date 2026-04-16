@@ -48,13 +48,28 @@ Page({
       });
 
       wx.showNavigationBarLoading();
-      const categories = await catalogService.getCategories();
+
+      const isDefaultCategory = !pendingCategoryId || pendingCategoryId === "all";
+      let categories;
+      let currentProducts;
+
+      if (isDefaultCategory) {
+        // 默认分类时，分类和商品并行加载
+        [categories, currentProducts] = await Promise.all([
+          catalogService.getCategories(),
+          catalogService.getProducts({ categoryId: "all" })
+        ]);
+      } else {
+        categories = await catalogService.getCategories();
+      }
+
+      const activeCategoryId = categories.some((item) => item.id === pendingCategoryId)
+        ? pendingCategoryId
+        : (categories[0] ? categories[0].id : "all");
 
       this.setData({
         categories,
-        activeCategoryId: categories.some((item) => item.id === pendingCategoryId)
-          ? pendingCategoryId
-          : (categories[0] ? categories[0].id : "all"),
+        activeCategoryId,
         pageState: "success",
         errorMessage: ""
       });
@@ -63,7 +78,16 @@ Page({
         app.globalData.pendingCategoryId = "";
       }
 
-      await this.syncProducts();
+      if (isDefaultCategory) {
+        this.setData({
+          currentProducts,
+          productLoading: false,
+          productErrorMessage: "",
+          isProductEmpty: currentProducts.length === 0
+        });
+      } else {
+        await this.syncProducts();
+      }
     } catch (error) {
       this.setData({
         categories: [],

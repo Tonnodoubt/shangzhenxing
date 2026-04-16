@@ -249,12 +249,6 @@ function buildFeatureEntries() {
       icon: "/assets/profile-icons/orders.svg"
     },
     {
-      id: "promotion-orders",
-      label: "推广订单",
-      action: "promotionOrders",
-      icon: "/assets/profile-icons/promotion.svg"
-    },
-    {
       id: "coupons",
       label: "优惠券",
       action: "coupons",
@@ -265,24 +259,6 @@ function buildFeatureEntries() {
       label: "收货地址",
       action: "addresses",
       icon: "/assets/profile-icons/address.svg"
-    },
-    {
-      id: "store-info",
-      label: "门店信息",
-      action: "storeInfo",
-      icon: "/assets/profile-icons/store.svg"
-    },
-    {
-      id: "member-center",
-      label: "会员中心",
-      action: "memberCenter",
-      icon: "/assets/profile-icons/member.svg"
-    },
-    {
-      id: "points-mall",
-      label: "积分商城",
-      action: "pointsMall",
-      icon: "/assets/profile-icons/points.svg"
     },
     {
       id: "after-sale",
@@ -445,13 +421,12 @@ Page({
   },
   handleAgreementLinkTap(event) {
     const { type } = event.currentTarget.dataset;
-    const title = type === "privacy" ? "隐私政策" : "服务条款";
+    const url = type === "privacy"
+      ? "/pages/privacy-policy/index"
+      : "/pages/service-terms/index";
 
-    wx.showModal({
-      title,
-      content: `${title}页面正在整理中，当前可先使用微信一键登录体验。`,
-      showCancel: false,
-      confirmText: "知道了"
+    wx.navigateTo({
+      url
     });
   },
   async syncProfileAfterLogin(successMessage = "登录成功") {
@@ -630,7 +605,7 @@ Page({
   },
   showPlaceholder(event) {
     const { label } = event.currentTarget.dataset || {};
-    const title = label ? `${label}开发中` : "功能开发中";
+    const title = label ? `${label}即将上线` : "功能即将上线";
 
     wx.showToast({
       title,

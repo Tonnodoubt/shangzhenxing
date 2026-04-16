@@ -91,6 +91,7 @@ function createAdminApi(deps) {
       productType: product.productType || deriveProductType(product.categoryId),
       coverImage: product.coverImage || "",
       imageList: cloneData(product.imageList || []),
+      detailImages: cloneData(product.detailImages || []),
       detailContent: normalizeDetailContent(product.detailContent, product.shortDesc || product.title),
       labelTags: cloneData(product.highlights || []),
       status: product.status || "on_sale",
@@ -159,21 +160,23 @@ function createAdminApi(deps) {
     const now = formatDateTime();
 
     if (categoryId) {
-      const current = categories.find((item) => item.id === categoryId);
+      const index = categories.findIndex((item) => item.id === categoryId);
 
-      if (!current) {
+      if (index === -1) {
         return null;
       }
 
-      Object.assign(current, {
+      const current = categories[index];
+      categories[index] = {
+        ...current,
         parentId: typeof payload.parentId === "undefined" ? current.parentId : Number(payload.parentId || 0),
         name: payload.name || current.name,
         sortOrder: typeof payload.sortOrder === "undefined" ? current.sortOrder : Number(payload.sortOrder || 0),
         status: payload.status || current.status || "enabled",
         updatedAt: now
-      });
+      };
 
-      return buildAdminCategoryRecord(current);
+      return buildAdminCategoryRecord(categories[index]);
     }
 
     const nextRecord = {
@@ -250,8 +253,9 @@ function createAdminApi(deps) {
       shortDesc: payload.shortDesc || payload.subTitle,
       subTitle: payload.subTitle || payload.shortDesc,
       productType: payload.productType,
-      coverImage: payload.coverImage,
+      coverImage: Array.isArray(payload.imageList) && payload.imageList[0] ? payload.imageList[0] : payload.coverImage,
       imageList: Array.isArray(payload.imageList) ? payload.imageList : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : undefined,
       detailContent: normalizeDetailContent(
         payload.detailContent,
         payload.shortDesc || payload.subTitle || payload.title
@@ -272,30 +276,32 @@ function createAdminApi(deps) {
     };
 
     if (productId) {
-      const current = products.find((item) => item.id === productId);
+      const index = products.findIndex((item) => item.id === productId);
 
-      if (!current) {
+      if (index === -1) {
         return null;
       }
 
+      const current = products[index];
+      const updated = { ...current };
       Object.keys(basePatch).forEach((key) => {
         if (typeof basePatch[key] !== "undefined") {
-          current[key] = basePatch[key];
+          updated[key] = basePatch[key];
         }
       });
-
-      current.updatedAt = now;
-      current.salesText = current.salesText || `月销 ${current.salesCount || 0}`;
+      updated.updatedAt = now;
+      updated.salesText = updated.salesText || `月销 ${updated.salesCount || 0}`;
+      products[index] = updated;
       ensureProductSeeds();
 
       if (specList) {
         withState((state) => {
-          syncProductSkusForSpecs(state, current);
+          syncProductSkusForSpecs(state, updated);
           return null;
         });
       }
 
-      return buildAdminProductDetail(current);
+      return buildAdminProductDetail(updated);
     }
 
     const nextProduct = {
@@ -307,6 +313,7 @@ function createAdminApi(deps) {
       productType: payload.productType || deriveProductType(payload.categoryId || "gift"),
       coverImage: payload.coverImage || "",
       imageList: Array.isArray(payload.imageList) ? payload.imageList : payload.coverImage ? [payload.coverImage] : undefined,
+      detailImages: Array.isArray(payload.detailImages) ? payload.detailImages : [],
       detailContent: normalizeDetailContent(
         payload.detailContent,
         payload.shortDesc || payload.subTitle || payload.title
@@ -626,17 +633,100 @@ function createAdminApi(deps) {
 
   function reviewAdminAfterSale(afterSaleId, action, remark = "") {
     return withState((state) => {
-      let target = null;
-      let orderId = "";
       const nextStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : "processing";
       const reviewedAt = formatDateTime();
+      const current = (state.afterSales || []).find((item) => item.id === afterSaleId);
 
+      if (!current) {
+        return null;
+      }
+
+      const orderId = current.orderId;
+
+      if (nextStatus === "approved") {
+        const normalizeAmount = (value) => {
+          const amount = Number(value || 0);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            return 0;
+          }
+
+          return Number(amount.toFixed(2));
+        };
+        const normalizeAmountCent = (value) => Math.round(normalizeAmount(value) * 100);
+        const orderCommissionRecords = (state.commissionRecords || []).filter((item) => item.orderNo === orderId && item.status !== "reversed");
+
+        orderCommissionRecords.forEach((item) => {
+          const status = String(item.status || "pending").trim() || "pending";
+          const amount = normalizeAmount(item.amount);
+          const amountCent = normalizeAmountCent(item.amount);
+
+          if (status === "withdrawing" || status === "withdrawn") {
+            throw new Error("该佣金已进入提现流程，需人工处理");
+          }
+
+          if (status !== "pending" && status !== "settled") {
+            throw new Error("当前佣金状态不可冲回，需人工处理");
+          }
+
+          if (amount > 0) {
+            state.distributor = {
+              ...(state.distributor || {}),
+              totalCommission: Number(Math.max(0, Number((state.distributor || {}).totalCommission || 0) - amount).toFixed(2)),
+              pendingCommission: status === "pending"
+                ? Number(Math.max(0, Number((state.distributor || {}).pendingCommission || 0) - amount).toFixed(2))
+                : Number(Number((state.distributor || {}).pendingCommission || 0).toFixed(2)),
+              settledCommission: status === "settled"
+                ? Number(Math.max(0, Number((state.distributor || {}).settledCommission || 0) - amount).toFixed(2))
+                : Number(Number((state.distributor || {}).settledCommission || 0).toFixed(2))
+            };
+
+            if (item.distributorId) {
+              state.distributorProfiles = (state.distributorProfiles || []).map((profile) => {
+                if (profile.id !== item.distributorId) {
+                  return profile;
+                }
+
+                const nextProfile = {
+                  ...profile,
+                  totalCommissionCent: Math.max(0, Number(profile.totalCommissionCent || 0) - amountCent)
+                };
+
+                if (status === "pending") {
+                  nextProfile.pendingCommissionCent = Math.max(0, Number(profile.pendingCommissionCent || 0) - amountCent);
+                } else if (typeof profile.settledCommissionCent !== "undefined") {
+                  nextProfile.settledCommissionCent = Math.max(0, Number(profile.settledCommissionCent || 0) - amountCent);
+                }
+
+                if (status === "settled" && typeof profile.withdrawableCommissionCent !== "undefined") {
+                  nextProfile.withdrawableCommissionCent = Math.max(0, Number(profile.withdrawableCommissionCent || 0) - amountCent);
+                }
+
+                return nextProfile;
+              });
+            }
+          }
+        });
+
+        state.commissionRecords = (state.commissionRecords || []).map((item) => {
+          if (item.orderNo !== orderId || item.status === "reversed") {
+            return item;
+          }
+
+          return {
+            ...item,
+            status: "reversed",
+            statusText: "已冲回"
+          };
+        });
+      }
+
+      let target = null;
       state.afterSales = (state.afterSales || []).map((item) => {
         if (item.id !== afterSaleId) {
           return item;
         }
 
-        orderId = item.orderId;
         target = {
           ...item,
           status: nextStatus,
@@ -718,13 +808,15 @@ function createAdminApi(deps) {
       const now = formatDateTime();
 
       if (templateId) {
-        const current = (state.couponCenterTemplates || []).find((item) => item.id === templateId);
+        const index = (state.couponCenterTemplates || []).findIndex((item) => item.id === templateId);
 
-        if (!current) {
+        if (index === -1) {
           return null;
         }
 
-        Object.assign(current, {
+        const current = state.couponCenterTemplates[index];
+        state.couponCenterTemplates[index] = {
+          ...current,
           title: payload.title || current.title,
           amount: typeof payload.amount === "undefined" ? current.amount : Number(payload.amount || payload.amountCent / 100 || 0),
           threshold: typeof payload.threshold === "undefined" ? current.threshold : Number(payload.threshold || payload.thresholdAmountCent / 100 || 0),
@@ -732,9 +824,9 @@ function createAdminApi(deps) {
           status: payload.status || current.status || "enabled",
           validDays: typeof payload.validDays === "undefined" ? current.validDays : Number(payload.validDays || 0),
           updatedAt: now
-        });
+        };
 
-        return buildAdminCouponTemplateRecord(current);
+        return buildAdminCouponTemplateRecord(state.couponCenterTemplates[index]);
       }
 
       const nextTemplate = {
@@ -880,6 +972,180 @@ function createAdminApi(deps) {
     });
   }
 
+  // ── 页面装修 / 主题 ──
+
+  function getAdminBanners() {
+    return cloneData(getState().pageBanners || []);
+  }
+
+  function saveAdminBanner(payload = {}) {
+    return withState((state) => {
+      const now = formatDateTime();
+      const bannerId = payload.bannerId || payload.id;
+
+      if (bannerId) {
+        const current = (state.pageBanners || []).find((item) => item.id === bannerId);
+
+        if (!current) {
+          return null;
+        }
+
+        const updated = {
+          ...current,
+          title: payload.title || current.title,
+          imageUrl: payload.imageUrl || current.imageUrl,
+          linkType: payload.linkType || current.linkType,
+          linkUrl: payload.linkUrl || payload.linkValue || current.linkUrl,
+          status: payload.status || current.status || "enabled",
+          updatedAt: now
+        };
+        const bannerIndex = state.pageBanners.findIndex((item) => item.id === bannerId);
+        state.pageBanners[bannerIndex] = updated;
+
+        return cloneData(updated);
+      }
+
+      const nextBanner = {
+        id: generateId("bnr"),
+        title: payload.title || "新轮播图",
+        imageUrl: payload.imageUrl || "",
+        linkType: payload.linkType || "none",
+        linkUrl: payload.linkUrl || payload.linkValue || "",
+        sortOrder: Number(payload.sortOrder || (state.pageBanners || []).length * 10 + 10),
+        status: payload.status || "enabled",
+        createdAt: now,
+        updatedAt: now
+      };
+
+      state.pageBanners = (state.pageBanners || []).concat(nextBanner);
+
+      return cloneData(nextBanner);
+    });
+  }
+
+  function deleteAdminBanner(bannerId) {
+    return withState((state) => {
+      const list = state.pageBanners || [];
+      const index = list.findIndex((item) => item.id === bannerId);
+
+      if (index === -1) {
+        return null;
+      }
+
+      const removed = list[index];
+      state.pageBanners = list.filter((_, i) => i !== index);
+
+      return cloneData(removed);
+    });
+  }
+
+  function reorderAdminBanners(items) {
+    return withState((state) => {
+      const updates = Array.isArray(items) ? items : [];
+
+      state.pageBanners = (state.pageBanners || []).map((banner) => {
+        const patch = updates.find((item) => item.bannerId === banner.id || item.id === banner.id);
+
+        if (!patch) {
+          return banner;
+        }
+
+        return {
+          ...banner,
+          sortOrder: Number(patch.sortOrder || banner.sortOrder || 0)
+        };
+      });
+
+      return cloneData(state.pageBanners);
+    });
+  }
+
+  function getAdminPageSections() {
+    return cloneData(getState().pageSections || {});
+  }
+
+  function saveAdminPageSection(sectionKey, payload = {}) {
+    return withState((state) => {
+      const now = formatDateTime();
+      const key = String(sectionKey || "").trim();
+
+      if (!key) {
+        return null;
+      }
+
+      const existing = (state.pageSections || {})[key];
+
+      if (existing) {
+        state.pageSections = {
+          ...state.pageSections,
+          [key]: {
+            ...existing,
+            ...payload,
+            updatedAt: now
+          }
+        };
+
+        return cloneData(state.pageSections[key]);
+      }
+
+      const nextSection = {
+        sectionKey: key,
+        sortOrder: Number(payload.sortOrder || 0),
+        visible: typeof payload.visible === "undefined" ? true : !!payload.visible,
+        props: payload.props || {},
+        createdAt: now,
+        updatedAt: now
+      };
+
+      state.pageSections = {
+        ...(state.pageSections || {}),
+        [key]: nextSection
+      };
+
+      return cloneData(nextSection);
+    });
+  }
+
+  function reorderAdminPageSections(items) {
+    return withState((state) => {
+      const updates = Array.isArray(items) ? items : [];
+
+      state.pageSections = Object.entries(state.pageSections || {}).reduce((result, [key, section]) => {
+        const patch = updates.find((item) => item.sectionKey === key);
+
+        result[key] = patch
+          ? { ...section, sortOrder: Number(patch.sortOrder || section.sortOrder || 0) }
+          : section;
+
+        return result;
+      }, {});
+
+      return cloneData(state.pageSections);
+    });
+  }
+
+  function getAdminStoreTheme() {
+    return cloneData(getState().storeTheme || {});
+  }
+
+  function saveAdminStoreTheme(themeKey, value) {
+    return withState((state) => {
+      const key = String(themeKey || "").trim();
+
+      if (!key) {
+        return null;
+      }
+
+      state.storeTheme = {
+        ...(state.storeTheme || {}),
+        [key]: value,
+        updatedAt: formatDateTime()
+      };
+
+      return cloneData(state.storeTheme);
+    });
+  }
+
   return {
     getAdminDashboardSummary,
     getAdminCategories,
@@ -905,7 +1171,16 @@ function createAdminApi(deps) {
     updateAdminDistributionRules,
     getAdminDistributors,
     getAdminDistributorDetail,
-    updateAdminDistributorStatus
+    updateAdminDistributorStatus,
+    getAdminBanners,
+    saveAdminBanner,
+    deleteAdminBanner,
+    reorderAdminBanners,
+    getAdminPageSections,
+    saveAdminPageSection,
+    reorderAdminPageSections,
+    getAdminStoreTheme,
+    saveAdminStoreTheme
   };
 }
 

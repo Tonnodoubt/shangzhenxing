@@ -108,7 +108,7 @@ Page({
 
     if (!normalizedReceiver || !normalizedPhone || !normalizedDetail) {
       wx.showToast({
-        title: "请把地址信息补完整",
+        title: "请完整填写收货地址信息",
         icon: "none"
       });
       return;
@@ -152,12 +152,11 @@ Page({
 
     wx.showToast({
       title: "地址已保存",
-      icon: "success"
+      icon: "success",
+      complete() {
+        wx.navigateBack();
+      }
     });
-
-    setTimeout(() => {
-      wx.navigateBack();
-    }, 250);
   },
   retryLoad() {
     this.loadAddress(this.data.id);

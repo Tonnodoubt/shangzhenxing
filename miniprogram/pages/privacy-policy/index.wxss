@@ -1,0 +1,52 @@
+.policy-wrap {
+  padding: 24rpx;
+}
+
+.policy-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+}
+
+.policy-h1 {
+  font-size: 34rpx;
+  line-height: 1.45;
+  color: #2f2b26;
+  font-weight: 700;
+  display: block;
+}
+
+.policy-meta {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #8a8175;
+  display: block;
+}
+
+.policy-section {
+  margin-top: 24rpx;
+}
+
+.policy-title {
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: #2f2b26;
+  font-weight: 600;
+  display: block;
+}
+
+.policy-text {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #4c443a;
+  display: block;
+}
+
+.policy-item {
+  margin-top: 6rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #4c443a;
+  display: block;
+}

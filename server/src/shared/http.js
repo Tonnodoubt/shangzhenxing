@@ -1,17 +1,9 @@
-let requestCounter = 0;
+const crypto = require("crypto");
 const INTERNAL_ERROR_MESSAGE = "服务暂时开小差了，请稍后再试";
 
 function createRequestId(prefix = "API") {
-  const now = new Date();
-  const dateText = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0")
-  ].join("");
-
-  requestCounter = (requestCounter + 1) % 10000;
-
-  return `${dateText}-${prefix}-${String(requestCounter).padStart(4, "0")}`;
+  const uuid = crypto.randomUUID().slice(0, 8);
+  return `${prefix}-${uuid}`;
 }
 
 function sendData(res, data, options = {}) {

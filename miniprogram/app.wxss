@@ -27,6 +27,40 @@ page {
   font-size: 24rpx;
 }
 
+/* Hide non-essential explanatory copy across pages */
+.section-subtitle,
+.state-copy,
+.empty-copy,
+.content-empty-copy,
+.checkout-empty-copy,
+.coupon-page-copy,
+.coupon-select-copy,
+.dist-copy,
+.dist-section-copy,
+.guide-copy,
+.level-copy,
+.action-subtitle,
+.poster-copy,
+.poster-coupon-copy,
+.benefit-copy,
+.feature-story-copy,
+.detail-status-copy,
+.detail-block-copy,
+.promise-copy,
+.process-copy,
+.service-copy,
+.tip-copy,
+.result-copy,
+.order-pagination-copy,
+.order-empty-copy,
+.partner-banner-copy,
+.coupon-copy,
+.login-sheet-copy,
+.hero-slide-subtitle,
+.aftersale-copy {
+  display: none !important;
+}
+
 .primary-button {
   background: #c96b48;
   color: #ffffff;
